@@ -36,4 +36,4 @@ jobs:
       environment-name: TestmcDocs
       runtime-identifier: win-x64
       internal-config-path: src/Diginsight.SmartDocs.Web/appsettings.TestmcDocs.json
-      deployment-environment: testmc
+      deployment-environment: testmcdocs

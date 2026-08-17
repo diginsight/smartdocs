@@ -53,7 +53,7 @@ env:
 jobs:
   publish:
     runs-on: self-hosted
-    environment: testmc
+    environment: testmcdocs
 
     steps:
       - name: Checkout repository
