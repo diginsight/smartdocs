@@ -76,12 +76,17 @@ jobs:
         env:
           INTERNAL_READ_TOKEN: ${{ secrets.internal-read-token }}
           INTERNAL_CONFIG_PATH: ${{ inputs.internal-config-path }}
+          GIT_TERMINAL_PROMPT: '0'
         run: |
           $auth = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes("x-access-token:$env:INTERNAL_READ_TOKEN"))
           $privatePath = ".private/smartdocs.internal"
-          git -c "http.extraheader=AUTHORIZATION: basic $auth" clone --depth=1 --filter=blob:none --sparse `
+          git -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=60 `
+            -c "http.extraheader=AUTHORIZATION: basic $auth" `
+            clone --depth=1 --no-tags --filter=blob:none --sparse `
             https://github.com/diginsight/smartdocs.internal.git $privatePath
+          if ($LASTEXITCODE -ne 0) { Write-Error "Configuration overlay clone failed"; exit 1 }
           git -C $privatePath sparse-checkout set --no-cone $env:INTERNAL_CONFIG_PATH
+          if ($LASTEXITCODE -ne 0) { Write-Error "Configuration overlay sparse checkout failed"; exit 1 }
 
       - name: Verify .NET SDK
         shell: pwsh
