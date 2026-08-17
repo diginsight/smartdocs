@@ -21,7 +21,7 @@ using Microsoft.Extensions.Options;
 
 namespace Diginsight.SmartDocs.Web;
 
-public class Program
+public class Program 
 {
     private static readonly string SmartCacheServiceBusSubscriptionName = Guid.NewGuid().ToString("N");
 
