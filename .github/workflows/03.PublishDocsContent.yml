@@ -56,20 +56,29 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          ref: main
-          clean: true
+        shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          $auth = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes("x-access-token:$env:GITHUB_TOKEN"))
+          git init
+          git remote remove origin 2>$null
+          git remote add origin "https://github.com/${{ github.repository }}.git"
+          git -c "http.extraheader=AUTHORIZATION: basic $auth" fetch --depth=1 origin main
+          git checkout --force -B main FETCH_HEAD
+          git clean -ffdx
 
       - name: Checkout configuration overlay from smartdocs.internal
-        uses: actions/checkout@v4
-        with:
-          repository: diginsight/smartdocs.internal
-          ref: main
-          token: ${{ secrets.SMARTDOCS_INTERNAL_READ_TOKEN }}
-          path: .private/smartdocs.internal
-          sparse-checkout: ${{ env.INTERNAL_CONFIG_PATH }}
-          sparse-checkout-cone-mode: false
+        shell: pwsh
+        env:
+          INTERNAL_READ_TOKEN: ${{ secrets.SMARTDOCS_INTERNAL_READ_TOKEN }}
+          INTERNAL_CONFIG_PATH: ${{ env.INTERNAL_CONFIG_PATH }}
+        run: |
+          $auth = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes("x-access-token:$env:INTERNAL_READ_TOKEN"))
+          $privatePath = ".private/smartdocs.internal"
+          git -c "http.extraheader=AUTHORIZATION: basic $auth" clone --depth=1 --filter=blob:none --sparse `
+            https://github.com/diginsight/smartdocs.internal.git $privatePath
+          git -C $privatePath sparse-checkout set --no-cone $env:INTERNAL_CONFIG_PATH
 
       - name: Resolve publish destination
         shell: pwsh
@@ -151,11 +160,18 @@ jobs:
           "CONTENT_STAGE=$stage" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
       - name: Azure login (OIDC)
-        uses: azure/login@v2
-        with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+        shell: pwsh
+        env:
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+        run: |
+          $oidc = Invoke-RestMethod `
+            -Headers @{ Authorization = "Bearer $env:ACTIONS_ID_TOKEN_REQUEST_TOKEN" } `
+            -Uri "$env:ACTIONS_ID_TOKEN_REQUEST_URL&audience=api://AzureADTokenExchange"
+          az login --service-principal `
+            --username $env:AZURE_CLIENT_ID --tenant $env:AZURE_TENANT_ID `
+            --federated-token $oidc.value --output none
+          if ($LASTEXITCODE -ne 0) { Write-Error "Azure OIDC login failed"; exit 1 }
 
       - name: Upload to blob storage
         shell: pwsh
