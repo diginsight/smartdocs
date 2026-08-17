@@ -36,6 +36,19 @@ on:
         required: false
         default: testmc
         type: string
+    secrets:
+      SMARTDOCS_INTERNAL_READ_TOKEN:
+        description: Token with Contents read access to diginsight/smartdocs.internal.
+        required: true
+      AZURE_CLIENT_ID:
+        description: Client ID for the Azure workload identity.
+        required: true
+      AZURE_TENANT_ID:
+        description: Tenant ID for the Azure workload identity.
+        required: true
+      SMARTDOCS_INVALIDATE_KEY:
+        description: Optional key used by the content invalidation endpoint.
+        required: false
 env:
   DOTNET_VERSION: "10.0.x"
 
@@ -70,6 +83,10 @@ jobs:
           INTERNAL_CONFIG_PATH: ${{ inputs.internal-config-path }}
           GIT_TERMINAL_PROMPT: '0'
         run: |
+          if ([string]::IsNullOrWhiteSpace($env:INTERNAL_READ_TOKEN)) {
+            Write-Error "SMARTDOCS_INTERNAL_READ_TOKEN was not provided to the reusable workflow"
+            exit 1
+          }
           $auth = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes("x-access-token:$env:INTERNAL_READ_TOKEN"))
           $privatePath = ".private/smartdocs.internal"
           git -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=60 `

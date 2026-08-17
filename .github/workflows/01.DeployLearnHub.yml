@@ -30,6 +30,11 @@ concurrency:
 jobs:
   deploy:
     uses: ./.github/workflows/00.BuildSmartDocsWeb.yml
+    secrets:
+      SMARTDOCS_INTERNAL_READ_TOKEN: ${{ secrets.SMARTDOCS_INTERNAL_READ_TOKEN }}
+      AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      SMARTDOCS_INVALIDATE_KEY: ${{ secrets.SMARTDOCS_INVALIDATE_KEY }}
     with:
       environment-name: Testmc
       runtime-identifier: win-x64
