@@ -76,14 +76,22 @@ jobs:
           INTERNAL_CONFIG_PATH: ${{ env.INTERNAL_CONFIG_PATH }}
           GIT_TERMINAL_PROMPT: '0'
         run: |
+          if ([string]::IsNullOrWhiteSpace($env:INTERNAL_READ_TOKEN)) {
+            Write-Error "SMARTDOCS_INTERNAL_READ_TOKEN is not available to this workflow"
+            exit 1
+          }
           $auth = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes("x-access-token:$env:INTERNAL_READ_TOKEN"))
           $privatePath = ".private/smartdocs.internal"
+          # No blob filter: a partial clone would defer the overlay's blob to a promisor fetch that
+          # runs outside this command and so without the authorization header.
           git -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=60 `
             -c "http.extraheader=AUTHORIZATION: basic $auth" `
-            clone --depth=1 --no-tags --filter=blob:none --sparse `
+            clone --depth=1 --no-tags --sparse `
             https://github.com/diginsight/smartdocs.internal.git $privatePath
           if ($LASTEXITCODE -ne 0) { Write-Error "Configuration overlay clone failed"; exit 1 }
-          git -C $privatePath sparse-checkout set --no-cone $env:INTERNAL_CONFIG_PATH
+          # Leading slash anchors the pattern to a single file rather than every matching suffix.
+          git -C $privatePath -c "http.extraheader=AUTHORIZATION: basic $auth" `
+            sparse-checkout set --no-cone "/$env:INTERNAL_CONFIG_PATH"
           if ($LASTEXITCODE -ne 0) { Write-Error "Configuration overlay sparse checkout failed"; exit 1 }
 
       - name: Resolve publish destination
