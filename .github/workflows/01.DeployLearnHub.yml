@@ -30,15 +30,8 @@ concurrency:
 jobs:
   deploy:
     uses: ./.github/workflows/00.BuildSmartDocsWeb.yml
-    environment: testmc
     with:
       environment-name: Testmc
       runtime-identifier: win-x64
       internal-config-path: src/Diginsight.SmartDocs.Web/appsettings.Testmc.json
       deployment-environment: testmc
-    secrets:
-      azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
-      azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-      azure-subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-      internal-read-token: ${{ secrets.SMARTDOCS_INTERNAL_READ_TOKEN }}
-      invalidate-key: ${{ secrets.SMARTDOCS_INVALIDATE_KEY }}
