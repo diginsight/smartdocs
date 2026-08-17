@@ -31,19 +31,11 @@ on:
         required: false
         default: src/Diginsight.SmartDocs.Web/appsettings.Testmc.json
         type: string
-    secrets:
-      azure-client-id:
-        required: true
-      azure-tenant-id:
-        required: true
-      azure-subscription-id:
-        required: true
-      internal-read-token:
-        description: "Fine-grained read-only token for diginsight/smartdocs.internal (Contents: read)."
-        required: true
-      invalidate-key:
-        description: Optional shared secret matching Site:InvalidateApiKey.
+      deployment-environment:
+        description: GitHub environment containing deployment credentials.
         required: false
+        default: testmc
+        type: string
 
 env:
   DOTNET_VERSION: "10.0.x"
@@ -51,6 +43,7 @@ env:
 jobs:
   build-and-deploy:
     runs-on: self-hosted
+    environment: ${{ inputs.deployment-environment }}
 
     # OIDC: request a short-lived federated token from GitHub rather than storing a client secret.
     permissions:
@@ -74,7 +67,7 @@ jobs:
       - name: Checkout configuration overlay from smartdocs.internal
         shell: pwsh
         env:
-          INTERNAL_READ_TOKEN: ${{ secrets.internal-read-token }}
+          INTERNAL_READ_TOKEN: ${{ secrets.SMARTDOCS_INTERNAL_READ_TOKEN }}
           INTERNAL_CONFIG_PATH: ${{ inputs.internal-config-path }}
           GIT_TERMINAL_PROMPT: '0'
         run: |
@@ -182,8 +175,8 @@ jobs:
       - name: Azure login (OIDC)
         shell: pwsh
         env:
-          AZURE_CLIENT_ID: ${{ secrets.azure-client-id }}
-          AZURE_TENANT_ID: ${{ secrets.azure-tenant-id }}
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
         run: |
           $oidc = Invoke-RestMethod `
             -Headers @{ Authorization = "Bearer $env:ACTIONS_ID_TOKEN_REQUEST_TOKEN" } `
@@ -202,7 +195,7 @@ jobs:
           # WEBAPP_NAME arrives from the staging step through GITHUB_ENV, already masked.
           ENVIRONMENT_NAME: ${{ inputs.environment-name }}
           RID: ${{ inputs.runtime-identifier }}
-          INVALIDATE_KEY: ${{ secrets.invalidate-key }}
+          INVALIDATE_KEY: ${{ secrets.SMARTDOCS_INVALIDATE_KEY }}
         run: |
           $rg = az webapp list --query "[?name=='$env:WEBAPP_NAME'].resourceGroup | [0]" -o tsv
           if (-not $rg) { Write-Error "Could not resolve resource group for the target App Service"; exit 1 }
