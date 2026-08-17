@@ -1,0 +1,30 @@
+@* Right-docked notifications panel, styled like the Visual Studio notifications flyout. *@
+
+@if (Open)
+{
+    <div class="notify-backdrop" @onclick="Close"></div>
+    <aside class="notify-panel" @onclick:stopPropagation="true">
+        <header class="notify-head">
+            <span class="notify-title">Notifications</span>
+            <div class="notify-actions">
+                <button class="notify-link" type="button" disabled="@(_items.Count == 0)" @onclick="DismissAll">Dismiss
+                    all</button>
+                    <button class="notify-close" type="button" title="Close" @onclick="Close">✕</button>
+                </div>
+            </header>
+            <div class="notify-count">@_items.Count total</div>
+            <div class="notify-body">
+                @if (_items.Count == 0)
+                {
+                    <p class="notify-empty">There are no notifications available.</p>
+                }
+                else
+                {
+                    @foreach (string item in _items)
+                    {
+                        <div class="notify-item">@item</div>
+                    }
+                }
+            </div>
+        </aside>
+    }

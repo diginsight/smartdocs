@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="Diginsight.SmartDocs.Web.Client/Diginsight.SmartDocs.Web.Client.csproj" />
+  <Project Path="Diginsight.SmartDocs.Web.Shared/Diginsight.SmartDocs.Web.Shared.csproj" />
+  <Project Path="Diginsight.SmartDocs.Web/Diginsight.SmartDocs.Web.csproj" />
+</Solution>

@@ -1,0 +1,44 @@
+name: 02 · Deploy docs site
+
+# Deploys SmartDocs.Web to the documentation host, which publishes the repository-derived spaces
+# (diginsight.telemetry, diginsight.smartcache, diginsight.components, …).
+#
+# Identical code, identical build, different overlay. Nothing here distinguishes this deployment
+# from the Learning Hub one except the environment name and the target host secret — which is the
+# property that makes "one codebase, two deployments" checkable rather than merely asserted.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - src/Diginsight.SmartDocs.Web/**
+      - src/Diginsight.SmartDocs.Web.Client/**
+      - src/Diginsight.SmartDocs.Web.Shared/**
+      - src/Directory.Build.props
+      - src/Directory.Build.targets
+      - nuget.config
+      - .github/workflows/00.BuildSmartDocsWeb.yml
+      - .github/workflows/02.DeployDocsSite.yml
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: deploy-docssite
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    uses: ./.github/workflows/00.BuildSmartDocsWeb.yml
+    with:
+      environment-name: TestmcDocs
+      runtime-identifier: win-x64
+      internal-config-path: src/Diginsight.SmartDocs.Web/appsettings.TestmcDocs.json
+    secrets:
+      azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
+      azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+      azure-subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      internal-read-token: ${{ secrets.SMARTDOCS_INTERNAL_READ_TOKEN }}
+      invalidate-key: ${{ secrets.SMARTDOCS_INVALIDATE_KEY }}

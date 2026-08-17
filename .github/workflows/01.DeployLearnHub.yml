@@ -1,0 +1,42 @@
+name: 01 · Deploy Learning Hub
+
+# Deploys SmartDocs.Web to the Learning Hub host — the site that replaces Learn.Web.
+#
+# Two hosts run this same codebase and differ only by the configuration overlay they receive, so
+# this workflow carries no build logic of its own: it names a target and calls the shared one.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - src/Diginsight.SmartDocs.Web/**
+      - src/Diginsight.SmartDocs.Web.Client/**
+      - src/Diginsight.SmartDocs.Web.Shared/**
+      - src/Directory.Build.props
+      - src/Directory.Build.targets
+      - nuget.config
+      - .github/workflows/00.BuildSmartDocsWeb.yml
+      - .github/workflows/01.DeployLearnHub.yml
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: deploy-learnhub
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    uses: ./.github/workflows/00.BuildSmartDocsWeb.yml
+    with:
+      environment-name: Testmc
+      runtime-identifier: win-x64
+      internal-config-path: src/Diginsight.SmartDocs.Web/appsettings.Testmc.json
+    secrets:
+      azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
+      azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+      azure-subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      internal-read-token: ${{ secrets.SMARTDOCS_INTERNAL_READ_TOKEN }}
+      invalidate-key: ${{ secrets.SMARTDOCS_INVALIDATE_KEY }}

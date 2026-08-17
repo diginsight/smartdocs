@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>Diginsight.SmartDocs.Web.Shared</RootNamespace>
+    <AssemblyName>Diginsight.SmartDocs.Web.Shared</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <SupportedPlatform Include="browser" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Component base types; works in both the server (prerender) and the WASM client. -->
+    <PackageReference Include="Microsoft.AspNetCore.Components.Web" Version="10.0.*" />
+    <!-- Pure managed Markdown engine: runs in-process on the server AND inside WASM. -->
+    <PackageReference Include="Markdig" Version="0.*" />
+  </ItemGroup>
+
+</Project>

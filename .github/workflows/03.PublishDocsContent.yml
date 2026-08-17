@@ -1,0 +1,229 @@
+name: 03 · Publish docs content
+
+# Publishes one space's Markdown to its blob container and tells the serving host to drop the
+# affected navigation branch.
+#
+# Upload alone never deletes, so a rename would leave the old article reachable forever. The stale
+# sweep after the upload is what makes storage a mirror of the repository rather than an append-only
+# pile — and it runs after the upload, so a failed sweep leaves the site complete rather than gapped.
+#
+# The destination is not configured here. This workflow is told which space to publish, and reads
+# that space's own Source/Blob settings out of the overlay in the private smartdocs.internal
+# repository — the same file the serving host is configured from. Publishing therefore cannot
+# target a container the site does not read, and a second space needs a Spaces entry rather than
+# another pair of repository secrets.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "src/docs/**"
+      - .github/workflows/03.PublishDocsContent.yml
+  workflow_dispatch:
+    inputs:
+      space-id:
+        description: Site:Spaces[].Id to publish into. Must name a Blob-sourced space.
+        required: false
+        default: diginsight.smartdocs
+        type: string
+      source-path:
+        description: Repository-relative folder to publish.
+        required: false
+        default: src/docs
+        type: string
+      internal-config-path:
+        description: Path of the overlay inside smartdocs.internal.
+        required: false
+        default: src/Diginsight.SmartDocs.Web/appsettings.TestmcDocs.json
+        type: string
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: publish-docs-content
+  cancel-in-progress: false
+
+env:
+  SPACE_ID: ${{ inputs.space-id || 'diginsight.smartdocs' }}
+  SOURCE_PATH: ${{ inputs.source-path || 'src/docs' }}
+  INTERNAL_CONFIG_PATH: ${{ inputs.internal-config-path || 'src/Diginsight.SmartDocs.Web/appsettings.TestmcDocs.json' }}
+
+jobs:
+  publish:
+    runs-on: self-hosted
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          clean: true
+
+      - name: Checkout configuration overlay from smartdocs.internal
+        uses: actions/checkout@v4
+        with:
+          repository: diginsight/smartdocs.internal
+          ref: main
+          token: ${{ secrets.SMARTDOCS_INTERNAL_READ_TOKEN }}
+          path: .private/smartdocs.internal
+          sparse-checkout: ${{ env.INTERNAL_CONFIG_PATH }}
+          sparse-checkout-cone-mode: false
+
+      - name: Resolve publish destination
+        shell: pwsh
+        run: |
+          # Runs before anything is staged: a destination that cannot be resolved should cost
+          # nothing. The space is the single source of truth for where its content lives, so this
+          # step reads rather than decides.
+          $overlay = ".private/smartdocs.internal/$env:INTERNAL_CONFIG_PATH"
+          if (-not (Test-Path $overlay)) {
+            Write-Error "Configuration overlay missing from smartdocs.internal checkout: $overlay"
+            exit 1
+          }
+
+          $json = Get-Content $overlay -Raw | ConvertFrom-Json
+          $space = @($json.Site.Spaces | Where-Object { $_.Id -eq $env:SPACE_ID })[0]
+          if (-not $space) {
+            $known = ($json.Site.Spaces | ForEach-Object { $_.Id }) -join ', '
+            Write-Error "Overlay declares no space with Id '$env:SPACE_ID'. Known spaces: $known"
+            exit 1
+          }
+
+          # A FileSystem space is served from the host's own disk; uploading to blob storage would
+          # succeed and change nothing, which is the worst kind of green run.
+          if ($space.Source -ne 'Blob') {
+            Write-Error "Space '$env:SPACE_ID' has Source '$($space.Source)' and is not published from this workflow"
+            exit 1
+          }
+          if (-not $space.Blob.AccountUri -or -not $space.Blob.ContainerName) {
+            Write-Error "Space '$env:SPACE_ID' does not declare Blob:AccountUri and Blob:ContainerName"
+            exit 1
+          }
+
+          # The app addresses storage by URI; the Azure CLI wants the bare account name.
+          $account = ([Uri]$space.Blob.AccountUri).Host.Split('.')[0]
+          $container = $space.Blob.ContainerName
+          $webAppName = $json.Deployment.WebAppName
+
+          # This repository is public. Mask before these values reach any later log line.
+          Write-Host "::add-mask::$account"
+          Write-Host "::add-mask::$container"
+          if ($webAppName) { Write-Host "::add-mask::$webAppName" }
+
+          @(
+            "STORAGE_ACCOUNT=$account",
+            "STORAGE_CONTAINER=$container",
+            "WEBAPP_NAME=$webAppName"
+          ) | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+          Write-Host "Resolved destination for space '$env:SPACE_ID'"
+
+      - name: Stage content
+        shell: pwsh
+        run: |
+          # Mirror the repository-relative paths the app resolves at runtime. Navigation is built
+          # live by the app, so there is nothing to generate here.
+          $stage = Join-Path $env:RUNNER_TEMP "smartdocs-content-stage"
+          Remove-Item -Recurse -Force $stage -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Path $stage | Out-Null
+
+          if (-not (Test-Path $env:SOURCE_PATH)) {
+            Write-Error "Source path '$env:SOURCE_PATH' does not exist"
+            exit 1
+          }
+
+          Copy-Item -Path (Join-Path $env:SOURCE_PATH '*') -Destination $stage -Recurse -Force
+
+          # Build outputs and dependency trees are not content, and their generated paths can exceed
+          # the Windows path limit the Azure CLI uploads under.
+          Get-ChildItem $stage -Directory -Recurse |
+            Where-Object { $_.Name -in "bin", "obj", "node_modules" } |
+            Sort-Object FullName -Descending |
+            ForEach-Object { Remove-Item -LiteralPath $_.FullName -Recurse -Force }
+
+          $mdCount = @(Get-ChildItem $stage -Recurse -File -Include *.md, *.qmd).Count
+          $imgCount = @(Get-ChildItem $stage -Recurse -File -Include *.png, *.jpg, *.jpeg, *.gif, *.svg, *.webp).Count
+          Write-Host "Staged $mdCount markdown files and $imgCount images under $stage"
+          if ($mdCount -eq 0) { Write-Error "No markdown staged - aborting"; exit 1 }
+
+          "CONTENT_STAGE=$stage" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Upload to blob storage
+        shell: pwsh
+        env:
+          PYTHONWARNINGS: ignore
+        run: |
+          az storage container create `
+            --account-name $env:STORAGE_ACCOUNT --name $env:STORAGE_CONTAINER `
+            --auth-mode login --only-show-errors | Out-Null
+
+          az storage blob upload-batch `
+            --account-name $env:STORAGE_ACCOUNT --destination $env:STORAGE_CONTAINER `
+            --source="$env:CONTENT_STAGE" --overwrite true `
+            --auth-mode login --only-show-errors | Out-Null
+
+          $uploaded = @(Get-ChildItem $env:CONTENT_STAGE -Recurse -File)
+          Write-Host "Uploaded $($uploaded.Count) files"
+
+      - name: Remove stale blobs
+        shell: pwsh
+        env:
+          PYTHONWARNINGS: ignore
+        run: |
+          # Runs after the upload on purpose: if this step fails the site still serves every current
+          # article, it merely also serves some deleted ones.
+          $local = @(Get-ChildItem $env:CONTENT_STAGE -Recurse -File | ForEach-Object {
+            $_.FullName.Substring($env:CONTENT_STAGE.Length).TrimStart('\', '/').Replace('\', '/')
+          })
+          $localSet = [System.Collections.Generic.HashSet[string]]::new(
+            [string[]]$local, [System.StringComparer]::OrdinalIgnoreCase)
+
+          $remote = az storage blob list `
+            --account-name $env:STORAGE_ACCOUNT --container-name $env:STORAGE_CONTAINER `
+            --auth-mode login --only-show-errors --query "[].name" -o tsv
+
+          $stale = @($remote -split "`n" | Where-Object { $_ -and -not $localSet.Contains($_.Trim()) })
+          if ($stale.Count -eq 0) {
+            Write-Host "No stale blobs"
+            exit 0
+          }
+
+          foreach ($name in $stale) {
+            Write-Host "Deleting stale blob: $name"
+            az storage blob delete `
+              --account-name $env:STORAGE_ACCOUNT --container-name $env:STORAGE_CONTAINER `
+              --name $name.Trim() --auth-mode login --only-show-errors | Out-Null
+          }
+          Write-Host "Deleted $($stale.Count) stale blob(s)"
+
+      - name: Invalidate navigation cache
+        shell: pwsh
+        env:
+          PYTHONWARNINGS: ignore
+          INVALIDATE_KEY: ${{ secrets.SMARTDOCS_INVALIDATE_KEY }}
+        run: |
+          # Best effort: content is already published and the host rebuilds its tree on its own
+          # schedule, so a failure here delays freshness rather than breaking the site.
+          $rg = az webapp list --query "[?name=='$env:WEBAPP_NAME'].resourceGroup | [0]" -o tsv
+          if (-not $rg) { Write-Host "Target host not resolved; skipping invalidation"; exit 0 }
+          $hostName = az webapp show --name $env:WEBAPP_NAME --resource-group $rg --query defaultHostName -o tsv
+
+          $headers = @{}
+          if ($env:INVALIDATE_KEY) { $headers["X-Invalidate-Key"] = $env:INVALIDATE_KEY }
+          try {
+            Invoke-WebRequest -Uri "https://$hostName/_nav/invalidate" -Method Post `
+              -Headers $headers -TimeoutSec 60 -UseBasicParsing | Out-Null
+            Write-Host "Navigation cache invalidated"
+          }
+          catch {
+            Write-Host "Invalidation call failed: $($_.Exception.Message)"
+          }

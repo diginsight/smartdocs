@@ -1,0 +1,90 @@
+@inject PageLoader Loader
+@inject INavProvider NavProvider
+@inject TocState Toc
+@inject ArticleState Article
+@inject IJSRuntime JS
+@implements IDisposable
+
+<PageTitle>@(_page?.Title ?? "Diginsight SmartDocs")</PageTitle>
+
+@if (_loading)
+{
+    <p class="content-loading"><em>Loading…</em></p>
+}
+else if (_page is null && _sectionChildren is not null)
+{
+    <article class="markdown-body section-landing">
+        <h1>@SectionTitle()</h1>
+        <ul class="section-landing-list">
+            @foreach (NavChild child in _sectionChildren)
+            {
+                @if (child.Route is not null)
+                {
+                    <li><a href="@child.Route">@child.Text</a></li>
+                }
+                else
+                {
+                    <li><span class="section-landing-header">@child.Text</span></li>
+                }
+            }
+        </ul>
+    </article>
+}
+else if (_page is null)
+{
+    <h1>Not found</h1>
+    <p>No Markdown source resolved for <code>@Path</code>.</p>
+}
+else
+{
+    @if (_trail.Count > 0 || _prev is not null || _next is not null)
+    {
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+            <div class="breadcrumb-trail">
+                @for (int i = 0; i < _trail.Count; i++)
+                {
+                    Crumb crumb = _trail[i];
+                    bool last = i == _trail.Count - 1;
+                    @if (i > 0)
+                    {
+                        <span class="breadcrumb-sep">›</span>
+                    }
+                    @if (!last && crumb.Route is not null)
+                    {
+                        <a class="breadcrumb-link" href="@crumb.Route">@crumb.Text</a>
+                    }
+                    else if (!last)
+                    {
+                        <span class="breadcrumb-section">@crumb.Text</span>
+                    }
+                    else
+                    {
+                        <span class="breadcrumb-current">@crumb.Text</span>
+                    }
+                }
+            </div>
+            @if (_prev is not null || _next is not null)
+            {
+                <div class="breadcrumb-nav">
+                    @if (_prev is not null)
+                    {
+                        <a class="crumb-navbtn" href="@_prev.Route" title="@_prev.Text" aria-label="Previous article">Previous</a>
+                    }
+                    else
+                    {
+                        <span class="crumb-navbtn disabled">Previous</span>
+                    }
+                    @if (_next is not null)
+                    {
+                        <a class="crumb-navbtn" href="@_next.Route" title="@_next.Text" aria-label="Next article">Next</a>
+                    }
+                    else
+                    {
+                        <span class="crumb-navbtn disabled">Next</span>
+                    }
+                </div>
+            }
+        </nav>
+    }
+    <article class="markdown-body">@((MarkupString)_page.Html)</article>
+}

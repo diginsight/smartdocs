@@ -1,0 +1,1330 @@
+:root {
+    /* default theme = Cosmo (light) */
+    --bg: #ffffff;
+    --fg: #1f2328;
+    --muted: #57606a;
+    --border: #d0d7de;
+    --sidebar: #f6f8fa;
+    --hover: #eaeef2;
+    --brand: #2563eb;
+    --on-brand: #ffffff;
+    --topbar: #1f6feb;
+    --selected: #1f6feb;
+    --pre-bg: #f6f8fa;
+    --code-bg: #eff1f3;
+    --mark-bg: #fef9c3;
+    --mark-fg: #1f2328;
+    --sidebar-width: 280px;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: var(--fg);
+    background: var(--bg);
+    line-height: 1.6;
+}
+
+.page {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden;
+    background: var(--bg);
+    color: var(--fg);
+}
+
+.topbar {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.6rem 0.75rem;
+    min-height: 62px;
+    background: var(--topbar);
+    color: #fff;
+    position: sticky;
+    top: 0;
+    z-index: 20;
+}
+
+.brand {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    font-weight: 700;
+    font-size: 1.1rem;
+    color: #fff;
+    text-decoration: none;
+    white-space: nowrap;
+    flex: 0 0 auto;
+}
+
+.brand .bi {
+    color: #fff;
+    font-size: 1.35rem;
+}
+
+.topbar-tag {
+    color: rgba(255, 255, 255, 0.75);
+    font-size: 0.85rem;
+}
+
+.body {
+    display: flex;
+    flex: 1;
+    align-items: stretch;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.sidebar {
+    width: var(--sidebar-width);
+    flex: 0 0 var(--sidebar-width);
+    background: var(--bg);
+    padding: 0.5rem 0.25rem;
+}
+
+.nav-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.nav-list li {
+    margin: 0.15rem 0;
+}
+
+.nav-link {
+    display: block;
+    padding: 0.4rem 0.6rem;
+    border-radius: 6px;
+    color: var(--fg);
+    text-decoration: none;
+    font-size: 0.92rem;
+}
+
+.nav-link:hover {
+    background: var(--hover);
+}
+
+.nav-link.active {
+    background: var(--selected);
+    color: var(--on-brand);
+}
+
+.nav-hint {
+    color: var(--muted);
+    font-size: 0.8rem;
+    margin-top: 1rem;
+}
+
+.nav-hint code {
+    background: var(--code-bg);
+    padding: 0 0.25rem;
+    border-radius: 4px;
+}
+
+.content {
+    flex: 1;
+    padding: 0.6rem 2rem 1.5rem;
+    max-width: 100%;
+    min-height: 0;
+    overflow: auto;
+}
+
+.article-layout {
+    display: flex;
+    gap: 2rem;
+    align-items: flex-start;
+}
+
+.markdown-body {
+    flex: 1 1 auto;
+    min-width: 0;
+    max-width: 100%;
+}
+
+.markdown-body> :first-child {
+    margin-top: 0;
+}
+
+/* ---- breadcrumb (article path) ---- */
+.breadcrumb {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin: 0 0 1rem;
+    font-size: 0.85rem;
+    color: var(--muted);
+}
+
+.breadcrumb-trail {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.15rem 0.35rem;
+    min-width: 0;
+}
+
+.breadcrumb-nav {
+    display: flex;
+    gap: 0.3rem;
+    flex: 0 0 auto;
+    margin-left: auto;
+}
+
+.crumb-navbtn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--brand);
+    text-decoration: none;
+    font-size: inherit;
+    line-height: 1;
+    padding: 0 0.15rem;
+}
+
+.crumb-navbtn:hover {
+    color: var(--brand);
+    text-decoration: none;
+}
+
+.crumb-navbtn.disabled {
+    color: var(--muted);
+    opacity: 0.35;
+    pointer-events: none;
+}
+
+.breadcrumb-link {
+    color: var(--brand);
+    text-decoration: none;
+}
+
+.breadcrumb-link:hover {
+    text-decoration: underline;
+}
+
+.breadcrumb-sep {
+    color: var(--muted);
+    opacity: 0.7;
+}
+
+.breadcrumb-current {
+    color: var(--fg);
+    font-weight: 600;
+}
+
+.breadcrumb-section {
+    color: var(--muted);
+}
+
+.markdown-body mark {
+    background: var(--mark-bg);
+    color: var(--mark-fg);
+    padding: 0 0.12em;
+    border-radius: 2px;
+}
+
+/* ---- on-page table of contents: docked right pane (VS Code style) ---- */
+.toc-resizer {
+    flex: 0 0 6px;
+    cursor: col-resize;
+    background: transparent;
+    border-right: 1px solid var(--border);
+}
+
+.toc-resizer:hover {
+    background: var(--brand);
+    border-right-color: var(--brand);
+}
+
+.toc-pane {
+    flex: 0 0 var(--toc-width, 260px);
+    width: var(--toc-width, 260px);
+    min-width: 0;
+    background: var(--bg);
+    padding: 0.5rem 1rem 1.2rem;
+    overflow-y: auto;
+    min-height: 0;
+}
+
+.toc-reopen {
+    flex: 0 0 auto;
+    align-self: flex-start;
+    margin-top: 0.6rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--border);
+    border-right: none;
+    border-radius: 6px 0 0 6px;
+    background: var(--bg);
+    color: var(--muted);
+    font-size: 1rem;
+    cursor: pointer;
+    padding: 0.4rem 0.5rem;
+}
+
+.toc-reopen:hover {
+    color: var(--fg);
+    background: var(--hover);
+}
+
+.toc-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    color: var(--muted);
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-bottom: 0.5rem;
+}
+
+.toc-toggle {
+    border: none;
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+    font-size: 1rem;
+    line-height: 1;
+}
+
+.toc-toggle:hover {
+    color: var(--fg);
+}
+
+.toc-list {
+    display: flex;
+    flex-direction: column;
+    border-left: 1px solid var(--border);
+}
+
+.toc-link {
+    color: var(--muted);
+    text-decoration: none;
+    padding: 0.16rem 0.7rem;
+    border-left: 2px solid transparent;
+    margin-left: -1px;
+    font-size: 0.82rem;
+    line-height: 1.3;
+}
+
+.toc-link:hover {
+    color: var(--fg);
+    border-left-color: var(--brand);
+}
+
+.toc-l3 {
+    padding-left: 1.4rem;
+    font-size: 0.78rem;
+}
+
+@media (max-width: 1024px) {
+
+    .toc-pane,
+    .toc-resizer,
+    .toc-reopen {
+        display: none;
+    }
+}
+
+/* Narrow viewports: the left group is the flexible region and clips its overflow from the LEFT
+   (leftmost items disappear first) so the right group + About + icons stay flush to the right
+   border. Only on very small screens do we drop the section menus entirely (redundant with the
+   sidebar rail); Brand, About and the icon buttons always stay. */
+@media (max-width: 560px) {
+    nav.topmenu {
+        display: none;
+    }
+}
+
+.markdown-body img {
+    max-width: 100%;
+    height: auto;
+}
+
+.markdown-body a {
+    color: var(--brand);
+}
+
+.markdown-body pre {
+    background: var(--pre-bg);
+    padding: 1rem;
+    border-radius: 6px;
+    overflow-x: auto;
+}
+
+.markdown-body code {
+    background: var(--code-bg);
+    padding: 0.1rem 0.3rem;
+    border-radius: 4px;
+}
+
+.markdown-body pre code {
+    background: none;
+    padding: 0;
+}
+
+/* Mermaid: not a code block. Show a muted hint until the client turns it into a centered SVG. */
+.markdown-body pre.mermaid {
+    background: none;
+    padding: 0.5rem 0;
+    border-radius: 0;
+    overflow-x: auto;
+    text-align: center;
+    line-height: normal;
+}
+
+.markdown-body pre.mermaid:not([data-processed]) {
+    color: var(--muted, #888);
+    font-size: 0.8rem;
+}
+
+.markdown-body pre.mermaid svg {
+    max-width: 100%;
+    height: auto;
+}
+
+.markdown-body table {
+    border-collapse: collapse;
+}
+
+.markdown-body th,
+.markdown-body td {
+    border: 1px solid var(--border);
+    padding: 0.4rem 0.6rem;
+}
+
+.bottombar {
+    border-top: 1px solid var(--border);
+    padding: 0.3rem 1.25rem;
+    color: var(--muted);
+    font-size: 0.85rem;
+}
+
+.content-loading {
+    color: var(--muted);
+}
+
+/* ---- topbar controls ---- */
+.topbar-spacer {
+    flex: 1;
+}
+
+/* ---- top-level menus ---- */
+.topmenu {
+    display: flex;
+    align-items: stretch;
+    gap: 0.15rem;
+    flex-wrap: nowrap;
+}
+
+/* The left group absorbs the free space and stays left-aligned right after the brand, pushing the
+   right group (+ About + controls) flush against the right browser border. min-width:0 lets the
+   group shrink below its content size when the window narrows. */
+.topmenu-left {
+    flex: 1 1 auto;
+    min-width: 0;
+    justify-content: flex-start;
+}
+
+.topmenu-right {
+    flex: 0 0 auto;
+}
+
+.topmenu-sep {
+    width: 1px;
+}
+
+.topmenu-link,
+.topmenu-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    color: #fff;
+    background: transparent;
+    border: none;
+    padding: 0.4rem 0.65rem;
+    font-size: 0.98rem;
+    font-family: inherit;
+    border-radius: 6px;
+    text-decoration: none;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.topmenu-link:hover,
+.topmenu-btn:hover {
+    background: rgba(255, 255, 255, 0.15);
+}
+
+.topmenu-btn .caret {
+    font-size: 0.7rem;
+    opacity: 0.85;
+}
+
+.topmenu-item {
+    position: relative;
+    display: flex;
+}
+
+.topmenu-dropdown {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    min-width: 260px;
+    max-height: 75vh;
+    overflow: auto;
+    background: var(--bg);
+    color: var(--fg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.2);
+    padding: 0.4rem;
+    z-index: 60;
+}
+
+.topmenu-item:hover .topmenu-dropdown,
+.topmenu-item.open .topmenu-dropdown {
+    display: block;
+}
+
+.dropdown-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.dropdown-list .dropdown-list {
+    margin-left: 0.5rem;
+    border-left: 1px solid var(--border);
+    padding-left: 0.4rem;
+}
+
+.dropdown-link {
+    display: block;
+    padding: 0.3rem 0.5rem;
+    border-radius: 5px;
+    color: var(--fg);
+    text-decoration: none;
+    font-size: 0.9rem;
+}
+
+.dropdown-link:hover {
+    background: var(--sidebar);
+}
+
+.dropdown-action {
+    display: block;
+    width: 100%;
+    text-align: left;
+    padding: 0.3rem 0.5rem;
+    border: none;
+    border-radius: 5px;
+    background: transparent;
+    color: var(--fg);
+    font: inherit;
+    font-size: 0.9rem;
+    cursor: pointer;
+}
+
+.dropdown-action:hover {
+    background: var(--sidebar);
+}
+
+.dropdown-header {
+    display: block;
+    font-weight: 600;
+    font-size: 0.78rem;
+    color: var(--muted);
+    padding: 0.4rem 0.5rem 0.15rem;
+}
+
+.dropdown-sep hr {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 0.3rem 0.25rem;
+}
+
+.nav-toggle,
+.theme-btn {
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    background: transparent;
+    color: #fff;
+    border-radius: 6px;
+    padding: 0.2rem 0.5rem;
+    cursor: pointer;
+    font-size: 0.95rem;
+    line-height: 1.2;
+}
+
+.nav-toggle:hover,
+.theme-btn:hover {
+    background: rgba(255, 255, 255, 0.15);
+}
+
+/* topbar icon buttons (search, notifications) — always white on the bar */
+.icon-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    background: transparent;
+    color: #fff;
+    border-radius: 6px;
+    padding: 0.25rem 0.5rem;
+    font-size: 1.05rem;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.icon-btn:hover {
+    background: rgba(255, 255, 255, 0.15);
+}
+
+.icon-btn .bi {
+    color: #fff;
+}
+
+/* ---- search overlay ---- */
+.search-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    padding-top: 12vh;
+    background: rgba(15, 23, 42, 0.45);
+}
+
+.search-box {
+    width: min(720px, 92vw);
+    background: var(--bg);
+    color: var(--fg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
+    overflow: hidden;
+}
+
+.search-input-row {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.85rem 1rem;
+    border-bottom: 1px solid var(--border);
+}
+
+.search-input-icon {
+    color: var(--muted);
+    font-size: 1.1rem;
+}
+
+.search-input {
+    flex: 1 1 auto;
+    border: none;
+    outline: none;
+    background: transparent;
+    color: var(--fg);
+    font-size: 1.05rem;
+}
+
+.search-cancel {
+    border: none;
+    background: transparent;
+    color: var(--brand);
+    font-size: 0.95rem;
+    cursor: pointer;
+    padding: 0.25rem 0.4rem;
+}
+
+.search-cancel:hover {
+    text-decoration: underline;
+}
+
+.search-results {
+    padding: 1rem 1.15rem 1.4rem;
+    min-height: 90px;
+}
+
+.search-hint {
+    color: var(--muted);
+    font-size: 0.92rem;
+    margin: 0;
+}
+
+/* ---- notifications panel (Visual Studio style, right-docked) ---- */
+.notify-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 90;
+    background: transparent;
+}
+
+.notify-panel {
+    position: fixed;
+    top: 62px;
+    right: 0;
+    bottom: 0;
+    z-index: 95;
+    width: 360px;
+    max-width: 92vw;
+    display: flex;
+    flex-direction: column;
+    background: var(--bg);
+    color: var(--fg);
+    border-left: 1px solid var(--border);
+    box-shadow: -8px 0 24px rgba(0, 0, 0, 0.18);
+}
+
+.notify-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding: 0.7rem 0.9rem;
+    border-bottom: 1px solid var(--border);
+    font-weight: 600;
+}
+
+.notify-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.notify-link {
+    border: none;
+    background: transparent;
+    color: var(--brand);
+    font-size: 0.85rem;
+    cursor: pointer;
+}
+
+.notify-link:disabled {
+    color: var(--muted);
+    cursor: default;
+}
+
+.notify-link:not(:disabled):hover {
+    text-decoration: underline;
+}
+
+.notify-close {
+    border: none;
+    background: transparent;
+    color: var(--muted);
+    font-size: 0.95rem;
+    cursor: pointer;
+    line-height: 1;
+}
+
+.notify-close:hover {
+    color: var(--fg);
+}
+
+.notify-count {
+    padding: 0.5rem 0.9rem;
+    color: var(--muted);
+    font-size: 0.82rem;
+    border-bottom: 1px solid var(--border);
+}
+
+.notify-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0.6rem 0.9rem;
+}
+
+.notify-empty {
+    color: var(--muted);
+    font-size: 0.9rem;
+    text-align: center;
+    margin-top: 40%;
+}
+
+.notify-item {
+    padding: 0.6rem 0.7rem;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin-bottom: 0.5rem;
+    font-size: 0.9rem;
+}
+
+/* ---- navigation tree ---- */
+.sidebar {
+    overflow-y: auto;
+    min-height: 0;
+}
+
+.sidebar.rail {
+    flex: 0 0 3rem;
+    width: 3rem;
+    padding: 0.4rem 0.2rem;
+    overflow-x: hidden;
+}
+
+/* draggable resize handle between sidebar and content */
+.sidebar-resizer {
+    flex: 0 0 6px;
+    align-self: stretch;
+    cursor: col-resize;
+    background: transparent;
+    border-left: 1px solid var(--border);
+    transition: background 0.12s;
+}
+
+.sidebar-resizer:hover,
+.sidebar-resizer:active {
+    background: var(--brand);
+}
+
+.sidebar.rail+.sidebar-resizer {
+    display: none;
+}
+
+/* ---- sidebar toolbar: filter box + expand/collapse-all + hide ---- */
+.sidebar-toolbar {
+    position: sticky;
+    top: 0;
+    z-index: 3;
+    background: var(--bg);
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.15rem 0 0.4rem;
+    margin-bottom: 0.35rem;
+    border-bottom: 1px solid var(--border);
+}
+
+.sidebar-search {
+    display: flex;
+    flex: 1 1 auto;
+    min-width: 0;
+    align-items: center;
+    gap: 0.35rem;
+    background: var(--sidebar);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.2rem 0.45rem;
+}
+
+.sidebar-search .bi {
+    color: var(--muted);
+    font-size: 0.82rem;
+}
+
+.sidebar-search input {
+    flex: 1 1 auto;
+    min-width: 0;
+    border: none;
+    outline: none;
+    background: transparent;
+    color: var(--fg);
+    font-size: 0.85rem;
+}
+
+.sidebar-search input::placeholder {
+    color: var(--muted);
+}
+
+.sidebar-search-clear {
+    border: none;
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+    font-size: 1.05rem;
+    line-height: 1;
+    padding: 0 0.1rem;
+}
+
+.sidebar-search-clear:hover {
+    color: var(--fg);
+}
+
+.sidebar-tools {
+    display: flex;
+    flex: 0 0 auto;
+    gap: 0.15rem;
+    justify-content: flex-end;
+}
+
+.sidebar-tool {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    background: transparent;
+    color: var(--muted);
+    border-radius: 6px;
+    cursor: pointer;
+    padding: 0.2rem 0.4rem;
+    font-size: 0.95rem;
+    line-height: 1.2;
+}
+
+.sidebar-tool:hover {
+    background: var(--hover);
+    color: var(--fg);
+}
+
+/* collapsed icon rail: top-level section icons + expand button */
+.sidebar-rail {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.15rem;
+}
+
+.rail-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.4rem;
+    height: 2.2rem;
+    border: none;
+    background: transparent;
+    color: var(--fg);
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 1.05rem;
+}
+
+.rail-btn:hover {
+    background: var(--hover);
+}
+
+.rail-btn.active {
+    color: var(--selected);
+}
+
+.rail-toggle {
+    color: var(--muted);
+    margin-bottom: 0.25rem;
+}
+
+/* collapsed rail: hovering opens the full menu as a temporary flyout (Edge vertical-tabs style);
+   the pin button inside then makes it permanently visible. */
+.dynnav.is-collapsed .sidebar-panel {
+    display: none;
+    position: fixed;
+    top: 62px;
+    left: 0;
+    bottom: 0;
+    width: var(--sidebar-width);
+    max-width: 320px;
+    padding: 0.5rem 0.35rem;
+    overflow-y: auto;
+    background: var(--bg);
+    border-right: 1px solid var(--border);
+    box-shadow: 6px 0 18px rgba(0, 0, 0, 0.22);
+    z-index: 40;
+}
+
+.dynnav.is-collapsed:hover .sidebar-panel {
+    display: block;
+}
+
+/* flat search results show the article + its section path */
+.nav-list.nav-search-results {
+    /* full-bleed: cancel the sidebar's horizontal padding so rows reach the scrollbar */
+    margin-left: -0.25rem;
+    margin-right: -0.25rem;
+}
+
+.nav-search-results .nav-link {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.05rem;
+}
+
+.nav-search-path {
+    color: var(--muted);
+    font-size: 0.72rem;
+    line-height: 1.15;
+}
+
+/* matched query characters in filter results (light yellow on light themes via --mark-bg) */
+.nav-search-hl {
+    background: var(--mark-bg);
+    color: var(--mark-fg);
+    border-radius: 2px;
+    padding: 0 0.05em;
+}
+
+.nav-search-results .nav-link.active .nav-search-path {
+    color: var(--on-brand);
+    opacity: 0.85;
+}
+
+.nav-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.nav-list .nav-list {
+    margin-left: 0.35rem;
+    border-left: 1px solid var(--border);
+    padding-left: 0.3rem;
+}
+
+.nav-list li {
+    margin: 0;
+}
+
+.nav-link {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.16rem 0.5rem;
+    border-radius: 6px;
+    color: var(--fg);
+    text-decoration: none;
+    font-size: 0.85rem;
+    line-height: 1.2;
+}
+
+.nav-link:hover {
+    background: var(--sidebar);
+}
+
+.nav-link.active {
+    background: var(--selected);
+    color: var(--on-brand);
+}
+
+.nav-link .bi {
+    color: var(--muted);
+    font-size: 0.85rem;
+}
+
+.nav-link.active .bi {
+    color: var(--on-brand);
+}
+
+/* fixed icon slot: reserves the icon's space even when a node has no icon, so leaf article
+   links line up with their sibling folders/sections in the tree. */
+.nav-ico {
+    flex: 0 0 auto;
+    width: 1.15em;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.nav-section>details>summary {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    cursor: pointer;
+    padding: 0.22rem 1.4rem 0.22rem 0.5rem;
+    font-weight: 400;
+    font-size: 0.85rem;
+    line-height: 1.2;
+    list-style: none;
+    border-radius: 6px;
+    position: relative;
+}
+
+.nav-section>details>summary::-webkit-details-marker {
+    display: none;
+}
+
+/* clickable chevron: toggles expand/collapse WITHOUT navigating (label click selects first article) */
+.nav-twisty {
+    position: absolute;
+    right: 0.2rem;
+    top: 0;
+    bottom: 0;
+    width: 1.4rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--muted);
+    cursor: pointer;
+    border-radius: 4px;
+}
+
+.nav-twisty::before {
+    content: "\203A";
+    font-size: 1rem;
+    line-height: 1;
+    transition: transform 0.15s ease;
+}
+
+.nav-section>details[open]>summary .nav-twisty::before {
+    transform: rotate(90deg);
+}
+
+.nav-twisty:hover {
+    color: var(--fg);
+    background: var(--hover);
+}
+
+.nav-label {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.nav-section>details>summary:hover {
+    background: var(--sidebar);
+}
+
+.nav-section>details>summary .bi {
+    color: var(--muted);
+}
+
+.nav-sep hr {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 0.5rem 0.25rem;
+}
+
+/* Top-level sidebar sections: separators between items + more vertical breathing room. */
+.nav-top>li {
+    border-bottom: 1px solid var(--border);
+}
+
+.nav-top>li:last-child {
+    border-bottom: none;
+}
+
+.nav-top>li>.nav-link,
+.nav-top>li>details>summary {
+    padding-top: 0.62rem;
+    padding-bottom: 0.62rem;
+    border-radius: 0;
+}
+
+.nav-loading {
+    color: var(--muted);
+    font-size: 0.85rem;
+    padding: 0.5rem;
+}
+
+/* Thin indeterminate progress bar shown while a nav level is loading */
+.nav-level-loading {
+    height: 2px;
+    margin: 0.35rem 0.5rem 0.2rem;
+    background: var(--border);
+    border-radius: 1px;
+    overflow: hidden;
+    position: relative;
+}
+
+.nav-level-loading::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -30%;
+    height: 100%;
+    width: 30%;
+    background: var(--accent, teal);
+    border-radius: 1px;
+    animation: nav-level-slide 1.2s ease-in-out infinite;
+}
+
+@keyframes nav-level-slide {
+    0% {
+        left: -30%;
+    }
+
+    100% {
+        left: 100%;
+    }
+}
+
+/* ---- bottombar ---- */
+.bottombar {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.bottombar-right {
+    color: var(--muted);
+    text-align: right;
+}
+
+.bottombar-left,
+.bottombar-right {
+    line-height: 1.4;
+}
+
+/* ---- theme palettes ---- */
+/* Light — Sandstone (warm paper, teal accent) */
+.page.theme-sandstone {
+    --bg: #fcfbf7;
+    --fg: #3a3730;
+    --muted: #857c6d;
+    --border: #e7ded0;
+    --sidebar: #f4efe4;
+    --hover: #ece4d5;
+    --brand: #2a7d6f;
+    --on-brand: #ffffff;
+    --topbar: #2f6f7d;
+    --selected: #2f6f7d;
+    --pre-bg: #f4efe4;
+    --code-bg: #efe7d8;
+    --mark-bg: #fbecc3;
+    --mark-fg: #3a3730;
+}
+
+/* Light — Solarized Light (cream, blue accent) */
+.page.theme-solarized-light {
+    --bg: #fdf6e3;
+    --fg: #586e75;
+    --muted: #93a1a1;
+    --border: #eee8d5;
+    --sidebar: #f5eeda;
+    --hover: #eee3c8;
+    --brand: #268bd2;
+    --on-brand: #ffffff;
+    --topbar: #268bd2;
+    --selected: #268bd2;
+    --pre-bg: #f5eeda;
+    --code-bg: #eee8d5;
+    --mark-bg: #ffe9a8;
+    --mark-fg: #586e75;
+}
+
+/* Light — Minty (fresh green) */
+.page.theme-minty {
+    --bg: #ffffff;
+    --fg: #24352e;
+    --muted: #6b7d75;
+    --border: #d6e7dd;
+    --sidebar: #eef7f1;
+    --hover: #e0f0e7;
+    --brand: #0f9d76;
+    --on-brand: #ffffff;
+    --topbar: #18b58c;
+    --selected: #18b58c;
+    --pre-bg: #eef7f1;
+    --code-bg: #e2f0ea;
+    --mark-bg: #fef3c3;
+    --mark-fg: #24352e;
+}
+
+/* Dark — GitHub Dark */
+.page.theme-github-dark {
+    --bg: #0d1117;
+    --fg: #e6edf3;
+    --muted: #8b949e;
+    --border: #30363d;
+    --sidebar: #161b22;
+    --hover: #21262d;
+    --brand: #388bfd;
+    --on-brand: #ffffff;
+    --topbar: #161b22;
+    --selected: #388bfd;
+    --pre-bg: #161b22;
+    --code-bg: #21262d;
+    --mark-bg: #5c531f;
+    --mark-fg: #f6efc4;
+}
+
+/* Dark — Darkly (deep, teal accent) */
+.page.theme-darkly {
+    --bg: #1a1d20;
+    --fg: #e9ecef;
+    --muted: #adb5bd;
+    --border: #2c3136;
+    --sidebar: #212529;
+    --hover: #2c3136;
+    --brand: #00bc8c;
+    --on-brand: #04231c;
+    --topbar: #212529;
+    --selected: #00bc8c;
+    --pre-bg: #212529;
+    --code-bg: #2c3136;
+    --mark-bg: #4d4a1f;
+    --mark-fg: #f0ecc6;
+}
+
+/* Dark — Nord (blue-gray) */
+.page.theme-nord {
+    --bg: #2e3440;
+    --fg: #eceff4;
+    --muted: #a9b1c0;
+    --border: #434c5e;
+    --sidebar: #3b4252;
+    --hover: #434c5e;
+    --brand: #88c0d0;
+    --on-brand: #2e3440;
+    --topbar: #3b4252;
+    --selected: #88c0d0;
+    --pre-bg: #3b4252;
+    --code-bg: #434c5e;
+    --mark-bg: #5e5330;
+    --mark-fg: #eceff4;
+}
+
+/* Dark — Solarized Dark (teal-navy) */
+.page.theme-solarized-dark {
+    --bg: #002b36;
+    --fg: #a7b6b6;
+    --muted: #7d9494;
+    --border: #0c4a5a;
+    --sidebar: #073642;
+    --hover: #0a5060;
+    --brand: #2aa198;
+    --on-brand: #04231f;
+    --topbar: #073642;
+    --selected: #2aa198;
+    --pre-bg: #073642;
+    --code-bg: #0a4552;
+    --mark-bg: #4d4626;
+    --mark-fg: #eee8d5;
+}
+
+/* theme picker swatches */
+.theme-swatch {
+    display: inline-block;
+    width: 0.95rem;
+    height: 0.95rem;
+    border-radius: 50%;
+    /* Mini theme preview: page background (top-left) split with the accent (bottom-right). */
+    background: linear-gradient(135deg, var(--sw-bg, #fff) 0 48%, var(--sw-accent, #888) 52% 100%);
+    border: 1px solid rgba(128, 128, 128, 0.45);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+    flex: 0 0 auto;
+}
+
+.dropdown-action.active {
+    font-weight: 700;
+}
+
+.dropdown-action.active::after {
+    content: " ✓";
+    color: var(--brand);
+}
+
+.dropdown-action {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+}
+
+.dropdown-subhead {
+    display: block;
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--muted);
+    padding: 0.4rem 0.5rem 0.1rem;
+}

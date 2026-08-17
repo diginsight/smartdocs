@@ -1,0 +1,59 @@
+@* Recursive, lazily-loaded menu node. Sections fetch their children the first time they open
+   (or when they contain the active route, or when expand-all is active). *@
+@inject INavProvider Provider
+@inject SidebarState Sidebar
+@inject NavigationManager NavMgr
+@inject NavStats Stats
+@implements IDisposable
+
+@if (Node.IsSection)
+{
+    <li class="nav-section" role="treeitem" aria-expanded="@(_open ? "true" : "false")">
+        <details open="@_open">
+            <summary tabindex="0" @onclick:preventDefault="true" @onclick="OnSummaryActivate" @onmouseover="OnPointerEnter"
+                     @onmouseleave="OnPointerLeave" @onfocusin="OnPointerEnter" @onfocusout="OnPointerLeave">
+                <span class="nav-ico">
+                    @if (!string.IsNullOrEmpty(Node.Icon))
+                    {
+                        <i class="bi bi-@Node.Icon"></i>
+                    }
+                </span>
+                <span class="nav-label">@Node.Text</span>
+                <span class="nav-twisty" role="button" aria-label="Expand or collapse" @onclick:stopPropagation="true"
+                      @onclick:preventDefault="true" @onclick="ToggleOpenOnly"></span>
+            </summary>
+            @if (_open)
+            {
+                @if (_children is null)
+                {
+                    <div class="nav-level-loading" aria-label="Loading…"></div>
+                }
+                else
+                {
+                    <ul class="nav-list" role="group">
+                        @foreach (NavChild child in _children)
+                        {
+                            <DynNavNode Node="child" CurrentRoute="@CurrentRoute" ParentPrefix="@Node.Prefix"
+                                        ParentLabel="@Node.Text" ParentCount="@Node.ArticleCount"
+                                        ParentCoverage="@Node.CountCoverage" />
+                        }
+                    </ul>
+                }
+            }
+        </details>
+    </li>
+}
+else if (Node.Route is not null)
+{
+    <li role="treeitem" @onmouseover="OnPointerEnter" @onmouseover:stopPropagation="true" @onmouseleave="OnPointerLeave"
+        @onfocusin="OnPointerEnter" @onfocusout="OnPointerLeave">
+        <NavLink class="nav-link" href="@Node.Route" Match="NavLinkMatch.All" tabindex="0">
+            @if (!string.IsNullOrEmpty(Node.Icon))
+            {
+                <span class="nav-ico"><i class="bi bi-@Node.Icon"></i></span>
+            }
+            <span>@Node.Text</span>
+        </NavLink>
+    </li>
+}
+

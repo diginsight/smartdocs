@@ -1,0 +1,28 @@
+@implements IDisposable
+@inject TocState Toc
+
+@if (Toc.Entries.Count > 0)
+{
+    @if (Toc.Open)
+    {
+        <div class="toc-resizer" title="Drag to resize"></div>
+        <aside class="toc-pane">
+            <div class="toc-head">
+                <span class="toc-title">On this page</span>
+                <button class="toc-toggle" title="Hide table of contents" @onclick="() => Toc.SetOpen(false)">×</button>
+            </div>
+            <nav class="toc-list">
+                @foreach (TocEntry entry in Toc.Entries)
+                {
+                    <a class="toc-link toc-l@(entry.Level)" href="#@entry.Id">@entry.Text</a>
+                }
+            </nav>
+        </aside>
+    }
+    else
+    {
+        <button class="toc-reopen" title="Show table of contents" @onclick="() => Toc.SetOpen(true)">
+            <i class="bi bi-list-nested"></i>
+        </button>
+    }
+}

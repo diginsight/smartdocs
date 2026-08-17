@@ -1,0 +1,239 @@
+name: 00 · Build and deploy SmartDocs.Web
+
+# Reusable build + deploy for one SmartDocs.Web target.
+#
+# There is one App Service per site, and the site each host serves is decided entirely by the
+# configuration overlay it is given — never by the code. That is why this workflow is called with
+# an environment name and the path of an overlay, and knows nothing else about the target.
+#
+# This repository is PUBLIC. No storage account name, container name or App Service host name
+# appears anywhere in it: every one of them arrives inside appsettings.<Environment>.json, checked
+# out from the private smartdocs.internal repository. Storage identity stays in the file and is
+# overlaid at startup by ConfigureAppConfiguration2; the App Service name is read out of the same
+# file by this workflow and stripped before staging, so the host never receives a setting it would
+# ignore. Keeping both in one file is what makes them impossible to mismatch — a secret holding the
+# host name could silently point a deployment at the wrong overlay's target.
+
+on:
+  workflow_call:
+    inputs:
+      environment-name:
+        description: Value of AppsettingsEnvironmentName; selects appsettings.<name>.json.
+        required: true
+        type: string
+      runtime-identifier:
+        description: Self-contained publish RID. Must match the App Service worker bitness.
+        required: false
+        default: win-x64
+        type: string
+      internal-config-path:
+        description: Path of the overlay inside smartdocs.internal.
+        required: false
+        default: src/Diginsight.SmartDocs.Web/appsettings.Testmc.json
+        type: string
+    secrets:
+      azure-client-id:
+        required: true
+      azure-tenant-id:
+        required: true
+      azure-subscription-id:
+        required: true
+      internal-read-token:
+        description: "Fine-grained read-only token for diginsight/smartdocs.internal (Contents: read)."
+        required: true
+      invalidate-key:
+        description: Optional shared secret matching Site:InvalidateApiKey.
+        required: false
+
+env:
+  DOTNET_VERSION: "10.0.x"
+
+jobs:
+  build-and-deploy:
+    runs-on: self-hosted
+
+    # OIDC: request a short-lived federated token from GitHub rather than storing a client secret.
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          clean: true
+
+      - name: Checkout configuration overlay from smartdocs.internal
+        uses: actions/checkout@v4
+        with:
+          repository: diginsight/smartdocs.internal
+          ref: main
+          token: ${{ secrets.internal-read-token }}
+          path: .private/smartdocs.internal
+          sparse-checkout: ${{ inputs.internal-config-path }}
+          sparse-checkout-cone-mode: false
+
+      - name: Verify .NET SDK
+        shell: pwsh
+        run: |
+          # Use the SDK pre-installed on the self-hosted runner. actions/setup-dotnet installs into
+          # C:\Program Files\dotnet, which the runner service account cannot write to.
+          $v = dotnet --version
+          if ($LASTEXITCODE -ne 0) { Write-Error "dotnet SDK not available on runner"; exit 1 }
+          Write-Host "Using pre-installed .NET SDK: $v"
+          if (-not ($v -like '10.*')) { Write-Error "Expected .NET 10 SDK, found $v"; exit 1 }
+
+      - name: Publish Diginsight.SmartDocs.Web
+        shell: pwsh
+        env:
+          RID: ${{ inputs.runtime-identifier }}
+        run: |
+          # Self-contained, so the App Service needs no pre-installed .NET 10 runtime. The RID must
+          # match the worker bitness: an x64 payload on a 32-bit worker fails to load with
+          # "HTTP 500.32 - ANCM Failed to Load dll". The deploy step below sets the bitness to match.
+          dotnet publish src/Diginsight.SmartDocs.Web/Diginsight.SmartDocs.Web.csproj `
+            -c Release -r $env:RID --self-contained true `
+            -o publish_smartdocs
+          if (-not (Test-Path "publish_smartdocs/Diginsight.SmartDocs.Web.exe")) {
+            Write-Error "publish_smartdocs/Diginsight.SmartDocs.Web.exe missing after publish"
+            exit 1
+          }
+
+      - name: Repair zero-byte Brotli assets
+        shell: pwsh
+        run: |
+          # The runner's SDK can emit zero-byte Brotli siblings alongside valid original and gzip
+          # assets, and matching endpoint metadata. Browsers then negotiate an empty payload and the
+          # WASM runtime never starts. Drop only the broken variants, from disk and from the manifest,
+          # so negotiation falls back to gzip/identity.
+          $brokenBrotli = @(Get-ChildItem "publish_smartdocs/wwwroot/_framework" `
+            -File -Recurse -Filter "*.br" | Where-Object Length -eq 0)
+          if ($brokenBrotli.Count -gt 0) {
+            $manifestPath = "publish_smartdocs/Diginsight.SmartDocs.Web.staticwebassets.endpoints.json"
+            $manifest = Get-Content $manifestPath -Raw | ConvertFrom-Json
+            $brokenAssetFiles = @($brokenBrotli | ForEach-Object { "_framework/$($_.Name)" })
+            $manifest.Endpoints = @($manifest.Endpoints | Where-Object { $_.AssetFile -notin $brokenAssetFiles })
+            $manifest | ConvertTo-Json -Depth 100 -Compress | Set-Content $manifestPath -Encoding utf8NoBOM
+            $brokenBrotli | ForEach-Object {
+              Write-Host "Removed broken Brotli endpoint: $($_.Name)"
+              Remove-Item -LiteralPath $_.FullName -Force
+            }
+          }
+
+          $empty = @(Get-ChildItem "publish_smartdocs/wwwroot/_framework" -File -Recurse | Where-Object Length -eq 0)
+          if ($empty.Count -gt 0) {
+            $empty | ForEach-Object { Write-Error "Empty framework asset: $($_.FullName)" }
+            Write-Error "Publish produced $($empty.Count) empty framework assets"
+            exit 1
+          }
+
+      - name: Stage configuration overlay and resolve deployment target
+        shell: pwsh
+        env:
+          OVERLAY: .private/smartdocs.internal/${{ inputs.internal-config-path }}
+          ENVIRONMENT_NAME: ${{ inputs.environment-name }}
+        run: |
+          # smartdocs.internal is authoritative for both storage identity and the deployment target.
+          # Fail closed rather than deploy a host that would start with an unconfigured space and
+          # serve nothing, or deploy the right payload to the wrong host.
+          if (-not (Test-Path $env:OVERLAY)) {
+            Write-Error "Configuration overlay missing from smartdocs.internal checkout: $env:OVERLAY"
+            exit 1
+          }
+          $json = Get-Content $env:OVERLAY -Raw | ConvertFrom-Json
+          if (-not $json.Site -or -not $json.Site.Spaces) {
+            Write-Error "Overlay does not declare Site:Spaces"
+            exit 1
+          }
+          if (-not $json.Deployment -or -not $json.Deployment.WebAppName) {
+            Write-Error "Overlay does not declare Deployment:WebAppName"
+            exit 1
+          }
+
+          # This repository is public, so the host name must not reach the log. Masking covers every
+          # later step too, including the Azure CLI output below.
+          $webAppName = $json.Deployment.WebAppName
+          Write-Host "::add-mask::$webAppName"
+          "WEBAPP_NAME=$webAppName" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+          # Deployment is workflow metadata, not application configuration. Strip it so the running
+          # host is never handed a section it has no binding for.
+          $json.PSObject.Properties.Remove('Deployment')
+
+          $target = "publish_smartdocs/appsettings.$($env:ENVIRONMENT_NAME).json"
+          $json | ConvertTo-Json -Depth 100 | Set-Content $target -Encoding utf8NoBOM
+          Write-Host "Staged $target with $($json.Site.Spaces.Count) space(s)"
+
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.azure-client-id }}
+          tenant-id: ${{ secrets.azure-tenant-id }}
+          subscription-id: ${{ secrets.azure-subscription-id }}
+
+      - name: Configure App Service
+        shell: pwsh
+        env:
+          # The Azure CLI on the self-hosted runner bundles a 32-bit Python that prints a harmless
+          # cryptography UserWarning to stderr on every invocation. Silence it to keep logs readable.
+          PYTHONWARNINGS: ignore
+          # WEBAPP_NAME arrives from the staging step through GITHUB_ENV, already masked.
+          ENVIRONMENT_NAME: ${{ inputs.environment-name }}
+          RID: ${{ inputs.runtime-identifier }}
+          INVALIDATE_KEY: ${{ secrets.invalidate-key }}
+        run: |
+          $rg = az webapp list --query "[?name=='$env:WEBAPP_NAME'].resourceGroup | [0]" -o tsv
+          if (-not $rg) { Write-Error "Could not resolve resource group for the target App Service"; exit 1 }
+
+          # Worker bitness must match the published RID, otherwise the host answers HTTP 500.32.
+          $use32 = if ($env:RID -eq 'win-x86') { 'true' } else { 'false' }
+          az webapp config set --name $env:WEBAPP_NAME --resource-group $rg `
+            --use-32bit-worker-process $use32 --net-framework-version v4.0 | Out-Null
+          Write-Host "Worker bitness set for $env:RID (use32BitWorkerProcess=$use32)"
+
+          # Only environment selection and the writable snapshot path are set here. Storage identity
+          # stays inside the overlay so it never has to travel through this public repository.
+          $settings = @(
+            "AppsettingsEnvironmentName=$env:ENVIRONMENT_NAME",
+            "ASPNETCORE_ENVIRONMENT=Production",
+            "Site__MetricsSnapshotPath=D:\home\data\nav-metrics-snapshot.json"
+          )
+          if ($env:INVALIDATE_KEY) { $settings += "Site__InvalidateApiKey=$env:INVALIDATE_KEY" }
+
+          az webapp config appsettings set `
+            --name $env:WEBAPP_NAME --resource-group $rg `
+            --settings $settings | Out-Null
+          Write-Host "App settings updated"
+
+      - name: Deploy to App Service
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ env.WEBAPP_NAME }}
+          package: publish_smartdocs
+
+      - name: Smoke check
+        shell: pwsh
+        env:
+          PYTHONWARNINGS: ignore
+        run: |
+          # A deploy that returns success while the host fails to start is the failure mode worth
+          # catching here: the payload is self-contained, so a bitness or overlay mistake shows up
+          # only on the first request.
+          $rg = az webapp list --query "[?name=='$env:WEBAPP_NAME'].resourceGroup | [0]" -o tsv
+          # $host is a PowerShell automatic variable and cannot be assigned.
+          $hostName = az webapp show --name $env:WEBAPP_NAME --resource-group $rg --query defaultHostName -o tsv
+          $url = "https://$hostName/"
+          for ($i = 1; $i -le 10; $i++) {
+            try {
+              $r = Invoke-WebRequest -Uri $url -UseBasicParsing -TimeoutSec 30
+              Write-Host "Attempt ${i}: HTTP $($r.StatusCode)"
+              if ($r.StatusCode -eq 200) { exit 0 }
+            }
+            catch {
+              Write-Host "Attempt ${i}: $($_.Exception.Message)"
+            }
+            Start-Sleep -Seconds 15
+          }
+          Write-Error "Site did not return HTTP 200 after deployment"
+          exit 1

@@ -1,0 +1,31 @@
+@implements IDisposable
+@inject IJSRuntime JS
+
+@if (Open)
+{
+    <div class="search-overlay" @onclick="Close">
+        <div class="search-box" @onclick:stopPropagation="true">
+            <div class="search-input-row">
+                <i class="bi bi-search search-input-icon"></i>
+                <input class="search-input" placeholder="Search articles…" @ref="_input" @bind="_query"
+                       @bind:event="oninput" @onkeydown="OnKeyDown" />
+                <button class="search-cancel" type="button" @onclick="Close">Cancel</button>
+            </div>
+            <div class="search-results">
+                @if (string.IsNullOrWhiteSpace(_query))
+                {
+                    <p class="search-hint">Type to search the documentation — results will be ranked by the server.</p>
+                }
+                else
+                {
+                    <p class="search-hint">
+                        <i class="bi bi-hourglass-split"></i>
+                        Search is being wired to the server. You searched for
+                        <strong>“@_query”</strong>.
+                    </p>
+                }
+            </div>
+        </div>
+    </div>
+}
+

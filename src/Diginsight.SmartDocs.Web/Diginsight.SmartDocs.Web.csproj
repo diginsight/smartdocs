@@ -1,0 +1,75 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>Diginsight.SmartDocs.Web</RootNamespace>
+    <AssemblyName>Diginsight.SmartDocs.Web</AssemblyName>
+    <UserSecretsId>diginsight-smartdocs-web</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Server content source over blob storage (production). -->
+    <PackageReference Include="Azure.Storage.Blobs" Version="12.*" />
+    <!-- Host the WebAssembly client with prerendering. -->
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Server" Version="10.0.*" />
+  </ItemGroup>
+
+  <!-- Diginsight telemetry (core + diagnostics + AspNetCore/OpenTelemetry + Log4Net + Stringify). -->
+  <ItemGroup>
+    <ProjectReference Include="$(DiginsightCoreSolutionDirectory)Diginsight.Core\Diginsight.Core.csproj" Condition="'$(DiginsightCoreDirectImport)' == 'true'" />
+    <ProjectReference Include="$(DiginsightCoreSolutionDirectory)Diginsight.Diagnostics\Diginsight.Diagnostics.csproj" Condition="'$(DiginsightCoreDirectImport)' == 'true'" />
+    <ProjectReference Include="$(DiginsightCoreSolutionDirectory)Diginsight.Diagnostics.Log4Net\Diginsight.Diagnostics.Log4Net.csproj" Condition="'$(DiginsightCoreDirectImport)' == 'true'" />
+    <ProjectReference Include="$(DiginsightCoreSolutionDirectory)Diginsight.Diagnostics.AspNetCore.OpenTelemetry\Diginsight.Diagnostics.AspNetCore.OpenTelemetry.csproj" Condition="'$(DiginsightCoreDirectImport)' == 'true'" />
+    <ProjectReference Include="$(DiginsightCoreSolutionDirectory)Diginsight.Stringify\Diginsight.Stringify.csproj" Condition="'$(DiginsightCoreDirectImport)' == 'true'" />
+    <PackageReference Include="Diginsight.Core" Version="$(DiginsightCoreVersion)" Condition="'$(DiginsightCoreDirectImport)' != 'true'" />
+    <PackageReference Include="Diginsight.Diagnostics" Version="$(DiginsightCoreVersion)" Condition="'$(DiginsightCoreDirectImport)' != 'true'" />
+    <PackageReference Include="Diginsight.Diagnostics.AspNetCore.OpenTelemetry" Version="$(DiginsightCoreVersion)" Condition="'$(DiginsightCoreDirectImport)' != 'true'" />
+    <PackageReference Include="Diginsight.Diagnostics.Log4Net" Version="$(DiginsightCoreVersion)" Condition="'$(DiginsightCoreDirectImport)' != 'true'" />
+    <PackageReference Include="Diginsight.Stringify" Version="$(DiginsightCoreVersion)" Condition="'$(DiginsightCoreDirectImport)' != 'true'" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="$(DiginsightComponentsSolutionDirectory)Diginsight.Components\Diginsight.Components.csproj" Condition="'$(DiginsightComponentsDirectImport)' == 'true'" />
+    <ProjectReference Include="$(DiginsightComponentsSolutionDirectory)Diginsight.Components.Configuration\Diginsight.Components.Configuration.csproj" Condition="'$(DiginsightComponentsDirectImport)' == 'true'" />
+    <ProjectReference Include="$(DiginsightComponentsSolutionDirectory)Diginsight.Components.Azure\Diginsight.Components.Azure.csproj" Condition="'$(DiginsightComponentsDirectImport)' == 'true'" />
+    <PackageReference Include="Diginsight.Components" Version="$(DiginsightComponentsVersion)" Condition="'$(DiginsightComponentsDirectImport)' != 'true'" />
+    <PackageReference Include="Diginsight.Components.Configuration" Version="$(DiginsightComponentsVersion)" Condition="'$(DiginsightComponentsDirectImport)' != 'true'" />
+    <PackageReference Include="Diginsight.Components.Azure" Version="$(DiginsightComponentsVersion)" Condition="'$(DiginsightComponentsDirectImport)' != 'true'" />
+  </ItemGroup>
+
+  <!-- Diginsight SmartCache: content-layer caching (in-memory + HTTP direct sync + optional Service Bus / Redis). -->
+  <ItemGroup>
+    <ProjectReference Include="$(DiginsightSmartCacheSolutionDirectory)Diginsight.SmartCache\Diginsight.SmartCache.csproj" Condition="'$(DiginsightSmartCacheDirectImport)' == 'true'" />
+    <ProjectReference Include="$(DiginsightSmartCacheSolutionDirectory)Diginsight.SmartCache.Externalization.Http\Diginsight.SmartCache.Externalization.Http.csproj" Condition="'$(DiginsightSmartCacheDirectImport)' == 'true'" />
+    <ProjectReference Include="$(DiginsightSmartCacheSolutionDirectory)Diginsight.SmartCache.Externalization.ServiceBus\Diginsight.SmartCache.Externalization.ServiceBus.csproj" Condition="'$(DiginsightSmartCacheDirectImport)' == 'true'" />
+    <ProjectReference Include="$(DiginsightSmartCacheSolutionDirectory)Diginsight.SmartCache.Externalization.Redis\Diginsight.SmartCache.Externalization.Redis.csproj" Condition="'$(DiginsightSmartCacheDirectImport)' == 'true'" />
+    <PackageReference Include="Diginsight.SmartCache" Version="$(DiginsightSmartcacheVersion)" Condition="'$(DiginsightSmartCacheDirectImport)' != 'true'" />
+    <PackageReference Include="Diginsight.SmartCache.Externalization.Http" Version="$(DiginsightSmartcacheVersion)" Condition="'$(DiginsightSmartCacheDirectImport)' != 'true'" />
+    <PackageReference Include="Diginsight.SmartCache.Externalization.ServiceBus" Version="$(DiginsightSmartcacheVersion)" Condition="'$(DiginsightSmartCacheDirectImport)' != 'true'" />
+    <PackageReference Include="Diginsight.SmartCache.Externalization.Redis" Version="$(DiginsightSmartcacheVersion)" Condition="'$(DiginsightSmartCacheDirectImport)' != 'true'" />
+  </ItemGroup>
+
+  <!-- Azure config/secrets + OpenTelemetry exporters and instrumentation. -->
+  <ItemGroup>
+    <PackageReference Include="Azure.Identity" Version="1.*" />
+    <PackageReference Include="Azure.Core" Version="1.*" />
+    <PackageReference Include="Azure.Extensions.AspNetCore.Configuration.Secrets" Version="1.*" />
+    <PackageReference Include="Azure.Monitor.OpenTelemetry.AspNetCore" Version="1.*" />
+
+    <PackageReference Include="log4net" Version="3.*" />
+
+    <PackageReference Include="OpenTelemetry" Version="1.*" />
+    <PackageReference Include="OpenTelemetry.Exporter.Console" Version="1.*" />
+    <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.*" />
+    <PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.*" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.*" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.Http" Version="1.*" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.Runtime" Version="1.*" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Diginsight.SmartDocs.Web.Client\Diginsight.SmartDocs.Web.Client.csproj" />
+    <ProjectReference Include="..\Diginsight.SmartDocs.Web.Shared\Diginsight.SmartDocs.Web.Shared.csproj" />
+  </ItemGroup>
+
+</Project>

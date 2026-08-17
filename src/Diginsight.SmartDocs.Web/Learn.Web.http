@@ -1,0 +1,21 @@
+@Diginsight.SmartDocs.Web_HostAddress = http://localhost:5280
+
+### Serve the site root (mapped to index.html)
+GET {{Diginsight.SmartDocs.Web_HostAddress}}/
+Accept: text/html
+
+### Serve a nested default document (foo/ -> foo/index.html)
+GET {{Diginsight.SmartDocs.Web_HostAddress}}/03.01-authentication/
+Accept: text/html
+
+### Serve a specific static asset
+GET {{Diginsight.SmartDocs.Web_HostAddress}}/styles.css
+Accept: text/css
+
+### Invalidate a single cached path
+POST {{Diginsight.SmartDocs.Web_HostAddress}}/_cache/invalidate?path=/index.html
+X-Invalidate-Key: change-me
+
+### Flush the entire cache
+POST {{Diginsight.SmartDocs.Web_HostAddress}}/_cache/invalidate
+X-Invalidate-Key: change-me

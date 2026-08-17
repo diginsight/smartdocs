@@ -1,0 +1,27 @@
+@* Dropdown body for a top-level menu: the section's immediate children as links, built live from
+   the content hierarchy. Sub-sections link to their own landing page (deeper levels live in the
+   sidebar); a child folder with no page of its own renders as a plain header. *@
+
+<ul class="dropdown-list">
+    @foreach (NavChild node in Nodes)
+    {
+        @if (node.Route is not null)
+        {
+            <li>
+                <a class="dropdown-link" href="@node.Route">@node.Text</a>
+            </li>
+        }
+        else if (node.Prefix is not null)
+        {
+            <li>
+                <a class="dropdown-link" href="@(node.Prefix.TrimEnd('/'))">@node.Text</a>
+            </li>
+        }
+        else
+        {
+            <li class="dropdown-group">
+                <span class="dropdown-header">@node.Text</span>
+            </li>
+        }
+    }
+</ul>

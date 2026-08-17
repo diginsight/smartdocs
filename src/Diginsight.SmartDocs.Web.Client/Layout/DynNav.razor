@@ -1,0 +1,112 @@
+@* Dynamic sidebar. Collapsed → a narrow icon rail (top-level section icons + expand button).
+   Full → a sticky toolbar (filter box, expand/collapse-all toggle, collapse-to-rail) above the
+   lazily-expanding tree. A non-empty filter switches to a flat, server-built whole-tree search. *@
+@inject INavProvider Provider
+@inject SidebarState Sidebar
+@inject NavigationManager NavMgr
+@inject NavStats Stats
+@inject IJSRuntime JS
+@inject IServiceProvider Services
+@implements IDisposable
+
+<div class="dynnav @(Sidebar.Collapsed ? "is-collapsed" : null)" @onkeydown="OnKeyDown">
+@if (Sidebar.Collapsed)
+{
+    <div class="sidebar-rail">
+        @if (_root is not null)
+        {
+            @foreach (NavChild n in _root)
+            {
+                @if (!string.IsNullOrEmpty(n.Icon))
+                {
+                    <button class="rail-btn @(IsActiveRail(n) ? "active" : null)" title="@n.Text" @onclick="() => OnRailClick(n)">
+                        <i class="bi bi-@n.Icon"></i>
+                    </button>
+                }
+            }
+        }
+    </div>
+}
+
+<div class="sidebar-panel">
+    <div class="sidebar-toolbar">
+        <div class="sidebar-search">
+            <i class="bi bi-search"></i>
+            <input type="search" placeholder="Filter menu…" value="@_query" @oninput="OnSearchInput"
+                   aria-label="Filter menu" />
+            @if (!string.IsNullOrEmpty(_query))
+            {
+                <button class="sidebar-search-clear" title="Clear filter" @onclick="ClearSearch">×</button>
+            }
+        </div>
+        <div class="sidebar-tools">
+            <button class="sidebar-tool" title="@(Sidebar.AllExpanded ? "Collapse all" : "Expand all")"
+                    @onclick="() => Sidebar.ToggleExpandAll()">
+                <i class="bi @(Sidebar.AllExpanded ? "bi-arrows-collapse" : "bi-arrows-expand")"></i>
+            </button>
+            @if (Sidebar.Collapsed)
+            {
+                <button class="sidebar-tool" title="Pin menu (keep open)" @onclick="() => Sidebar.SetCollapsed(false)">
+                    <i class="bi bi-pin-angle"></i>
+                </button>
+            }
+            else
+            {
+                <button class="sidebar-tool" title="Collapse menu" @onclick="() => Sidebar.SetCollapsed(true)">
+                    <i class="bi bi-chevron-double-left"></i>
+                </button>
+            }
+        </div>
+    </div>
+
+    @if (_root is null)
+    {
+        <p class="nav-loading"><em>Loading menu…</em></p>
+    }
+    else if (!string.IsNullOrWhiteSpace(_query))
+    {
+        @if (_index is null)
+        {
+            <p class="nav-loading"><em>Searching…</em></p>
+        }
+        else
+        {
+            var matches = Filter(_index, _query);
+            @if (matches.Count == 0)
+            {
+                <p class="nav-loading"><em>No matches for “@_query”.</em></p>
+            }
+            else
+            {
+                <ul class="nav-list nav-search-results">
+                    @foreach (NavLeaf m in matches)
+                    {
+                        <li>
+                            <NavLink class="nav-link" href="@m.Route" Match="NavLinkMatch.All">
+                                <span class="nav-search-text">@Highlight(m.Text, _query)</span>
+                                @if (!string.IsNullOrEmpty(m.Path))
+                                {
+                                    <span class="nav-search-path">@Highlight(m.Path, _query)</span>
+                                }
+                            </NavLink>
+                        </li>
+                    }
+                </ul>
+            }
+        }
+    }
+    else if (_root.Count == 0)
+    {
+        <p class="nav-loading"><em>No content found.</em></p>
+    }
+    else
+    {
+        <ul class="nav-list nav-top" role="tree">
+            @foreach (NavChild node in _root)
+            {
+                <DynNavNode Node="node" CurrentRoute="@_current" />
+            }
+        </ul>
+    }
+</div>
+</div>

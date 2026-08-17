@@ -1,0 +1,46 @@
+@inherits LayoutComponentBase
+@implements IDisposable
+@using Diginsight.SmartDocs.Web.Shared.Navigation
+@inject IJSRuntime JS
+@inject ThemeState Theme
+@inject SidebarState Sidebar
+@inject NavStats Stats
+@inject ArticleState Article
+
+<div class="page theme-@Theme.ThemeId">
+    <header class="topbar">
+        <a class="brand" href=""><i class="bi bi-lightbulb-fill"></i> <span>Diginsight SmartDocs</span></a>
+        <TopMenu Placement="TopMenu.Group.Left" />
+        <TopMenu Placement="TopMenu.Group.Right" />
+        <AboutMenu />
+        <button class="icon-btn" title="Search" @onclick="() => _searchOpen = true">
+            <i class="bi bi-search"></i>
+        </button>
+        <button class="icon-btn" title="Notifications" @onclick="() => _notifyOpen = !_notifyOpen">
+            <i class="bi bi-bell"></i>
+        </button>
+        <button class="theme-btn" title="Toggle light/dark" @onclick="() => Theme.Toggle()">
+            @(Theme.Dark ? "☀️" : "🌙")
+        </button>
+    </header>
+
+    <SearchOverlay Open="_searchOpen" OnClose="() => _searchOpen = false" />
+    <NotificationPanel Open="_notifyOpen" OnClose="() => _notifyOpen = false" />
+
+    <div class="body">
+        <nav class="sidebar @(Sidebar.Collapsed ? "rail" : null)">
+            <DynNav />
+        </nav>
+        <div class="sidebar-resizer" title="Drag to resize · double-click to reset"></div>
+        <main class="content">
+            @Body
+        </main>
+        <TocPane />
+    </div>
+
+    <footer class="bottombar">
+        <span class="bottombar-left">@SectionLine<br />Total: @TotalArticlesText</span>
+        <span class="bottombar-right">@ArticleLine<br />@ArticleMetaLine</span>
+    </footer>
+</div>
+
