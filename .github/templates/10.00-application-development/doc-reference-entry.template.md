@@ -23,7 +23,11 @@ source_sets:
 
 # [entry name]
 
-## 🎯 What this is
+## 📚 Table of contents
+
+[required when the page exceeds 500 words - one entry per H2, mirroring its emoji]
+
+## 🎯 Purpose
 
 [One to three sentences. Enough to confirm the reader is on the right page.] ^[[area]-nn]
 
@@ -55,7 +59,7 @@ source_sets:
 |---|---|---|
 | [component-id or page] | [read / written / bound at startup] | ^[[area]-nn] |
 
-## 🕳️ Not established
+## 🕳️ Open questions
 
 > **Not established**: [what is missing and where it was sought]. ^[gap]
 

@@ -22,6 +22,10 @@ source_sets:
 
 # [goal, stated as an outcome]
 
+## 📚 Table of contents
+
+[required when the page exceeds 500 words - one entry per H2, mirroring its emoji]
+
 ## 🎯 Goal
 
 - **Actor**: [who or what initiates] ^[[area]-nn]
@@ -53,7 +57,7 @@ source_sets:
 
 [Which tests or observations demonstrate this use case works. Link to Validation.] ^[[area]-nn]
 
-## 🕳️ Not established
+## 🕳️ Open questions
 
 > **Not established**: [what is missing and where it was sought]. ^[gap]
 

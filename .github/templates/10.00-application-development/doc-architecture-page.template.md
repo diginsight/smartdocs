@@ -19,6 +19,10 @@ source_sets: [composition-root, entry-points, domain-model, infrastructure-defin
 
 # [component-id] — architecture
 
+## 📚 Table of contents
+
+[required when the page exceeds 500 words - one entry per H2, mirroring its emoji]
+
 ## 🎯 Purpose and context
 
 [Layer 1. What the component exists for, derived from evidence — not from its name.] ^[[area]-nn]
@@ -59,7 +63,7 @@ source_sets: [composition-root, entry-points, domain-model, infrastructure-defin
 
 [Where it runs. Link to Infrastructure rather than restating environment detail.] ^[[area]-nn]
 
-## 🕳️ Not established
+## 🕳️ Open questions
 
 > **Not established**: [what is missing and where it was sought]. ^[gap]
 <!--

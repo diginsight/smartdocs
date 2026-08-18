@@ -47,7 +47,10 @@ You are deliberately blind. You cannot open source, run anything, query anything
 | `.copilot/context/10.00-application-development/07-documentation-authoring-criteria.md` | disclosure layers, preservation, missing-information rule |
 | `.copilot/context/10.00-application-development/04-documentation-structure.md` | chapters, page shapes, placement |
 | `.copilot/context/10.00-application-development/02-evidence-dossier-schema.md` | how to read a record and a gap |
+| `.copilot/context/05.00-content-classification/00-classification-and-split-model.md` | what is public, what splits to a companion, and where the companion goes |
 | `.copilot/context/10.00-application-development/00-stream-contract.md` | escalation format |
+
+Before writing any page, run 📖 `.github/prompt-snippets/content-classification-and-split.md`. It resolves `repository.metadata.yml`, decides whether a split applies at all, and fixes the role names the page will use. Classification precedes authoring — a fact aliased after it is written was already written.
 
 ## 🚨 Critical boundaries
 

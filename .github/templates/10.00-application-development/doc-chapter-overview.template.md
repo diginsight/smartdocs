@@ -20,16 +20,16 @@ source_sets:
 
 # [chapter name]
 
-## 📑 Table of contents
+## 📚 Table of contents
 
 [required when the page exceeds 500 words]
 
-## 🎯 What this chapter answers
+## 🎯 Introduction
 
 [Layer 1 — orientation. Two to four sentences. A reader who stops here knows
 whether to keep reading.] ^[[area]-nn]
 
-## 🗺️ Pages in this chapter
+## 🗺️ Pages in this section
 
 | Page | Covers |
 |---|---|
@@ -39,7 +39,7 @@ whether to keep reading.] ^[[area]-nn]
 
 - [the two to five things a reader must take away] ^[[area]-nn]
 
-## 🕳️ Not established
+## 🕳️ Open questions
 
 > **Not established**: [what is missing and where it was sought]. ^[gap]
 

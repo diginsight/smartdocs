@@ -22,22 +22,25 @@ src/docs/
 │       ├── environment.md
 │       ├── devops.md
 │       └── security.md
-├── [home-folder]/                  # metadata.yml → label: Home,             order: 1
-├── [getting-started-folder]/       # metadata.yml → label: Getting Started,  order: 2
-├── [architecture-folder]/          # metadata.yml → label: Architecture,     order: 3
-├── [use-cases-folder]/             # metadata.yml → label: Use Cases,        order: 4
-├── [infrastructure-folder]/        # metadata.yml → label: Infrastructure,   order: 5
-├── [reference-folder]/             # metadata.yml → label: Reference,        order: 6
-├── [other-components-folder]/      # metadata.yml → label: Other Components, order: 7
-├── [validation-folder]/            # metadata.yml → label: Validation,       order: 8
-├── [security-folder]/              # metadata.yml → label: Security,         order: 9
-├── [devops-folder]/                # metadata.yml → label: DevOps,           order: 10
-└── [appendix-folder]/              # metadata.yml → label: Appendix,         order: 11
+├── index.md                        # Home (chapter 1) — the space root page, NOT a folder
+├── 02.00-getting-started/          # metadata.yml → label: Getting Started,  order: 2
+├── 03.00-architecture/             # metadata.yml → label: Architecture,     order: 3
+├── 04.00-use-cases/                # metadata.yml → label: Use Cases,        order: 4
+├── 05.00-infrastructure/           # metadata.yml → label: Infrastructure,   order: 5
+├── 06.00-reference/                # metadata.yml → label: Reference,        order: 6
+├── 07.00-other-components/         # metadata.yml → label: Other Components, order: 7
+├── 08.00-validation/               # metadata.yml → label: Validation,       order: 8
+├── 09.00-security/                 # metadata.yml → label: Security,         order: 9
+├── 10.00-devops/                   # metadata.yml → label: DevOps,           order: 10
+└── 11.00-appendix/                 # metadata.yml → label: Appendix,         order: 11
 ```
 
 ## Rules
 
-- An existing folder MUST be reused by adding `metadata.yml`. NEVER rename it.
+- **Name every new chapter folder `NN.00-<kebab-name>`**, where `NN` is the chapter's zero-padded order — `02.00-getting-started` … `11.00-appendix`. The **prefix carries the order**; `metadata.yml` only confirms it.
+- **A chapter folder without a numeric prefix is a defect.** `NavRules.SortKey` puts an unprefixed name in the alphabetical group, so the chapter sequence collapses to `appendix, architecture, devops, …` the moment `metadata.yml` is missing, misspelt or unparsed — and it fails silently, with no error anywhere.
+- **Before creating a chapter folder, list `src/docs/` and check whether a folder already serves that chapter.** If one does, reuse it by adding `metadata.yml` — NEVER create a second folder for the same chapter beside it.
+- An existing folder that holds content or has inbound links MUST be reused, NEVER renamed. An empty, untracked placeholder folder is not protected by this rule.
 - A folder outside the eleven keeps its own `metadata.yml` and is NEVER a placement target.
 - Every chapter folder MUST contain an overview page, even when the chapter is otherwise empty.
 

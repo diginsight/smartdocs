@@ -48,8 +48,14 @@ Applied to every generated page. All must pass.
 | 6 | **Template conformance** | the page follows its bound template's required sections |
 | 7 | **Gap marking** | every unestablished fact is marked, not hedged |
 | 8 | **Preservation** | no human-authored block was dropped without classification |
+| 9 | **Repo baseline conformance** | H2 emoji present; `## 📚 Table of contents` present once the page exceeds 500 words, one entry per H2 mirroring its emoji; no heading names the document instead of the subject, and no evidence-layer vocabulary (*derived*, *declared*, *established*, *surface*) appears in a heading |
+| 10 | **Page order** | the file name carries an `NN-` prefix — `index.md` excepted — numbered contiguously from `01` across the chapter, in the same sequence as the chapter overview's Pages table |
 
 Gates 1, 2 and 8 are the load-bearing ones — they are what make `D14` enforceable rather than aspirational.
+
+Gate 9 exists because a page can satisfy every evidence gate and still read as machine output. The set is published into a repository that already has a house style; conforming to it is what makes generated pages sit beside hand-written ones without announcing which is which.
+
+Gate 10 catches a failure that is invisible on the page and only appears in navigation. Nothing in a page's front matter can order it — `metadata.yml` orders folders, not files — so an unprefixed chapter renders alphabetically with no error raised anywhere, typically stranding its overview page at the bottom. The gate is applied per page but can only be judged across the chapter, so verify it once per chapter and report it against every page in that chapter.
 
 ---
 
@@ -78,12 +84,15 @@ Absolute. A failure here blocks publication regardless of every other outcome.
 
 | Check | Fails when |
 |---|---|
-| **No internal link** | a published page links to, or cites the path of, a `*.internal.md` file |
+| **No internal quotation** | a published page quotes content from a `*.internal.md` file, or cites the path of any internal file other than its own companion |
 | **No secret value** | any credential, key, token, connection string or certificate material appears in a published page |
 | **No personal data** | any identifying value appears, including inside sample output |
 | **No exploit detail** | a weakness is described precisely enough to act on |
 | **No internal surface** | an internal hostname, private endpoint, management URL or tenant identifier appears |
 | **Dossiers unpublished** | every file under `_evidence/` carries `publish: false` |
+| **Correction test** | fixing an internal identifier would require editing the published page — meaning an identifier leaked into it |
+
+A published page citing the path of **its own** internal companion is not a failure: that pointer is what makes the pair usable, and it is required by 📖 `content-classification.instructions.md`.
 
 Classification is owned by 📖 `03-evidence-access-policy.md`. This gate only enforces it.
 

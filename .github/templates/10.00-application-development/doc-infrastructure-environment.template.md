@@ -22,6 +22,10 @@ source_sets:
 
 # [environment name] environment
 
+## 📚 Table of contents
+
+[required when the page exceeds 500 words - one entry per H2, mirroring its emoji]
+
 ## 🎯 Purpose
 
 [What this environment is for and who uses it.] ^[[area]-nn]
@@ -60,7 +64,7 @@ source_sets:
 | Environment | [environment name] |
 | Observed | [YYYY-MM-DD] |
 
-## 🕳️ Not established
+## 🕳️ Open questions
 
 > **Not established**: [what is missing and where it was sought]. ^[gap]
 <!--

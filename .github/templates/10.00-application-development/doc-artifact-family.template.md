@@ -26,18 +26,22 @@ source_sets:
 
 # [family-id]
 
+## 📚 Table of contents
+
+[required when the page exceeds 500 words - one entry per H2, mirroring its emoji]
+
 - **Priority**: [🟡 Tooling | ⚪ Peripheral]
 - **Grouped by**: [metadata | folder | usage]  ^[[area]-nn]
 - **Roots**: [the artifact-type subtrees this family spans]
 - **Members**: [n artifacts across n types]  ^[[area]-nn]
 
-## 🎯 Derived purpose
+## 🎯 Purpose
 
 [Why this family exists, with the derivation source named.] ^[[area]-nn]
 
 - **Derived from**: [explicit marker | entry-point analysis | deployment descriptor | configuration defaults | sibling claim]
 
-## 🧭 Declared behaviour
+## 🧭 Behaviour
 
 [What the family declares it does, stated as declaration. Three to six
 sentences drawn from layer 1 — the artifacts' own declared descriptions,
@@ -78,7 +82,7 @@ graph, not narrated as an execution.] ^[[area]-nn]
 
 [What the family declares it produces, and where.] ^[[area]-nn]
 
-## 🕳️ Not established
+## 🕳️ Open questions
 
 > **Not established**: [anything else sought and not found, and where it was
 > sought]. ^[gap]

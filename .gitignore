@@ -427,3 +427,17 @@ FodyWeavers.xsd
 *.msix
 *.msm
 *.msp
+
+# ---------------------------------------------------------------------------
+# Content classification guard - this repository is PUBLIC.
+#
+# Internal content belongs in the private peer repository diginsight/smartdocs.internal
+# under docs-internal/, path-parallel to its public sibling. These rules exist so a
+# mis-targeted write cannot be committed here by accident. They are a backstop, not the
+# control: the primary rule is that a sensitive value is never written into a public
+# document in the first place.
+# ---------------------------------------------------------------------------
+*.internal.md
+**/*.internal.md
+**/_internal/
+src/docs/_evidence/

@@ -25,6 +25,7 @@ The following rules are defined in context files and instruction files. They app
 |---|---|---|
 | **Kebab-case naming** | `.copilot/context/90.00-learning-hub/06-folder-organization-and-navigation.md` | All folders and files |
 | **Dual metadata system** | `.copilot/context/90.00-learning-hub/02-dual-yaml-metadata.md` | All article `.md` files |
+| **Content classification** | `.github/instructions/content-classification.instructions.md` | All `.md` files — public/internal split |
 | **Article writing** | `.github/instructions/article-writing.instructions.md` | All `.md` files |
 | **Documentation structure** | `.github/instructions/documentation.instructions.md` | All `.md` files |
 | **PE artifacts** | `.copilot/context/00.00-prompt-engineering/00.00-context-structure-index.md` | PE customization files |

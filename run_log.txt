@@ -1,0 +1,327 @@
+deploy / build-and-deploy	UNKNOWN STEP	﻿2026-08-17T19:53:20.4116280Z Current runner version: '2.336.0'
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:53:20.4124318Z Runner name: 'AIROLDI02'
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:53:20.4124997Z Runner group name: 'Default'
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:53:20.4125757Z Machine name: 'AIROLDI02'
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:53:20.4128560Z ##[group]GITHUB_TOKEN Permissions
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:53:20.4130757Z Contents: read
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:53:20.4131253Z Metadata: read
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:53:20.4131678Z ##[endgroup]
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:53:20.4133677Z Secret source: Actions
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:53:20.4134517Z Prepare workflow directory
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:53:20.4512823Z Prepare all required actions
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:53:20.4598436Z Uses: diginsight/smartdocs/.github/workflows/00.BuildSmartDocsWeb.yml@refs/heads/main (8eb2c653931eddfd88800845e81490be24fd2cc3)
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:53:20.4603300Z ##[group] Inputs
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:53:20.4603824Z   environment-name: TestmcDocs
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:53:20.4604359Z   runtime-identifier: win-x64
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:53:20.4605189Z   internal-config-path: src/Diginsight.SmartDocs.Web/appsettings.TestmcDocs.json
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:53:20.4606049Z   deployment-environment: testmcdocs
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:53:20.4606564Z ##[endgroup]
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:53:20.4607064Z Complete job name: deploy / build-and-deploy
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:53:21.4125768Z ##[group]Run $auth = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes("x-access-token:$env:GITHUB_TOKEN"))
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:53:21.4128266Z [36;1m$auth = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes("x-access-token:$env:GITHUB_TOKEN"))[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:53:21.4129614Z [36;1mgit init[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:53:21.4130355Z [36;1mgit remote remove origin 2>$null[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:53:21.4131398Z [36;1mgit remote add origin "https://github.com/diginsight/smartdocs.git"[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:53:21.4132986Z [36;1mgit -c "http.extraheader=AUTHORIZATION: basic $auth" fetch --depth=1 origin main[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:53:21.4134157Z [36;1mgit checkout --force -B main FETCH_HEAD[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:53:21.4134885Z [36;1mgit clean -ffdx[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:53:21.4198732Z shell: C:\Program Files\PowerShell\7\pwsh.EXE -command ". '{0}'"
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:53:21.4200122Z env:
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:53:21.4200689Z   DOTNET_VERSION: 10.0.x
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:53:21.4206808Z   GITHUB_TOKEN: ***
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:53:21.4207586Z ##[endgroup]
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:53:22.1983253Z Reinitialized existing Git repository in C:/actions-runner/smartdocs/_work/smartdocs/smartdocs/.git/
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:53:23.4909132Z From https://github.com/diginsight/smartdocs
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:53:23.4910363Z  * branch            main       -> FETCH_HEAD
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:53:23.4911094Z  * [new branch]      main       -> origin/main
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:53:23.7823340Z Reset branch 'main'
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:53:25.1472285Z Removing .private/
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:53:25.1473291Z Removing publish_smartdocs/
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:53:25.1474887Z Removing smartdocs-deploy.zip
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:53:25.1476912Z Removing src/Diginsight.SmartDocs.Web.Client/bin/
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:53:25.1478462Z Removing src/Diginsight.SmartDocs.Web.Client/obj/
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:53:25.1479940Z Removing src/Diginsight.SmartDocs.Web.Shared/bin/
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:53:25.1481587Z Removing src/Diginsight.SmartDocs.Web.Shared/obj/
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:53:25.1482949Z Removing src/Diginsight.SmartDocs.Web/bin/
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:53:25.1484349Z Removing src/Diginsight.SmartDocs.Web/obj/
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:53:25.6621036Z ##[group]Run if ([string]::IsNullOrWhiteSpace($env:INTERNAL_READ_TOKEN)) {
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:53:25.6623832Z [36;1mif ([string]::IsNullOrWhiteSpace($env:INTERNAL_READ_TOKEN)) {[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:53:25.6625981Z [36;1m  Write-Error "SMARTDOCS_INTERNAL_READ_TOKEN was not provided to the reusable workflow"[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:53:25.6627654Z [36;1m  exit 1[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:53:25.6628344Z [36;1m}[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:53:25.6629998Z [36;1m$auth = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes("x-access-token:$env:INTERNAL_READ_TOKEN"))[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:53:25.6632144Z [36;1m$privatePath = ".private/smartdocs.internal"[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:53:25.6633964Z [36;1m# No blob filter: a partial clone would defer the overlay's blob to a promisor fetch that[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:53:25.6644868Z [36;1m# runs outside this command and so without the authorization header.[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:53:25.6646637Z [36;1mgit -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=60 `[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:53:25.6648338Z [36;1m  -c "http.extraheader=AUTHORIZATION: basic $auth" `[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:53:25.6649655Z [36;1m  clone --depth=1 --no-tags --sparse `[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:53:25.6651283Z [36;1m  https://github.com/diginsight/smartdocs.internal.git $privatePath[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:53:25.6653342Z [36;1mif ($LASTEXITCODE -ne 0) { Write-Error "Configuration overlay clone failed"; exit 1 }[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:53:25.6655556Z [36;1m# Leading slash anchors the pattern to a single file rather than every matching suffix.[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:53:25.6657956Z [36;1mgit -C $privatePath -c "http.extraheader=AUTHORIZATION: basic $auth" `[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:53:25.6659793Z [36;1m  sparse-checkout set --no-cone "/$env:INTERNAL_CONFIG_PATH"[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:53:25.6661858Z [36;1mif ($LASTEXITCODE -ne 0) { Write-Error "Configuration overlay sparse checkout failed"; exit 1 }[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:53:25.6825329Z shell: C:\Program Files\PowerShell\7\pwsh.EXE -command ". '{0}'"
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:53:25.6827274Z env:
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:53:25.6828165Z   DOTNET_VERSION: 10.0.x
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:53:25.6831347Z   INTERNAL_READ_TOKEN: ***
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:53:25.6832879Z   INTERNAL_CONFIG_PATH: src/Diginsight.SmartDocs.Web/appsettings.TestmcDocs.json
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:53:25.6834510Z   GIT_TERMINAL_PROMPT: 0
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:53:25.6835314Z ##[endgroup]
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:53:26.8495252Z Cloning into '.private/smartdocs.internal'...
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:53:28.4025065Z ##[group]Run # Use the SDK pre-installed on the self-hosted runner. actions/setup-dotnet installs into
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:53:28.4026441Z [36;1m# Use the SDK pre-installed on the self-hosted runner. actions/setup-dotnet installs into[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:53:28.4027328Z [36;1m# C:\Program Files\dotnet, which the runner service account cannot write to.[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:53:28.4027940Z [36;1m$v = dotnet --version[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:53:28.4028584Z [36;1mif ($LASTEXITCODE -ne 0) { Write-Error "dotnet SDK not available on runner"; exit 1 }[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:53:28.4029297Z [36;1mWrite-Host "Using pre-installed .NET SDK: $v"[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:53:28.4029972Z [36;1mif (-not ($v -like '10.*')) { Write-Error "Expected .NET 10 SDK, found $v"; exit 1 }[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:53:28.4096638Z shell: C:\Program Files\PowerShell\7\pwsh.EXE -command ". '{0}'"
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:53:28.4097188Z env:
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:53:28.4097466Z   DOTNET_VERSION: 10.0.x
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:53:28.4097790Z ##[endgroup]
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:53:29.3682121Z Using pre-installed .NET SDK: 10.0.400
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:53:29.9795187Z ##[group]Run # Self-contained, so the App Service needs no pre-installed .NET 10 runtime. The RID must
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:53:29.9796286Z [36;1m# Self-contained, so the App Service needs no pre-installed .NET 10 runtime. The RID must[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:53:29.9797052Z [36;1m# match the worker bitness: an x64 payload on a 32-bit worker fails to load with[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:53:29.9797833Z [36;1m# "HTTP 500.32 - ANCM Failed to Load dll". The deploy step below sets the bitness to match.[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:53:29.9798615Z [36;1mdotnet publish src/Diginsight.SmartDocs.Web/Diginsight.SmartDocs.Web.csproj `[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:53:29.9799269Z [36;1m  -c Release -r $env:RID --self-contained true `[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:53:29.9799690Z [36;1m  -o publish_smartdocs[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:53:29.9800876Z [36;1mif (-not (Test-Path "publish_smartdocs/Diginsight.SmartDocs.Web.exe")) {[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:53:29.9801871Z [36;1m  Write-Error "publish_smartdocs/Diginsight.SmartDocs.Web.exe missing after publish"[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:53:29.9802479Z [36;1m  exit 1[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:53:29.9802715Z [36;1m}[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:53:29.9856917Z shell: C:\Program Files\PowerShell\7\pwsh.EXE -command ". '{0}'"
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:53:29.9857392Z env:
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:53:29.9857847Z   DOTNET_VERSION: 10.0.x
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:53:29.9858143Z   RID: win-x64
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:53:29.9858396Z ##[endgroup]
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:53:31.8305851Z   Determining projects to restore...
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:53:34.4869948Z   Restored C:\actions-runner\smartdocs\_work\smartdocs\smartdocs\src\Diginsight.SmartDocs.Web.Client\Diginsight.SmartDocs.Web.Client.csproj (in 889 ms).
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:53:34.4937965Z   Restored C:\actions-runner\smartdocs\_work\smartdocs\smartdocs\src\Diginsight.SmartDocs.Web.Shared\Diginsight.SmartDocs.Web.Shared.csproj (in 893 ms).
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:53:35.2757247Z   Restored C:\actions-runner\smartdocs\_work\smartdocs\smartdocs\src\Diginsight.SmartDocs.Web\Diginsight.SmartDocs.Web.csproj (in 1.71 sec).
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:53:41.9050922Z   Diginsight.SmartDocs.Web.Shared -> C:\actions-runner\smartdocs\_work\smartdocs\smartdocs\src\Diginsight.SmartDocs.Web.Shared\bin\Release\net10.0\Diginsight.SmartDocs.Web.Shared.dll
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:53:55.3675391Z   Diginsight.SmartDocs.Web.Client -> C:\actions-runner\smartdocs\_work\smartdocs\smartdocs\src\Diginsight.SmartDocs.Web.Client\bin\Release\net10.0\Diginsight.SmartDocs.Web.Client.dll
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:53:55.3774814Z   Diginsight.SmartDocs.Web.Client (Blazor output) -> C:\actions-runner\smartdocs\_work\smartdocs\smartdocs\src\Diginsight.SmartDocs.Web.Client\bin\Release\net10.0\wwwroot
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:54:05.6836991Z   Diginsight.SmartDocs.Web -> C:\actions-runner\smartdocs\_work\smartdocs\smartdocs\src\Diginsight.SmartDocs.Web\bin\Release\net10.0\win-x64\Diginsight.SmartDocs.Web.dll
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:54:07.8549496Z   Optimizing assemblies for size may change the behavior of the app. Be sure to test after publishing. See: https://aka.ms/dotnet-illink
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:54:07.8592646Z   Optimizing assemblies for size. This process might take a while.
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:54:21.9602803Z   Optimizing assemblies for size may change the behavior of the app. Be sure to test after publishing. See: https://aka.ms/dotnet-illink
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:54:24.9447422Z   Compiling native assets with C:\Program Files\dotnet\packs\Microsoft.NET.Runtime.Emscripten.3.1.56.Sdk.win-x64\10.0.11\Sdk\..\tools\emscripten\emcc with -Oz. This may take a while ...
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:54:26.9788994Z   [1/4] pinvoke.c -> pinvoke.o [took 2.01s]
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:54:27.0201166Z   [2/4] driver.c -> driver.o [took 2.05s]
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:54:27.0291480Z   [3/4] corebindings.c -> corebindings.o [took 2.05s]
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:54:27.2431570Z   [4/4] runtime.c -> runtime.o [took 2.27s]
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:54:27.2580133Z   Linking for initial memory $(WasmInitialHeapSize)=33554432 bytes. Set this msbuild property to change the value.
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:54:27.2584563Z   Linking with emcc with -O2. This may take a while ...
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:54:29.1556479Z    "C:\Program Files\dotnet\packs\Microsoft.NET.Runtime.Emscripten.3.1.56.Sdk.win-x64\10.0.11\tools\bin\clang.exe" --version
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:54:29.2412340Z    "C:\Program Files\dotnet\packs\Microsoft.NET.Runtime.Emscripten.3.1.56.Node.win-x64\10.0.11\tools\bin\node.exe" "C:\Program Files\dotnet\packs\Microsoft.NET.Runtime.Emscripten.3.1.56.Sdk.win-x64\10.0.11\tools\emscripten\src\compiler.mjs" C:\WINDOWS\SERVIC~1\NETWOR~1\AppData\Local\Temp\tmporvts1gp.json --symbols-only
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:54:29.6745051Z    "C:\Program Files\dotnet\packs\Microsoft.NET.Runtime.Emscripten.3.1.56.Sdk.win-x64\10.0.11\tools\bin\wasm-ld.exe" -o C:\actions-runner\smartdocs\_work\smartdocs\smartdocs\src\Diginsight.SmartDocs.Web.Client\obj\Release\net10.0\wasm\for-publish\dotnet.native.wasm C:\actions-runner\smartdocs\_work\smartdocs\smartdocs\src\Diginsight.SmartDocs.Web.Client\obj\Release\net10.0\wasm\for-publish\pinvoke.o C:\actions-runner\smartdocs\_work\smartdocs\smartdocs\src\Diginsight.SmartDocs.Web.Client\obj\Release\net10.0\wasm\for-publish\driver.o C:\actions-runner\smartdocs\_work\smartdocs\smartdocs\src\Diginsight.SmartDocs.Web.Client\obj\Release\net10.0\wasm\for-publish\corebindings.o C:\actions-runner\smartdocs\_work\smartdocs\smartdocs\src\Diginsight.SmartDocs.Web.Client\obj\Release\net10.0\wasm\for-publish\runtime.o "C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Runtime.Mono.browser-wasm\10.0.11\runtimes\browser-wasm\native\libbrotlicommon.a" "C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Runtime.Mono.browser-wasm\10.0.11\runtimes\browser-wasm\native\libbrotlidec.a" "C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Runtime.Mono.browser-wasm\10.0.11\runtimes\browser-wasm\native\libbrotlienc.a" "C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Runtime.Mono.browser-wasm\10.0.11\runtimes\browser-wasm\native\libicudata.a" "C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Runtime.Mono.browser-wasm\10.0.11\runtimes\browser-wasm\native\libicui18n.a" "C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Runtime.Mono.browser-wasm\10.0.11\runtimes\browser-wasm\native\libicuuc.a" "C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Runtime.Mono.browser-wasm\10.0.11\runtimes\browser-wasm\native\libmono-component-debugger-stub-static.a" "C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Runtime.Mono.browser-wasm\10.0.11\runtimes\browser-wasm\native\libmono-component-diagnostics_tracing-stub-static.a" "C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Runtime.Mono.browser-wasm\10.0.11\runtimes\browser-wasm\native\libmono-component-hot_reload-stub-static.a" "C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Runtime.Mono.browser-wasm\10.0.11\runtimes\browser-wasm\native\libmono-component-marshal-ilgen-stub-static.a" "C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Runtime.Mono.browser-wasm\10.0.11\runtimes\browser-wasm\native\libmono-ee-interp.a" "C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Runtime.Mono.browser-wasm\10.0.11\runtimes\browser-wasm\native\libmono-icall-table.a" "C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Runtime.Mono.browser-wasm\10.0.11\runtimes\browser-wasm\native\libmono-profiler-aot.a" "C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Runtime.Mono.browser-wasm\10.0.11\runtimes\browser-wasm\native\libmono-profiler-browser.a" "C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Runtime.Mono.browser-wasm\10.0.11\runtimes\browser-wasm\native\libmono-profiler-log.a" "C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Runtime.Mono.browser-wasm\10.0.11\runtimes\browser-wasm\native\libmono-wasm-eh-wasm.a" "C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Runtime.Mono.browser-wasm\10.0.11\runtimes\browser-wasm\native\libmono-wasm-simd.a" "C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Runtime.Mono.browser-wasm\10.0.11\runtimes\browser-wasm\native\libmonosgen-2.0.a" "C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Runtime.Mono.browser-wasm\10.0.11\runtimes\browser-wasm\native\libSystem.Globalization.Native.a" "C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Runtime.Mono.browser-wasm\10.0.11\runtimes\browser-wasm\native\libSystem.IO.Compression.Native.a" "C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Runtime.Mono.browser-wasm\10.0.11\runtimes\browser-wasm\native\libSystem.Native.a" "C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Runtime.Mono.browser-wasm\10.0.11\runtimes\browser-wasm\native\libz.a" "C:\Program Files\dotnet\packs\Microsoft.NETCore.App.Runtime.Mono.browser-wasm\10.0.11\runtimes\browser-wasm\native\wasm-bundled-timezones.a" "-LC:\Program Files\dotnet\packs\Microsoft.NET.Runtime.Emscripten.3.1.56.Cache.win-x64\10.0.11\tools\emscripten\cache\sysroot\lib\wasm32-emscripten" -lGL-getprocaddr -lal -lhtml5 -lbulkmemory -lstubs -lc -ldlmalloc -lcompiler_rt-wasm-sjlj -lc++-except -lc++abi-except -lunwind-except -lsockets -mllvm -combiner-global-alias-analysis=false -mllvm -wasm-enable-sjlj -mllvm -disable-lsr -mllvm -wasm-enable-eh -mllvm -exception-model=wasm C:\WINDOWS\SERVIC~1\NETWOR~1\AppData\Local\Temp\tmpix1zyge2libemscripten_js_symbols.so --export=free --export=htons --export=malloc --export=sbrk --export=memalign --export=posix_memalign --export=memset --export=ntohs --export=stackAlloc --export=stackRestore --export=stackSave --export=fmod --export=atan2 --export=fma --export=pow --export=fmodf --export=atan2f --export=fmaf --export=powf --export=asin --export=asinh --export=acos --export=acosh --export=atan --export=atanh --export=cbrt --export=cos --export=cosh --export=exp --export=log --export=log2 --export=log10 --export=sin --export=sinh --export=tan --export=tanh --export=asinf --export=asinhf --export=acosf --export=acoshf --export=atanf --export=atanhf --export=cbrtf --export=cosf --export=coshf --export=expf --export=logf --export=log2f --export=log10f --export=sinf --export=sinhf --export=tanf --export=tanhf --export=__cpp_exception --export=stackAlloc --export=__funcs_on_exit --export=__trap --export=__wasm_call_ctors --export=stackSave --export=stackRestore --export-if-defined=__start_em_asm --export-if-defined=__stop_em_asm --export-if-defined=__start_em_lib_deps --export-if-defined=__stop_em_lib_deps --export-if-defined=__start_em_js --export-if-defined=__stop_em_js --export-if-defined=fflush --export-table --growable-table -z stack-size=5242880 --max-memory=2147483648 --initial-memory=33554432 --no-entry --table-base=1 --global-base=1024
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:54:30.4602303Z    "C:\Program Files\dotnet\packs\Microsoft.NET.Runtime.Emscripten.3.1.56.Sdk.win-x64\10.0.11\tools\bin\llvm-objcopy.exe" C:\actions-runner\smartdocs\_work\smartdocs\smartdocs\src\Diginsight.SmartDocs.Web.Client\obj\Release\net10.0\wasm\for-publish\dotnet.native.wasm C:\actions-runner\smartdocs\_work\smartdocs\smartdocs\src\Diginsight.SmartDocs.Web.Client\obj\Release\net10.0\wasm\for-publish\dotnet.native.wasm --remove-section=producers
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:54:31.0528646Z    "C:\Program Files\dotnet\packs\Microsoft.NET.Runtime.Emscripten.3.1.56.Node.win-x64\10.0.11\tools\bin\node.exe" "C:\Program Files\dotnet\packs\Microsoft.NET.Runtime.Emscripten.3.1.56.Sdk.win-x64\10.0.11\tools\emscripten\src\compiler.mjs" C:\WINDOWS\SERVIC~1\NETWOR~1\AppData\Local\Temp\tmpp7na3bd1.json
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:54:31.5247635Z    "C:\Program Files\dotnet\packs\Microsoft.NET.Runtime.Emscripten.3.1.56.Sdk.win-x64\10.0.11\tools\bin\wasm-opt" --strip-target-features --post-emscripten -O2 --low-memory-unused --zero-filled-memory --pass-arg=directize-initial-contents-immutable C:\actions-runner\smartdocs\_work\smartdocs\smartdocs\src\Diginsight.SmartDocs.Web.Client\obj\Release\net10.0\wasm\for-publish\dotnet.native.wasm -o C:\actions-runner\smartdocs\_work\smartdocs\smartdocs\src\Diginsight.SmartDocs.Web.Client\obj\Release\net10.0\wasm\for-publish\dotnet.native.wasm -g --mvp-features --enable-bulk-memory --enable-exception-handling --enable-multivalue --enable-mutable-globals --enable-reference-types --enable-sign-ext --enable-simd
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:55:38.1384809Z   Diginsight.SmartDocs.Web -> C:\actions-runner\smartdocs\_work\smartdocs\smartdocs\publish_smartdocs\
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:55:39.0918030Z ##[group]Run # The runner's SDK can emit zero-byte Brotli siblings alongside valid original and gzip
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:55:39.0922623Z [36;1m# The runner's SDK can emit zero-byte Brotli siblings alongside valid original and gzip[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:55:39.0925047Z [36;1m# assets, and matching endpoint metadata. Browsers then negotiate an empty payload and the[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:55:39.0927412Z [36;1m# WASM runtime never starts. Drop only the broken variants, from disk and from the manifest,[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:55:39.0929329Z [36;1m# so negotiation falls back to gzip/identity.[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:55:39.0944761Z [36;1m$brokenBrotli = @(Get-ChildItem "publish_smartdocs/wwwroot/_framework" `[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:55:39.0959542Z [36;1m  -File -Recurse -Filter "*.br" | Where-Object Length -eq 0)[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:55:39.0962041Z [36;1mif ($brokenBrotli.Count -gt 0) {[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:55:39.0973959Z [36;1m  $manifestPath = "publish_smartdocs/Diginsight.SmartDocs.Web.staticwebassets.endpoints.json"[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:55:39.0976679Z [36;1m  $manifest = Get-Content $manifestPath -Raw | ConvertFrom-Json[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:55:39.0988282Z [36;1m  $brokenAssetFiles = @($brokenBrotli | ForEach-Object { "_framework/$($_.Name)" })[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:55:39.0991268Z [36;1m  $manifest.Endpoints = @($manifest.Endpoints | Where-Object { $_.AssetFile -notin $brokenAssetFiles })[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:55:39.1036114Z [36;1m  $manifest | ConvertTo-Json -Depth 100 -Compress | Set-Content $manifestPath -Encoding utf8NoBOM[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:55:39.1043581Z [36;1m  $brokenBrotli | ForEach-Object {[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:55:39.1044913Z [36;1m    Write-Host "Removed broken Brotli endpoint: $($_.Name)"[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:55:39.1049945Z [36;1m    Remove-Item -LiteralPath $_.FullName -Force[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:55:39.1071961Z [36;1m  }[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:55:39.1072728Z [36;1m}[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:55:39.1074839Z [36;1m[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:55:39.1093925Z [36;1m$empty = @(Get-ChildItem "publish_smartdocs/wwwroot/_framework" -File -Recurse | Where-Object Length -eq 0)[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:55:39.1096421Z [36;1mif ($empty.Count -gt 0) {[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:55:39.1097903Z [36;1m  $empty | ForEach-Object { Write-Error "Empty framework asset: $($_.FullName)" }[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:55:39.1108394Z [36;1m  Write-Error "Publish produced $($empty.Count) empty framework assets"[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:55:39.1130519Z [36;1m  exit 1[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:55:39.1132150Z [36;1m}[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:55:39.1403313Z shell: C:\Program Files\PowerShell\7\pwsh.EXE -command ". '{0}'"
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:55:39.1404105Z env:
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:55:39.1404515Z   DOTNET_VERSION: 10.0.x
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:55:39.1405079Z ##[endgroup]
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:55:42.6598548Z ##[group]Run # smartdocs.internal is authoritative for both storage identity and the deployment target.
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:55:42.6601646Z [36;1m# smartdocs.internal is authoritative for both storage identity and the deployment target.[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:55:42.6603790Z [36;1m# Fail closed rather than deploy a host that would start with an unconfigured space and[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:55:42.6605873Z [36;1m# serve nothing, or deploy the right payload to the wrong host.[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:55:42.6607153Z [36;1mif (-not (Test-Path $env:OVERLAY)) {[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:55:42.6608782Z [36;1m  Write-Error "Configuration overlay missing from smartdocs.internal checkout: $env:OVERLAY"[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:55:42.6610311Z [36;1m  exit 1[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:55:42.6610910Z [36;1m}[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:55:42.6611775Z [36;1m$json = Get-Content $env:OVERLAY -Raw | ConvertFrom-Json[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:55:42.6613150Z [36;1mif (-not $json.Site -or -not $json.Site.Spaces) {[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:55:42.6614557Z [36;1m  Write-Error "Overlay does not declare Site:Spaces"[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:55:42.6615580Z [36;1m  exit 1[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:55:42.6616156Z [36;1m}[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:55:42.6617129Z [36;1mif (-not $json.Deployment -or -not $json.Deployment.WebAppName) {[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:55:42.6618684Z [36;1m  Write-Error "Overlay does not declare Deployment:WebAppName"[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:55:42.6619810Z [36;1m  exit 1[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:55:42.6620381Z [36;1m}[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:55:42.6620928Z [36;1m[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:55:42.6622060Z [36;1m# This repository is public, so the host name must not reach the log. Masking covers every[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:55:42.6623743Z [36;1m# later step too, including the Azure CLI output below.[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:55:42.6634649Z [36;1m$webAppName = $json.Deployment.WebAppName[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:55:42.6635968Z [36;1mWrite-Host "::add-mask::$webAppName"[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:55:42.6637501Z [36;1m"WEBAPP_NAME=$webAppName" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:55:42.6639202Z [36;1m[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:55:42.6640446Z [36;1m# Deployment is workflow metadata, not application configuration. Strip it so the running[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:55:42.6642183Z [36;1m# host is never handed a section it has no binding for.[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:55:42.6643514Z [36;1m$json.PSObject.Properties.Remove('Deployment')[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:55:42.6644544Z [36;1m[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:55:42.6645577Z [36;1m$target = "publish_smartdocs/appsettings.$($env:ENVIRONMENT_NAME).json"[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:55:42.6647281Z [36;1m$json | ConvertTo-Json -Depth 100 | Set-Content $target -Encoding utf8NoBOM[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:55:42.6651959Z [36;1mWrite-Host "Staged $target with $($json.Site.Spaces.Count) space(s)"[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:55:42.6798992Z shell: C:\Program Files\PowerShell\7\pwsh.EXE -command ". '{0}'"
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:55:42.6800296Z env:
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:55:42.6800992Z   DOTNET_VERSION: 10.0.x
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:55:42.6802124Z   OVERLAY: .private/smartdocs.internal/src/Diginsight.SmartDocs.Web/appsettings.TestmcDocs.json
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:55:42.6803334Z   ENVIRONMENT_NAME: TestmcDocs
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:55:42.6803889Z ##[endgroup]
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:55:45.1932003Z Staged publish_smartdocs/appsettings.TestmcDocs.json with 1 space(s)
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:55:46.0302322Z ##[group]Run $oidc = Invoke-RestMethod `
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:55:46.0310837Z [36;1m$oidc = Invoke-RestMethod `[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:55:46.0313290Z [36;1m  -Headers @{ Authorization = "***" } `[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:55:46.0314803Z [36;1m  -Uri "$env:ACTIONS_ID_TOKEN_REQUEST_URL&audience=api://AzureADTokenExchange"[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:55:46.0316276Z [36;1maz login --service-principal `[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:55:46.0317523Z [36;1m  --username $env:AZURE_CLIENT_ID --tenant $env:AZURE_TENANT_ID `[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:55:46.0318907Z [36;1m  --federated-token $oidc.value --output none[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:55:46.0320400Z [36;1mif ($LASTEXITCODE -ne 0) { Write-Error "Azure OIDC login failed"; exit 1 }[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:55:46.0456636Z shell: C:\Program Files\PowerShell\7\pwsh.EXE -command ". '{0}'"
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:55:46.0458617Z env:
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:55:46.0461824Z   DOTNET_VERSION: 10.0.x
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:55:46.0462744Z   WEBAPP_NAME: ***
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:55:46.0463423Z   AZURE_CLIENT_ID: ***
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:55:46.0469642Z   AZURE_TENANT_ID: ***
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:55:46.0470148Z ##[endgroup]
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:55:59.3018233Z ##[group]Run $rg = az webapp list --query "[?name=='$env:WEBAPP_NAME'].resourceGroup | [0]" -o tsv
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:55:59.3021192Z [36;1m$rg = az webapp list --query "[?name=='$env:WEBAPP_NAME'].resourceGroup | [0]" -o tsv[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:55:59.3023497Z [36;1mif (-not $rg) { Write-Error "Could not resolve resource group for the target App Service"; exit 1 }[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:55:59.3025202Z [36;1m[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:55:59.3026509Z [36;1m# Worker bitness must match the published RID, otherwise the host answers HTTP 500.32.[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:55:59.3028440Z [36;1m$use32 = if ($env:RID -eq 'win-x86') { 'true' } else { 'false' }[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:55:59.3030099Z [36;1maz webapp config set --name $env:WEBAPP_NAME --resource-group $rg `[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:55:59.3038367Z [36;1m  --use-32bit-worker-process $use32 --net-framework-version v4.0 | Out-Null[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:55:59.3040509Z [36;1mWrite-Host "Worker bitness set for $env:RID (use32BitWorkerProcess=$use32)"[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:55:59.3042615Z [36;1m[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:55:59.3043991Z [36;1m# Only environment selection and the writable snapshot path are set here. Storage identity[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:55:59.3046288Z [36;1m# stays inside the overlay so it never has to travel through this public repository.[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:55:59.3047839Z [36;1m$settings = @([0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:55:59.3048928Z [36;1m  "AppsettingsEnvironmentName=$env:ENVIRONMENT_NAME",[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:55:59.3050289Z [36;1m  "ASPNETCORE_ENVIRONMENT=Production",[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:55:59.3051854Z [36;1m  "Site__MetricsSnapshotPath=D:\home\data\nav-metrics-snapshot.json"[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:55:59.3053236Z [36;1m)[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:55:59.3054505Z [36;1mif ($env:INVALIDATE_KEY) { $settings += "Site__InvalidateApiKey=$env:INVALIDATE_KEY" }[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:55:59.3055999Z [36;1m[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:55:59.3056714Z [36;1maz webapp config appsettings set `[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:55:59.3057948Z [36;1m  --name $env:WEBAPP_NAME --resource-group $rg `[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:55:59.3059152Z [36;1m  --settings $settings | Out-Null[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:55:59.3060187Z [36;1mWrite-Host "App settings updated"[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:55:59.4042682Z shell: C:\Program Files\PowerShell\7\pwsh.EXE -command ". '{0}'"
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:55:59.4043958Z env:
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:55:59.4044669Z   DOTNET_VERSION: 10.0.x
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:55:59.4046017Z   WEBAPP_NAME: ***
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:55:59.4046795Z   PYTHONWARNINGS: ignore
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:55:59.4047599Z   ENVIRONMENT_NAME: TestmcDocs
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:55:59.4048419Z   RID: win-x64
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:55:59.4050601Z   INVALIDATE_KEY: ***
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:55:59.4051339Z ##[endgroup]
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:56:08.2081097Z D:\a\_work\1\s\build_scripts\windows\artifacts\cli\Lib\site-packages\cryptography/hazmat/backends/openssl/backend.py:8: UserWarning: You are using cryptography on a 32-bit Python on a 64-bit Windows Operating System. Cryptography will be significantly faster if you switch to using a 64-bit Python.
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:56:15.8424824Z D:\a\_work\1\s\build_scripts\windows\artifacts\cli\Lib\site-packages\cryptography/hazmat/backends/openssl/backend.py:8: UserWarning: You are using cryptography on a 32-bit Python on a 64-bit Windows Operating System. Cryptography will be significantly faster if you switch to using a 64-bit Python.
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:56:21.1561588Z Worker bitness set for win-x64 (use32BitWorkerProcess=false)
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:56:23.0027784Z D:\a\_work\1\s\build_scripts\windows\artifacts\cli\Lib\site-packages\cryptography/hazmat/backends/openssl/backend.py:8: UserWarning: You are using cryptography on a 32-bit Python on a 64-bit Windows Operating System. Cryptography will be significantly faster if you switch to using a 64-bit Python.
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:56:26.0303238Z App settings updated
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:56:26.2589244Z ##[group]Run $rg = az webapp list --query "[?name=='$env:WEBAPP_NAME'].resourceGroup | [0]" -o tsv
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:56:26.2590678Z [36;1m$rg = az webapp list --query "[?name=='$env:WEBAPP_NAME'].resourceGroup | [0]" -o tsv[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:56:26.2592265Z [36;1mif (-not $rg) { Write-Error "Could not resolve resource group for the target App Service"; exit 1 }[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:56:26.2593620Z [36;1mCompress-Archive -Path "publish_smartdocs/*" -DestinationPath "smartdocs-deploy.zip" -Force[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:56:26.2594686Z [36;1maz webapp deploy --name $env:WEBAPP_NAME --resource-group $rg `[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:56:26.2595563Z [36;1m  --src-path "smartdocs-deploy.zip" --type zip --only-show-errors[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:56:26.2596504Z [36;1mif ($LASTEXITCODE -ne 0) { Write-Error "App Service deployment failed"; exit 1 }[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:56:26.2671774Z shell: C:\Program Files\PowerShell\7\pwsh.EXE -command ". '{0}'"
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:56:26.2672399Z env:
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:56:26.2672796Z   DOTNET_VERSION: 10.0.x
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:56:26.2673618Z   WEBAPP_NAME: ***
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:56:26.2674029Z   PYTHONWARNINGS: ignore
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:56:26.2674422Z ##[endgroup]
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:56:28.7663855Z D:\a\_work\1\s\build_scripts\windows\artifacts\cli\Lib\site-packages\cryptography/hazmat/backends/openssl/backend.py:8: UserWarning: You are using cryptography on a 32-bit Python on a 64-bit Windows Operating System. Cryptography will be significantly faster if you switch to using a 64-bit Python.
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:56:53.6086360Z D:\a\_work\1\s\build_scripts\windows\artifacts\cli\Lib\site-packages\cryptography/hazmat/backends/openssl/backend.py:8: UserWarning: You are using cryptography on a 32-bit Python on a 64-bit Windows Operating System. Cryptography will be significantly faster if you switch to using a 64-bit Python.
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:57:40.7719051Z {
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:57:40.7719578Z   "active": true,
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:57:40.7719872Z   "author": "N/A",
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:57:40.7720109Z   "author_email": "N/A",
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:57:40.7720402Z   "complete": true,
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:57:40.7720673Z   "deployer": "OneDeploy",
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:57:40.7720955Z   "end_time": "2026-08-17T19:57:36.3532808Z",
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:57:40.7721281Z   "id": "413b144c58b249f596864e345b8aa0ea",
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:57:40.7721589Z   "is_readonly": true,
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:57:40.7721822Z   "is_temp": false,
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:57:40.7722124Z   "last_success_end_time": "2026-08-17T19:57:36.3532808Z",
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:57:40.7723314Z   "log_url": "https://***.scm.azurewebsites.net/api/deployments/latest/log",
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:57:40.7723763Z   "message": "OneDeploy",
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:57:40.7724024Z   "progress": "",
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:57:40.7724267Z   "provisioningState": "Succeeded",
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:57:40.7724587Z   "received_time": "2026-08-17T19:57:24.4197288Z",
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:57:40.7725497Z   "site_name": "***",
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:57:40.7725756Z   "start_time": "2026-08-17T19:57:24.6228534Z",
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:57:40.7726058Z   "status": 4,
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:57:40.7726276Z   "status_text": "",
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:57:40.7726732Z   "url": "https://***.scm.azurewebsites.net/api/deployments/latest"
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:57:40.7727111Z }
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:57:41.1489618Z ##[group]Run # A deploy that returns success while the host fails to start is the failure mode worth
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:57:41.1492335Z [36;1m# A deploy that returns success while the host fails to start is the failure mode worth[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:57:41.1494388Z [36;1m# catching here: the payload is self-contained, so a bitness or overlay mistake shows up[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:57:41.1495930Z [36;1m# only on the first request.[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:57:41.1497305Z [36;1m$rg = az webapp list --query "[?name=='$env:WEBAPP_NAME'].resourceGroup | [0]" -o tsv[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:57:41.1499024Z [36;1m# $host is a PowerShell automatic variable and cannot be assigned.[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:57:41.1500968Z [36;1m$hostName = az webapp show --name $env:WEBAPP_NAME --resource-group $rg --query defaultHostName -o tsv[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:57:41.1501595Z [36;1m$url = "https://$hostName/"[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:57:41.1501934Z [36;1mfor ($i = 1; $i -le 10; $i++) {[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:57:41.1502315Z [36;1m  try {[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:57:41.1502698Z [36;1m    $r = Invoke-WebRequest -Uri $url -UseBasicParsing -TimeoutSec 30[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:57:41.1503216Z [36;1m    Write-Host "Attempt ${i}: HTTP $($r.StatusCode)"[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:57:41.1503614Z [36;1m    if ($r.StatusCode -eq 200) { exit 0 }[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:57:41.1503920Z [36;1m  }[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:57:41.1504149Z [36;1m  catch {[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:57:41.1504460Z [36;1m    Write-Host "Attempt ${i}: $($_.Exception.Message)"[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:57:41.1505067Z [36;1m  }[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:57:41.1505306Z [36;1m  Start-Sleep -Seconds 15[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:57:41.1505549Z [36;1m}[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:57:41.1506052Z [36;1mWrite-Error "Site did not return HTTP 200 after deployment"[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:57:41.1506611Z [36;1mexit 1[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:57:41.1578210Z shell: C:\Program Files\PowerShell\7\pwsh.EXE -command ". '{0}'"
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:57:41.1578781Z env:
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:57:41.1579084Z   DOTNET_VERSION: 10.0.x
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:57:41.1579799Z   WEBAPP_NAME: ***
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:57:41.1580183Z   PYTHONWARNINGS: ignore
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:57:41.1580525Z ##[endgroup]
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:57:43.9080639Z D:\a\_work\1\s\build_scripts\windows\artifacts\cli\Lib\site-packages\cryptography/hazmat/backends/openssl/backend.py:8: UserWarning: You are using cryptography on a 32-bit Python on a 64-bit Windows Operating System. Cryptography will be significantly faster if you switch to using a 64-bit Python.
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:57:48.5484953Z D:\a\_work\1\s\build_scripts\windows\artifacts\cli\Lib\site-packages\cryptography/hazmat/backends/openssl/backend.py:8: UserWarning: You are using cryptography on a 32-bit Python on a 64-bit Windows Operating System. Cryptography will be significantly faster if you switch to using a 64-bit Python.
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:58:06.2367880Z Attempt 1: Response status code does not indicate success: 500 (Internal Server Error).
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:58:29.8948163Z Attempt 2: Response status code does not indicate success: 500 (Internal Server Error).
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:58:45.7685752Z Attempt 3: Response status code does not indicate success: 500 (Internal Server Error).
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:59:01.9538666Z Attempt 4: Response status code does not indicate success: 500 (Internal Server Error).
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:59:17.3408136Z Attempt 5: Response status code does not indicate success: 500 (Internal Server Error).
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:59:32.7341814Z Attempt 6: Response status code does not indicate success: 500 (Internal Server Error).
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T19:59:48.0923068Z Attempt 7: Response status code does not indicate success: 500 (Internal Server Error).
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T20:00:03.4554551Z Attempt 8: Response status code does not indicate success: 500 (Internal Server Error).
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T20:00:18.7921047Z Attempt 9: Response status code does not indicate success: 500 (Internal Server Error).
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T20:00:34.1887566Z Attempt 10: Response status code does not indicate success: 500 (Internal Server Error).
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T20:00:50.1269086Z [31;1mWrite-Error: [31;1mSite did not return HTTP 200 after deployment[0m
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T20:00:50.1508109Z ##[error]Process completed with exit code 1.
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T20:00:50.1597928Z Cleaning up orphan processes
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T20:00:50.2111668Z Terminate orphan process: pid (19024) (dotnet)
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T20:00:50.2252967Z Terminate orphan process: pid (21544) (conhost)
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T20:00:50.2452375Z Terminate orphan process: pid (47540) (VBCSCompiler)
+deploy / build-and-deploy	UNKNOWN STEP	2026-08-17T20:00:50.2564459Z Terminate orphan process: pid (11740) (conhost)

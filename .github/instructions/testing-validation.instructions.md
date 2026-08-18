@@ -62,5 +62,5 @@ The only repository-specific values. Replace this table when porting these rules
 | Build | `dotnet build src/Diginsight.SmartDocs.slnx -c Debug` |
 | Run | `dotnet run --launch-profile http` from the web project |
 | URL | `http://localhost:5280/` |
-| Work-item root | `src/docs/90. Issues/<yyyymm>/<yyyymmdd>.NN-<slug>/` |
+| Work-item root | `src/docs/90.00-issues/<yyyymm>/<yyyymmdd>.NN-<slug>/` |
 | Catalog folder (off-limits) | `src/docs/95. Validations/` |

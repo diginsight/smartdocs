@@ -10,10 +10,19 @@ argument-hint: 'topic="Your Article Topic" outline="key points to cover"'
 # Generate analysis from current conversation
 
 ## Goal
-Generate a comprehensive issue markdown document using the enhanced structure defined in the file `ISSUE Template.md`.
-The issue markdown document should be created in the folder `/src/docs/90. Issues` and named as `YYYYMMDD - [Issue Title].md`.
+Generate a comprehensive issue analysis from the current conversation, split into a **public document** and — when the repository is public — an **internal companion** carrying the identifying detail.
+
+The analysis is created as a **folder** under `src/docs/90.00-issues/<YYYYMM>/`, named `<YYYYMMDD>.<NN>-<kebab-slug>/`, containing read-ordered pages named `<NN>-<kebab-name>.md`. A single-page analysis is still a folder with one page, so a follow-up page can be added without renaming anything.
 
 ## Instructions
+
+### 0. Classify before writing — MANDATORY
+
+Run 📖 `.github/prompt-snippets/content-classification-and-split.md` in full **before** creating any file.
+
+That procedure resolves `repository.metadata.yml`, decides whether a split is needed at all, resolves and reads the internal peer, and fixes the role names this analysis will use. It is not a review step afterwards — an identifier written into a public draft has already been written.
+
+**Do not proceed to step 1 until it has completed or explicitly determined that `visibility: private` makes the split unnecessary.**
 
 ### 1. Analyze Current Conversation
 Analyze the current conversation and identify the following information:
@@ -26,7 +35,7 @@ Analyze the current conversation and identify the following information:
 
 ### 2. Read and Understand Template Structure
 Read the template file located at:
-`.github/copilot/templates/ISSUE Template.md`
+`.github/templates/01.00-article-writing/issue.template.md`
 
 Understand the enhanced structure including:
 - **Header with metadata** (Date, Author, Status, Severity, Component, Framework)
@@ -34,12 +43,34 @@ Understand the enhanced structure including:
 - **Comprehensive sections** with detailed subsections
 - **Modern formatting** with tables, code blocks, and checklists
 
-### 3. Create New Issue Document
-Create a new issue document in the folder:
-`/src/docs/90. Issues`
+### 2.5. Sweep the conversation for signals — MANDATORY
 
-Name the document as:
-`<DatePrefix> - <IssueTitle>.md`
+Run 📖 `.github/skills/signal-capture/SKILL.md` against the conversation **before** the split.
+
+The split that follows asks the conversation *what happened*. It never asks *what else the conversation revealed*, so anything outside the issue is lost the moment the payload rolls over. The sweep is the only step that asks. Run all seven of its questions; do not substitute an impression that there was nothing.
+
+The skill owns the record shape, the kinds, the priority derivation and the page split. This prompt owns only the timing: **before** step 3, so the pages it produces can take their ordinals in the same pass.
+
+### 3. Create New Issue Document
+
+Create the analysis folder:
+`src/docs/90.00-issues/<YYYYMM>/<YYYYMMDD>.<NN>-<kebab-slug>/`
+
+Inside it, create read-ordered pages. Order by how they should be read, not by when they were written — index first, then incidents in time order, then any standing reference:
+
+| Page | Purpose |
+|---|---|
+| `01-overview.md` | entry point: what happened, how the parts relate, what generalises |
+| `02-…`, `03-…` | one page per incident or theme, in order |
+| `NN-signals.md` | signals from step 2.5 that are relevant **or** actionable, in priority order |
+| `NN-other-signals.md` | the less defined remainder |
+| `NN-…-reference.md` | standing reference material, last |
+
+The two signal pages take the next free ordinals **after** the case pages and **before** the standing reference page, and are created from `.github/templates/01.00-article-writing/signals.template.md`. Omit either page when the sweep produced nothing for it — an empty signals page is noise, but a missing report is not: step 6 states the absence explicitly.
+
+When the repository is public, each page gets a companion at the **same relative path** in the internal peer, named `<same-name>.internal.md`. Write the companion **first**.
+
+The public page carries a pointer to its companion — a backticked path, not a link — stating what the companion adds.
 
 ### 4. Fill Content from Conversation Analysis
 Analyze the current debugging conversation and fill ALL sections of the issue report:
@@ -74,8 +105,28 @@ Ensure the generated document:
 - ✅ Provides clear reproduction steps
 - ✅ Documents lessons learned for future prevention
 
+And, for every captured signal:
+- ✅ Declares `kind`, `relevance`, `actionability`, `target` and `state`
+- ✅ Carries **no execution steps** — those belong to the context that executes it
+- ✅ Names an existing landing, or states "none found" after actually looking
+- ✅ Reads as a complete work item without the conversation or this work item's folder
+- ✅ Sits on the page and in the position its relevance and actionability dictate, not where judgement put it
+
+And, when the repository is public, that the split holds:
+- ✅ Zero sensitive values in any public page — scan, do not assume
+- ✅ Every companion written at the path-parallel location and **complete**, not a list of redactions
+- ✅ Every alias used publicly resolves in the alias registry
+- ✅ Screenshots checked for in-image disclosure (address bars, window titles, terminal prompts)
+- ✅ **Correction test**: fixing an internal identifier would require no edit to any public page
+
+### 6. Report the split and the signals
+
+State which pages are public, which are internal, where the internal ones were written, and any fact classified sensitive that a reader might have expected to find publicly.
+
+Then state the signals captured, per page, with their targets — or explicitly state that the sweep found none. Silence is indistinguishable from not having run the sweep.
+
 <!--
 prompt_metadata:
-  version: "1.0.0"
-  last_updated: "2026-06-12"
+  version: "1.1.0"
+  last_updated: "2026-08-18"
 -->

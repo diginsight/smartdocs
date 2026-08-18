@@ -230,7 +230,7 @@ Every run must return:
 
 ## References
 
-- `src/docs/90. Issues/` for issue-first research workflow
+- `src/docs/90.00-issues/` for issue-first research workflow
 - `03.00-tech/` for long-form integration targets
 - [Get Started with AI Architecture Design - Azure Architecture Center](https://learn.microsoft.com/en-us/azure/architecture/ai-ml/) 📘 [Official]
 - [LangChain Agents](https://docs.langchain.com/oss/python/langchain/agents) 📗 [Verified Community]

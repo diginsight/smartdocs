@@ -24,6 +24,10 @@ source_sets:
 
 # [CONTROL-ID] — [requirement title]
 
+## 📚 Table of contents
+
+[required when the page exceeds 500 words - one entry per H2, mirroring its emoji]
+
 - **Dimension**: [the declared dimension this requirement belongs to] ^[[area]-nn]
 - **Control family**: [family name] → [`../control-families/[family].md`]
 - **Status**: [implemented / partial / not implemented]
@@ -44,7 +48,7 @@ source_sets:
 
 **[internal]** `security.internal.md#[id]`
 
-## 🕳️ Not established
+## 🕳️ Open questions
 
 > **Not established**: [what is missing and where it was sought]. ^[gap]
 

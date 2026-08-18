@@ -117,7 +117,7 @@ The top-level use-case-set overview (sibling of folder overviews) MUST anchor to
 
 - **The canonical use-case filename is `p<priority>-<order>-<slug>-usecase.md`.** Rationale: the `-usecase` suffix lets a future instruction file target use-case bodies specifically (via `applyTo: '**/*-usecase.md'`) while a separate rule set targets folder overviews (`applyTo: '**/*usecases/**/00-overview.md'`). Without the suffix the only available glob — `**/*usecases/**/*.md` — bundles both file classes under one rule set, which has already caused friction. (Supersedes the v1.1.0 decision in this file that rejected `-usecase.md`; the prior rationale weighed only intra-folder uniqueness and missed the cross-folder `applyTo` targeting use case.)
 - **The canonical folder-overview filename is `00-overview.md`** (not `README.md`). The `00-` numeric prefix sorts before all `pN-NN-…` files in both case-sensitive and case-insensitive listings, and the explicit `-overview` part is a stable `applyTo` target. GitHub's auto-rendered README behavior is sacrificed deliberately for these two properties.
-- **Dimension references in use-case bodies and folder overviews use the canonical `D#-readable-id` form**, not bare `D#`, per [01-dimids-rename-plan.md](../../src/docs/90.%20Issues/202606/20260601.02-dim-readable-ids/01-dimids-rename-plan.md).
+- **Dimension references in use-case bodies and folder overviews use the canonical `D#-readable-id` form**, not bare `D#`, per [01-dimids-rename-plan.md](../../src/docs/90.00-issues/202606/20260601.02-dim-readable-ids/01-dimids-rename-plan.md).
 
 ## Quality Checklist
 
@@ -152,5 +152,5 @@ The top-level use-case-set overview (sibling of folder overviews) MUST anchor to
 - **📒** `06.00-idea/self-updating-prompt-engineering/20260503.02-vision-pe-meta-usecases/05-reliability/p0-04-domain-coherent-batching-usecase.md` — example with full optional-field set
 - **📘** `.github/instructions/vision-amendment.instructions.md` — defines the coverage promise that points to use cases as a landing target
 - **📘** `.github/instructions/vision-frontmatter.instructions.md` — declares the principles use cases may anchor against
-- **🔗** `src/docs/90. Issues/202606/20260601.02-dim-readable-ids/02-align-dimids-usecases-pemeta-plan.md` — issue plan introducing the v1.1.0 README and index rules
-- **🔗** `src/docs/90. Issues/202606/20260601.02-dim-readable-ids/04-usecase-suffix-and-overview-sort-plan.md` — v1.2.0 reversal: adopts `-usecase.md` and renames READMEs to `00-overview.md`
+- **🔗** `src/docs/90.00-issues/202606/20260601.02-dim-readable-ids/02-align-dimids-usecases-pemeta-plan.md` — issue plan introducing the v1.1.0 README and index rules
+- **🔗** `src/docs/90.00-issues/202606/20260601.02-dim-readable-ids/04-usecase-suffix-and-overview-sort-plan.md` — v1.2.0 reversal: adopts `-usecase.md` and renames READMEs to `00-overview.md`

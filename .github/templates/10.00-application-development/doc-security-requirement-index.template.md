@@ -22,6 +22,10 @@ source_sets:
 
 # Security requirements — [component-id]
 
+## 📚 Table of contents
+
+[required when the page exceeds 500 words - one entry per H2, mirroring its emoji]
+
 ## 🎯 Scope
 
 [What this component is assessed against and where that was declared, in two or three sentences.] ^[[area]-nn]
@@ -58,7 +62,7 @@ source_sets:
 
 [Repeat one section per control family. Families from different dimensions are peers and appear at the same level, in catalogue order.]
 
-## 🕳️ Not established
+## 🕳️ Open questions
 
 > **Not established**: [what is missing and where it was sought — an unreadable catalogue source belongs here, naming the source]. ^[gap]
 

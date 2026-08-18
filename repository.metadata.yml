@@ -1,0 +1,61 @@
+# Repository metadata — classification and internal peer
+#
+# This file is the single anchor that documentation and issue-analysis artifacts read before
+# writing anything. It answers two questions:
+#
+#   1. Does content produced here need to be split into public and internal parts?
+#   2. If it does, where does the internal part go?
+#
+# It is the repository-level equivalent of the `ExternalConfigurationFolder` pointer in
+# launchSettings.json: a declared location for material that must not live in this repository.
+#
+# ---------------------------------------------------------------------------------------------
+# FAIL-SAFE DEFAULT
+# When this file is absent, or `visibility` is missing or unrecognised, artifacts MUST assume
+# `public`. Guessing "private" and being wrong discloses; guessing "public" and being wrong costs
+# some unnecessary aliasing. The cheap error is the safe one.
+# ---------------------------------------------------------------------------------------------
+
+schema: repository-metadata/v1
+
+repository:
+  id: diginsight/smartdocs
+
+  # public  — classification and the public/internal split apply to every authored document.
+  # private — the split is skipped: write real names, one file, no internal peer, no sync.
+  #
+  # Changing this from private to public does NOT retro-classify existing content. A repository
+  # being opened must be de-identified deliberately, as its own piece of work.
+  visibility: public
+
+# Where internal content is written when `visibility: public`.
+# Omit this whole block in a private repository.
+internal_peer:
+  id: diginsight/smartdocs.internal
+  path_env: SMARTDOCS_INTERNAL_FOLDER
+  default_relative_path: "../smartdocs.internal"
+  mirror_strategy: path-parallel
+  suffix: ".internal.md"
+
+  # What to do when the peer cannot be resolved or read.
+  #
+  # fail-closed: stop the task. Do NOT continue into the public document.
+  #
+  # This matters most on the READ side. If a fetch of an existing companion fails quietly, the
+  # agent sees no companion, writes a new one from scratch, and the next sync overwrites a richer
+  # original. Silent absence and genuine absence must never be confused.
+  on_missing: fail-closed
+
+  # Single registry resolving every role name used publicly to its real identifier. Repository
+  # relative, inside the internal peer. One registry per repository — an alias defined in two
+  # places will disagree eventually.
+  alias_registry: "src/docs/_aliases/{environment}.aliases.internal.md"
+
+# Values that are already public by deliberate choice. Aliasing these costs readability and buys
+# no protection, so classification MUST leave them alone. Anything not listed here and matching a
+# sensitive class is classified sensitive.
+deliberately_public:
+  - "Environment short names used in public workflows (testmc, testmcdocs)"
+  - "The internal peer repository name itself (diginsight/smartdocs.internal)"
+  - "Secret NAMES as referenced in workflows, never their values"
+  - "GitHub Actions run identifiers and public error codes (for example AADSTS codes)"

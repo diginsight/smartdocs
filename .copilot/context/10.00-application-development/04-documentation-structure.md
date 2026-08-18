@@ -10,6 +10,8 @@ scope:
     - "Page-shape catalogue and its template binding"
     - "Major versus minor placement by component priority"
     - "Mapping chapters onto existing folders through metadata.yml"
+    - "Chapter folder naming and the numeric prefix that carries the order"
+    - "Page file naming and the numeric prefix that carries the reading order"
     - "Placement tie-breakers"
   excludes:
     - "How a page is written once placed (see 07-documentation-authoring-criteria.md)"
@@ -18,11 +20,17 @@ scope:
 boundaries:
   - "The chapter set is FIXED — a stream MUST NOT invent, merge or rename a chapter"
   - "NEVER rename an existing folder to realise a chapter — use metadata.yml"
+  - "NEVER create a new chapter folder without its NN.00- numeric prefix"
+  - "NEVER create a page file without its NN- numeric prefix — the chapter's own index.md is the only exception"
+  - "NEVER leave the page prefix sequence disagreeing with the chapter overview's Pages table"
+  - "NEVER create a chapter folder before listing src/docs/ to check whether one already serves that chapter"
   - "Every page shape MUST bind to exactly one template, and every template MUST be bound by at least one shape"
 rationales:
   - "A fixed chapter set is what lets a reader move between two documented repositories without relearning the layout"
   - "Deriving the template count from page shapes rather than chapters prevents eleven near-identical templates or one template stretched over incompatible content"
   - "Realising chapters through metadata.yml keeps existing folder names and their inbound links intact"
+  - "Carrying the order in the folder name makes the chapter sequence survive a lost or mistyped metadata.yml, which otherwise degrades to alphabetical order silently"
+  - "Pages have no metadata.yml equivalent at all, so the file name is the only carrier of reading order — without a prefix a chapter presents itself alphabetically, which routinely puts its overview page last"
 ---
 
 # Documentation structure
@@ -134,20 +142,51 @@ Chapters are realised through per-folder `metadata.yml`, so **existing folders k
 | Key | Effect |
 |---|---|
 | `label` | the chapter name shown in navigation |
-| `order` | position in the chapter sequence |
+| `order` | position in the chapter sequence — **confirms** the folder's numeric prefix, and **supplies** it for a folder that cannot be renamed |
 | `icon` | the chapter's navigation icon |
 | `hidden` | excludes a folder from navigation without deleting it |
 
 ### Worked example — this repository
 
-`src/docs/` currently holds two content folders. Neither is renamed.
+`src/docs/` holds one content folder outside the chapter set.
 
 | Existing folder | `metadata.yml` | Result |
 |---|---|---|
-| `80. Usecases/` | `label: Use Cases`, `order: 4` | becomes the Use Cases chapter in place |
-| `90. Issues/` | `label: Issues`, `order: 90` | **not** one of the eleven — working documents (plans, investigations) that sit outside the chapter set |
+| `90.00-issues/` | `label: Issues`, `order: 90` | **not** one of the eleven — working documents (plans, investigations) that sit outside the chapter set; the `90` prefix keeps it last |
 
-Missing chapters are created as new folders alongside them. A folder outside the chapter set is legitimate; it simply carries no page shape and is never a placement target for generated content.
+The numeric prefix is not a chapter privilege: **every** folder under `src/docs/` carries one, chapter or not. `metadata.yml` supplies the display label, so the prefix never has to read well.
+
+### Naming a new chapter folder
+
+A chapter that has no existing folder is created as `NN.00-<kebab-name>`, where `NN` is the chapter's zero-padded order:
+
+`02.00-getting-started` · `03.00-architecture` · `04.00-use-cases` · `05.00-infrastructure` · `06.00-reference` · `07.00-other-components` · `08.00-validation` · `09.00-security` · `10.00-devops` · `11.00-appendix`
+
+Chapter 1 (Home) is the space root page `src/docs/index.md`, not a folder.
+
+**The prefix carries the order; `metadata.yml` only confirms it.** `NavRules.SortKey` sorts a numeric-prefixed name in the explicit-order group and an unprefixed name in the alphabetical group. A prefixed folder therefore holds its position even if `metadata.yml` is absent, misspelt or unparsed; an unprefixed one collapses to `appendix, architecture, devops, getting-started, …` — wrong, and with no error raised anywhere. Carry the order in both places so neither alone is load-bearing.
+
+**Before creating any chapter folder, list `src/docs/` and check whether a folder already serves that chapter.** Creating a second folder for a chapter that already has one is the failure this check exists to prevent — the duplicate is invisible in a diff of new files, and both folders then appear in navigation.
+
+An existing folder that holds content or has inbound links is reused, never renamed. An empty placeholder folder that git does not track carries neither, and is not protected by that rule — replace it with the correctly prefixed name.
+
+A folder outside the chapter set is legitimate; it simply carries no page shape and is never a placement target for generated content.
+
+### Naming a page file
+
+Every page inside a chapter is created as `NN-<kebab-name>.md`, where `NN` is its zero-padded position in that chapter's reading order:
+
+`01-system-architecture.md` · `02-host-application.md` · `03-browser-client.md` · `04-shared-library.md` · `05-caching-and-invalidation.md`
+
+The chapter's own `index.md` is never prefixed — `NavRules.IsIndexName` treats it as the folder's own page rather than a sibling.
+
+**A page has no other way to hold its position.** `metadata.yml` orders folders; there is no equivalent for files. `DynamicNavBuilder` reads only `hidden` from a page's front matter and then sorts on the file name alone, so an unprefixed chapter collapses to alphabetical order — which is what put `system-architecture.md`, the page that opens Architecture, last behind `browser-client.md` and `caching-and-invalidation.md`.
+
+The prefix costs nothing in presentation. The sidebar label comes from the page's `title:`, and where there is none `NavRules.Label` strips the prefix anyway, so the number is never seen by a reader — it only moves the item.
+
+**The prefix sequence MUST match the chapter overview's Pages table**, which is where the reading order is declared in prose. The table and the file names are two renderings of one sequence; when they disagree, the sidebar contradicts the page the reader has just finished. Number contiguously from `01`, leaving no gaps.
+
+A page added later takes the next free number, or forces a renumber of the pages after it. Either way the rename and every inbound link are rewritten in the same edit — a stale link is the cost of getting this wrong twice.
 
 ---
 

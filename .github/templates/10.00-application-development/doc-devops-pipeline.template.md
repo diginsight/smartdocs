@@ -22,6 +22,10 @@ source_sets:
 
 # [pipeline name]
 
+## 📚 Table of contents
+
+[required when the page exceeds 500 words - one entry per H2, mirroring its emoji]
+
 ## 🎯 What it does
 
 [What the pipeline produces or promotes, and for which components.] ^[[area]-nn]
@@ -61,7 +65,7 @@ source_sets:
 
 [Which environments it deploys to, in what order, and what promotes between them.] ^[[area]-nn]
 
-## 🕳️ Not established
+## 🕳️ Open questions
 
 > **Not established**: [what is missing and where it was sought]. ^[gap]
 <!--

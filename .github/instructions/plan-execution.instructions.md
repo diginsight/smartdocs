@@ -31,7 +31,7 @@ The filename **is** the enforcement trigger. This file loads only for `**/*.plan
 
 - **[C1]** MUST name every plan `<NN>-<kebab-name>.plan.md` — e.g. `01-robustness-fixes.plan.md`
 - **[C1]** MUST decide the name at creation time, BEFORE writing the file — renaming afterwards means the body was authored without these rules loaded, so the Actionability Gate MUST then be re-run against the renamed file
-- **[C1]** MUST place the plan in the work-item folder it belongs to (`src/docs/90. Issues/<YYYYMM>/<work-item>/`), not at a content root
+- **[C1]** MUST place the plan in the work-item folder it belongs to (`src/docs/90.00-issues/<YYYYMM>/<work-item>/`), not at a content root
 - NEVER name a plan `overview.md`, `notes.md`, or any name lacking the `.plan.md` suffix — if a document declares `status: draft | actionable | in-progress | done`, it is a plan and MUST carry the suffix
 
 ## Plan Creation Rules
@@ -69,7 +69,7 @@ Run BEFORE writing the body and again at the `draft`→`actionable` transition. 
 3. **Execution determinism** — each step has exactly one reasonable execution
 4. **Clarity & actionability** — verify/confirm/check/assess are NOT actionable unless they carry a defined negative branch or live in § Discovery
 5. **Unknown resolution** — every blocking unknown resolved (evidence/ask/discovery); none guessed
-6. **Scope discipline** — no item exceeds the verbatim trigger; expansions → § Park lot
+6. **Scope discipline** — no item exceeds the verbatim trigger; expansions → § Park lot; divergent items → the work item's signals page
 7. **Coverage promise** — every in-scope goal item names a downstream landing (path, sibling-plan id, or `vision-only`)
 8. **Principle impact** *(vision-amendment plans only)* — every item tagged per `vision-amendment.instructions.md`
 
@@ -79,6 +79,7 @@ On any failure: **resolve FIRST** (evidence → ask user), keep `status: draft`,
 
 Plans MUST contain a § Park lot section (may be empty) for edge cases surfaced during authoring or execution that are out of scope for the current plan.
 
+- § Park lot MUST hold only items that were **in-domain for this goal and deliberately excluded**. An item that was never in scope is a **signal** and MUST be routed to the work item's signals page (`<NN>-signals.md` or `<NN>-other-signals.md`), NEVER parked — the park lot is a coverage guarantee, and mixing in items that were never in scope destroys it. 📖 `.github/skills/signal-capture/SKILL.md`
 - Items in § Park lot MUST NOT be executed as part of the current plan
 - Each parked item MUST carry a one-line disposition: `→ <sibling-plan-id>.md` (will spawn a new plan), `→ defer` (revisit later, no commitment), or `→ closed: <reason>` (intentionally not pursued)
 - Migrating an item from § Park lot into the active goal list MUST drop the plan back to `status: draft` and re-run the Actionability Gate
@@ -108,13 +109,14 @@ Point-of-action essentials: suffix `Task text. (✅ done)` — NEVER `[x]` or `[
 
 ## References
 
-- **�** `.copilot/context/00.00-prompt-engineering/05.11-plan-authoring-discipline.md` — readiness/lifecycle/gate elaboration + rationale (this file holds the terse MUSTs)
-- **�📘** `.github/instructions/plan-marking.instructions.md` — marking format + identifier-readability authority
+- **📘** `.copilot/context/00.00-prompt-engineering/05.11-plan-authoring-discipline.md` — readiness/lifecycle/gate elaboration + rationale (this file holds the terse MUSTs)
+- **📘** `.github/instructions/plan-marking.instructions.md` — marking format + identifier-readability authority
 - **📘** `.github/instructions/vision-amendment.instructions.md` — per-item tagging for Gate check #8 (matches `*vision*plan*.md`)
 - **📘** `.github/instructions/vision-frontmatter.instructions.md` — declares the `principles:` block for Gate check #8
+- **📘** `.github/skills/signal-capture/SKILL.md` — the signals page that receives divergent items barred from § Park lot
 
 <!--
 instruction_metadata:
-  version: "1.5.0"
-  last_updated: "2026-08-16"
+  version: "1.6.0"
+  last_updated: "2026-08-18"
 -->

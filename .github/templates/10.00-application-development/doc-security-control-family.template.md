@@ -24,7 +24,11 @@ source_sets:
 
 # [control family name]
 
-## 🎯 What this family covers
+## 📚 Table of contents
+
+[required when the page exceeds 500 words - one entry per H2, mirroring its emoji]
+
+## 🎯 Scope
 
 [The concern the family addresses, in the catalogue's own terms.] ^[[area]-nn]
 
@@ -58,7 +62,7 @@ source_sets:
 |---|---|---|
 | [control id] | [reason grounded in evidence] | ^[[area]-nn] |
 
-## 🕳️ Not established
+## 🕳️ Open questions
 
 > **Not established**: [what is missing and where it was sought]. ^[gap]
 

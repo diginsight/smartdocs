@@ -5,6 +5,7 @@ date: "2026-08-15"
 categories: [smartdocs, rendering, blazor, deployment, github-actions, azure]
 description: "Migrates the Learn.Web rendering application into diginsight/smartdocs as Diginsight.SmartDocs.Web with unchanged behaviour for the learning hub, generalises it to render any repository's documentation through configured route bases, and deploys the one artifact to its two Testmc targets."
 status: actionable
+publish: true
 ---
 
 # Diginsight.SmartDocs.Web — convergence, multi-space rendering and Testmc deployment
@@ -13,23 +14,24 @@ status: actionable
 
 - [🎯 Goal and scope](#-goal-and-scope)
 - [🧭 Decisions taken](#-decisions-taken)
-- [⚠️ Pre-flight warnings](#️-pre-flight-warnings)
+- [⚠️ Pre-flight warnings](#-pre-flight-warnings)
 - [🔢 Execution order](#-execution-order)
-- [📦 WS-A-relocation — repository preparation and projects into `src`](#-ws-a-relocation--repository-preparation-and-projects-into-src)
-- [🧱 WS-B-space-model — configuration and resolution](#-ws-b-space-model--configuration-and-resolution)
-- [🔌 WS-C-endpoints — space-addressed surface](#-ws-c-endpoints--space-addressed-surface)
-- [🖼️ WS-D-space-index — generated index and switcher](#️-ws-d-space-index--generated-index-and-switcher)
-- [🎨 WS-K-branding — configurable app-level look and feel](#-ws-k-branding--configurable-app-level-look-and-feel)
-- [🔨 WS-E-scaffolding — solution, build files and local run](#-ws-e-scaffolding--solution-build-files-and-local-run)
-- [🔐 WS-F-internal-config — move Testmc configuration to `smartdocs.internal`](#-ws-f-internal-config--move-testmc-configuration-to-smartdocsinternal)
-- [🚀 WS-G-deployment — build and deploy the learning hub](#-ws-g-deployment--build-and-deploy-the-learning-hub)
-- [🏢 WS-L-docs-instance — deploy the documentation site](#-ws-l-docs-instance--deploy-the-documentation-site)
-- [📤 WS-H-content-publishing — the `diginsight.smartdocs` space](#-ws-h-content-publishing--the-diginsightsmartdocs-space)
-- [🧪 WS-I-validation — visible browser evidence](#-ws-i-validation--visible-browser-evidence)
-- [🧹 WS-J-retirement — remove from the source repositories](#-ws-j-retirement--remove-from-the-source-repositories)
+- [📦 WS-A-relocation — repository preparation and projects into `src` (✅ done)](#-ws-a-relocation--repository-preparation-and-projects-into-src--done)
+- [🧱 WS-B-space-model — configuration and resolution (🟡 todo)](#-ws-b-space-model--configuration-and-resolution--todo)
+- [🔌 WS-C-endpoints — space-addressed surface (🟡 todo)](#-ws-c-endpoints--space-addressed-surface--todo)
+- [🖼️ WS-D-space-index — generated index and switcher (🟡 todo)](#-ws-d-space-index--generated-index-and-switcher--todo)
+- [🎨 WS-K-branding — configurable app-level look and feel (🟡 todo)](#-ws-k-branding--configurable-app-level-look-and-feel--todo)
+- [🔨 WS-E-scaffolding — solution, build files and local run (🟡 todo)](#-ws-e-scaffolding--solution-build-files-and-local-run--todo)
+- [🔐 WS-F-internal-config — move Testmc configuration to `smartdocs.internal` (🟡 todo)](#-ws-f-internal-config--move-testmc-configuration-to-smartdocsinternal--todo)
+- [🚀 WS-G-deployment — build and deploy the learning hub (🟡 todo)](#-ws-g-deployment--build-and-deploy-the-learning-hub--todo)
+- [🏢 WS-L-docs-instance — deploy the documentation site (🟡 todo)](#-ws-l-docs-instance--deploy-the-documentation-site--todo)
+- [📤 WS-H-content-publishing — the `diginsight.smartdocs` space (🟡 todo)](#-ws-h-content-publishing--the-diginsightsmartdocs-space--todo)
+- [🧪 WS-I-validation — visible browser evidence (🟡 todo)](#-ws-i-validation--visible-browser-evidence--todo)
+- [🧹 WS-J-retirement — remove from the source repositories (🟡 todo)](#-ws-j-retirement--remove-from-the-source-repositories--todo)
+- [🕳️ Gaps found during execution](#-gaps-found-during-execution)
 - [🔎 Discovery](#-discovery)
-- [🗳️ Open decisions](#️-open-decisions)
-- [🅿️ Park lot](#️-park-lot)
+- [🗳️ Open decisions](#-open-decisions)
+- [🅿️ Park lot](#-park-lot)
 - [🏁 Exit criteria](#-exit-criteria)
 - [📚 References](#-references)
 
@@ -114,7 +116,7 @@ The source repository placed the OIDC identifiers in `secrets.*`; do not carry t
 
 **`D11-cutover-then-retire`** — projects are added here, deployed, and verified in a browser **before** anything is removed from the source repositories. Retirement is `WS-J-retirement`, gated on the validation exit criterion.
 
-**`D12-tools-scaffolds-out-of-scope`** — `src/20.00 Api/SmartDocs` and `src/20.00 Api/SmartDocsApi` live in `diginsight/tools` and are not touched by this plan. They now sit in a different repository from the renderer whose name they share; whether they should follow it here is a separate question, parked as `PL-3-scaffold-cleanup`.
+**`D12-tools-scaffolds-out-of-scope`** — `src/20.00 Api/SmartDocs` and `src/20.00 Api/SmartDocsApi` live in `diginsight/tools` and are not touched by this plan. They now sit in a different repository from the renderer whose name they share; whether they should follow it here is a separate question, recorded as `SIG-B` in [02-signals.md](02-signals.md).
 
 **`D13-one-workflow-per-target`** — one **reusable build** workflow, plus one **deployment** workflow per target, numbered so that adding a target is adding a file rather than adding a branch to a shared one:
 
@@ -927,15 +929,17 @@ None. `OD1-docs-instance-host` closed on 2026-08-16 when `docs-testmc-app-itn-01
 
 ## 🅿️ Park lot
 
-Out of scope for this plan. Not to be executed here.
+Out of scope for this plan, but **in domain** for it. Not to be executed here.
+
+Items that were never in this plan's domain — `PL-2`, `PL-3` and `PL-7`, all landing in `diginsight/tools` — moved to [02-signals.md](02-signals.md) on 2026-08-18, where a landing outside this repository can actually be expressed. Their identifiers are preserved there as aliases.
 
 - **`PL-1-quarto-retirement`** — → closed: `quarto-publish.yml` is deleted in `Step A0`. It was inherited into this repository, triggers on every push to `main`, and has nothing to publish here. No other Quarto artefact exists in this repository.
-- **`PL-2-ai-content-services`** — semantic search, summarisation and question answering over the spaces, as a separate service rather than inside the renderer. It belongs in `diginsight/tools`, alongside the existing API scaffolds, not here. → defer
-- **`PL-3-scaffold-cleanup`** — the git-tracked, solution-absent `dotnet new webapi` scaffolds under `diginsight/tools`. Not this repository's concern, per `D12-tools-scaffolds-out-of-scope`. → defer
+- **`PL-2-ai-content-services`** — → moved to [02-signals.md](02-signals.md) as `SIG-C`.
+- **`PL-3-scaffold-cleanup`** — → moved to [02-signals.md](02-signals.md) as `SIG-B`.
 - **`PL-4-per-space-theme-override`** — letting an individual **space** override the deployment's logo or palette. App-level branding is now in scope as `WS-K-branding` per `D15-branding-is-per-deployment`; a per-space override is a separate feature needing its own justification. → defer
 - **`PL-5-additional-spaces`** — onboarding further repositories. The model supports it with configuration only: a container, a copy of `03.PublishDocsContent.yml` in the source repository, and an entry in `Step L2`. No change here. → defer
 - **`PL-6-dedicated-app-service`** — renaming or migrating the learning hub's App Service. → closed: `D17-two-deployments-one-codebase` makes the existing name correct — a host called `learn-testmc-app-itn-01` serving the learning hub is no longer a mismatch, and the documentation site got its own name in `D18-docs-instance-host`.
-- **`PL-7-learning-hub-context-generalisation`** — `.copilot/context/90.00-learning-hub/` holds site-specific rules that partly apply to any space. → `01-autonomous-streams-artifacts.plan.md`, in `diginsight/tools`
+- **`PL-7-learning-hub-context-generalisation`** — → moved to [02-signals.md](02-signals.md) as `SIG-A`. It lands in `diginsight/tools`, which no park-lot disposition can name.
 - **`PL-8-space-level-authorisation`** — per-space access control. Every space is currently public. → defer
 - **`PL-9-seo-artifacts`** — `sitemap.xml`, `robots.txt`, canonical links, meta descriptions and Open Graph tags. The application's entire SEO surface today is one `<PageTitle>` in `ContentView.razor`. Prerendering is preserved and proven by `Step I2`, so nothing regresses; adding these is **new capability** and belongs to its own plan with its own goal. → defer
 - **`PL-10-docs-plan-capacity`** — `samples-testmc-asp-01` is Basic B1: one instance, no deployment slots, now shared by two sites. Upgrading to Standard would buy slots and therefore zero-downtime swaps for both. Not needed while these are test deployments. → defer

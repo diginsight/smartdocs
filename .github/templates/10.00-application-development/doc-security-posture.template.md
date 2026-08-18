@@ -22,6 +22,10 @@ source_sets:
 
 # [component-id] — security posture
 
+## 📚 Table of contents
+
+[required when the page exceeds 500 words - one entry per H2, mirroring its emoji]
+
 ## 🎯 What is protected
 
 [What would matter if it were lost, altered or disclosed.] ^[[area]-nn]
@@ -58,7 +62,7 @@ source_sets:
 |---|---|---|---|
 | [what is missing, stated as absence] | [invariant class] | [🔴/🟠/🟡] | **[internal]** `security.internal.md#[id]` |
 
-## 🕳️ Not established
+## 🕳️ Open questions
 
 > **Not established**: [what is missing and where it was sought]. ^[gap]
 <!--

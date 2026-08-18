@@ -21,11 +21,15 @@ source_sets:
 
 # [component-id]
 
+## 📚 Table of contents
+
+[required when the page exceeds 500 words - one entry per H2, mirroring its emoji]
+
 - **Priority**: [🟡 Tooling | ⚪ Peripheral]
 - **Path**: [repository-relative root]
 - **Deployed**: [yes, where | no]  ^[[area]-nn]
 
-## 🎯 Derived purpose
+## 🎯 Purpose
 
 [Why this component exists, with the derivation source named. This is the
 section that stops a deliberate sample being read as dead code.] ^[[area]-nn]
@@ -47,7 +51,7 @@ layer 3.] ^[[area]-nn]
 |---|---|
 | [component-id or external role] | ^[[area]-nn] |
 
-## 🕳️ Not established
+## 🕳️ Open questions
 
 > **Not established**: [what is missing and where it was sought]. ^[gap]
 

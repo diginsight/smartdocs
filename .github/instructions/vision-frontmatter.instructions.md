@@ -266,7 +266,7 @@ This mirrors the P0/P1/P2 amendment-friction rules above: a P0 touch MUST bump (
 ## References
 
 - **📒** `06.00-idea/self-updating-prompt-engineering/20260531.01-vision.md` — first vision to carry the block
-- **📒** `src/docs/90. Issues/202605/20260525.03-staleness-review/05-vision-usecase-plan-rules/01-overview.md` — sub-issue analysis that motivated this rule
+- **📒** `src/docs/90.00-issues/202605/20260525.03-staleness-review/05-vision-usecase-plan-rules/01-overview.md` — sub-issue analysis that motivated this rule
 - **📘** `.github/instructions/vision-amendment.instructions.md` — consumer of this block
 - **📘** `.github/instructions/pe-instruction-files.instructions.md` — instruction-file schema authority
 

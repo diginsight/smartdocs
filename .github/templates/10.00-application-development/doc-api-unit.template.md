@@ -22,7 +22,11 @@ source_sets:
 
 # [api unit name]
 
-## 🎯 What this surface is
+## 📚 Table of contents
+
+[required when the page exceeds 500 words - one entry per H2, mirroring its emoji]
+
+## 🎯 Purpose
 
 - **Kind**: [http endpoint group | message contract | scheduled trigger | cli surface]
 - **Component**: [component-id]
@@ -54,7 +58,7 @@ source_sets:
 |---|---|---|
 | [batch size / payload size / rate / timeout] | [value] | ^[[area]-nn] |
 
-## 🕳️ Not established
+## 🕳️ Open questions
 
 > **Not established**: [what is missing and where it was sought]. ^[gap]
 
