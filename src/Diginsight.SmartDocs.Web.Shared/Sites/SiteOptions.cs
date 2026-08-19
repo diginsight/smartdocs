@@ -38,6 +38,44 @@ public sealed class BrandingOptions
     public string DefaultTheme { get; set; } = string.Empty;
 }
 
+public sealed class SiteShellOptions
+{
+    public string Title { get; set; } = "Diginsight SmartDocs";
+    public BrandingOptions Branding { get; set; } = new();
+
+    public static SiteShellOptions From(SiteOptions site) => new()
+    {
+        Title = site.Title,
+        Branding = site.Branding,
+    };
+}
+
+public sealed class SiteShellState
+{
+    public string Title { get; private set; } = "Diginsight SmartDocs";
+    public BrandingOptions Branding { get; private set; } = new();
+    public bool IsConfigured { get; private set; }
+
+    public event Action? Changed;
+
+    public SiteShellState()
+    {
+    }
+
+    public SiteShellState(SiteOptions site)
+    {
+        Apply(SiteShellOptions.From(site));
+    }
+
+    public void Apply(SiteShellOptions site)
+    {
+        Title = string.IsNullOrWhiteSpace(site.Title) ? "Diginsight SmartDocs" : site.Title;
+        Branding = site.Branding ?? new BrandingOptions();
+        IsConfigured = true;
+        Changed?.Invoke();
+    }
+}
+
 /// <summary>
 /// One published documentation set. <see cref="Id"/> and <see cref="BlobOptions.ContainerName"/>
 /// are configured independently and are never derived from one another: identifiers read naturally

@@ -3,6 +3,7 @@ using Diginsight.SmartDocs.Web.Shared;
 using Diginsight.SmartDocs.Web.Shared.Navigation;
 using Diginsight.SmartDocs.Web.Shared.Rendering;
 using Diginsight.SmartDocs.Web.Shared.Services;
+using Diginsight.SmartDocs.Web.Shared.Sites;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
 
 var builder = WebAssemblyHostBuilder.CreateDefault(args);
@@ -19,6 +20,7 @@ builder.Services.AddScoped<ThemeState>();
 builder.Services.AddScoped<SidebarState>();
 builder.Services.AddScoped<NavStats>();
 builder.Services.AddScoped<ArticleState>();
+builder.Services.AddScoped<SiteShellState>();
 builder.Services.AddScoped<INavProvider, HttpNavProvider>();
 builder.Services.AddScoped<NavHubClient>();
 

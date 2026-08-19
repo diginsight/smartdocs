@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
 using Diginsight.SmartDocs.Web.Shared.Navigation;
+using Diginsight.SmartDocs.Web.Shared.Sites;
+using System.Net.Http.Json;
 
 namespace Diginsight.SmartDocs.Web.Client.Layout;
 
@@ -9,6 +11,10 @@ public partial class MainLayout
     private bool _searchOpen;
     private bool _notifyOpen;
     private DotNetObjectReference<MainLayout>? _selfRef;
+
+    private string BrandIconClass => string.IsNullOrWhiteSpace(Site.Branding.IconClass)
+        ? "bi-lightbulb-fill"
+        : Site.Branding.IconClass;
 
     private string SectionLine
     {
@@ -60,16 +66,28 @@ public partial class MainLayout
         }
     }
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
         Theme.Changed += OnThemeChanged;
         Sidebar.Changed += OnSidebarChanged;
+        Site.Changed += OnSiteChanged;
 
         // The footer counter is fed by the navigation menu as it loads (see NavStats): no dedicated
         // count query, and refreshes are debounced so they never impact rendering.
         Stats.Changed += OnStatsChanged;
         Article.Changed += OnArticleChanged;
+
+        if (!Site.IsConfigured)
+        {
+            SiteShellOptions? site = await Http.GetFromJsonAsync<SiteShellOptions>("_site");
+            if (site is not null)
+            {
+                Site.Apply(site);
+            }
+        }
     }
+
+    private void OnSiteChanged() => InvokeAsync(StateHasChanged);
 
     private void OnArticleChanged() => InvokeAsync(StateHasChanged);
 
@@ -118,6 +136,7 @@ public partial class MainLayout
     {
         Theme.Changed -= OnThemeChanged;
         Sidebar.Changed -= OnSidebarChanged;
+        Site.Changed -= OnSiteChanged;
         Stats.Changed -= OnStatsChanged;
         Article.Changed -= OnArticleChanged;
         _selfRef?.Dispose();

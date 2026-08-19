@@ -52,6 +52,14 @@ public class Program
 
             services.TryAddSingleton<EarlyLoggingManager>(observabilityManager);
             services.AddHttpContextAccessor();
+            services.AddScoped(sp =>
+            {
+                HttpRequest? request = sp.GetRequiredService<IHttpContextAccessor>().HttpContext?.Request;
+                Uri baseAddress = request is null
+                    ? new Uri("http://localhost/")
+                    : new Uri($"{request.Scheme}://{request.Host}{request.PathBase}/");
+                return new HttpClient { BaseAddress = baseAddress };
+            });
             services.AddDynamicLogLevel<DefaultDynamicLogLevelInjector>();
             services.AddParallelService(configuration);
 
@@ -66,6 +74,7 @@ public class Program
             services.Configure<SiteOptions>(configuration.GetSection("Site"));
             SiteOptions siteOptions = configuration.GetSection("Site").Get<SiteOptions>()
                 ?? throw new InvalidOperationException("Missing 'Site' configuration section.");
+            services.AddScoped(_ => new SiteShellState(siteOptions));
             var spaceRegistry = new SpaceRegistry(siteOptions.Spaces);
             services.AddSingleton(spaceRegistry);
             logger.LogInformation(
@@ -204,6 +213,7 @@ public class Program
             // Content passthrough + dynamic navigation APIs (see the *Endpoints classes).
             app.MapContentEndpoints();
             app.MapNavEndpoints();
+            app.MapSiteEndpoints();
             app.MapTestContentEndpoints(app.Configuration);
             app.MapHub<NavHub>(NavHubContract.Route);
 

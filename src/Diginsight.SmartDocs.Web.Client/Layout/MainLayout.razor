@@ -1,15 +1,18 @@
 @inherits LayoutComponentBase
 @implements IDisposable
 @using Diginsight.SmartDocs.Web.Shared.Navigation
+@using Diginsight.SmartDocs.Web.Shared.Sites
 @inject IJSRuntime JS
 @inject ThemeState Theme
 @inject SidebarState Sidebar
 @inject NavStats Stats
 @inject ArticleState Article
+@inject SiteShellState Site
+@inject HttpClient Http
 
 <div class="page theme-@Theme.ThemeId">
     <header class="topbar">
-        <a class="brand" href=""><i class="bi bi-lightbulb-fill"></i> <span>Diginsight SmartDocs</span></a>
+        <a class="brand" href=""><i class="bi @BrandIconClass"></i> <span>@Site.Title</span></a>
         <TopMenu Placement="TopMenu.Group.Left" />
         <TopMenu Placement="TopMenu.Group.Right" />
         <AboutMenu />
