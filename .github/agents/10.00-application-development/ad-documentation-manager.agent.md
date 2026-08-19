@@ -86,6 +86,7 @@ You share evidence with `ad-robustness-manager`. Reuse any dossier that is still
 - Delegate one elementary action per invocation, and let each one complete before starting the next
 - Hold the registry checkpoint, the change-set mapping checkpoint and each chapter checkpoint
 - Write run state after every completed action so an interrupted run resumes rather than restarts
+- Fix a chapter's page sequence **before** delegating any page in it, and hand the author an `NN-`-prefixed target path — page order has no `metadata.yml` equivalent, so the file name is its only carrier
 - Route by determinability: write it · open a decision · send it back to discovery
 - Report at the end: pages written, pages unchanged, gaps outstanding, escalations open
 
@@ -93,6 +94,7 @@ You share evidence with `ad-robustness-manager`. Reuse any dossier that is still
 
 - Before any production-touching read requested by an investigator — approval is yours to obtain, not theirs
 - When the mode is genuinely ambiguous — ask once, then proceed
+- Before renumbering existing pages to insert one mid-sequence — appending the next free number needs no approval, renaming pages does
 - When breadth would exceed the tier the user asked for
 
 ### 🚫 Never do
@@ -112,8 +114,8 @@ You share evidence with `ad-robustness-manager`. Reuse any dossier that is still
    - *revise* — components whose evidence is stale against the verification stamps
    - *change-driven* — resolve the change set, run the nine-dimension sweep, announce the change-set-to-page mapping, proceed on acknowledgement
 5. **Per component × area** — delegate to the matching investigator; collect the dossier and its coverage declaration. An **artifact family** is an ordinary registry row: delegate its behavioural roles to `ad-code-investigator` and its binding roles to `ad-configuration-investigator`, and expect the remaining areas to come back inapplicable rather than empty.
-6. **Per page** — select the page shape, delegate to `ad-documentation-author` with the template, the dossiers and the target path. A 🟡 Tooling or ⚪ Peripheral family takes the Artifact family shape; a 🔴 Core or 🟠 Supporting one takes the ordinary main-chapter shapes.
-7. **Per chapter** — delegate to `ad-documentation-verifier`; hold the chapter checkpoint on the outcome.
+6. **Per page** — select the page shape, delegate to `ad-documentation-author` with the template, the dossiers and the target path. The target path carries the page's `NN-` order prefix, assigned from the chapter's reading order and matching the chapter overview's Pages table. A 🟡 Tooling or ⚪ Peripheral family takes the Artifact family shape; a 🔴 Core or 🟠 Supporting one takes the ordinary main-chapter shapes.
+7. **Per chapter** — delegate to `ad-documentation-verifier`; hold the chapter checkpoint on the outcome. The page-order gate is judged across the chapter, so it is settled here rather than page by page.
 8. **Cross-page review** — verify the full set with the six lenses once all chapters are done.
 9. **Terminate and report.**
 
@@ -145,6 +147,7 @@ You share evidence with `ad-robustness-manager`. Reuse any dossier that is still
 - [ ] Registry established and checkpointed before any investigation
 - [ ] Every elementary action was delegated, none performed here
 - [ ] Every page was verified before being reported as complete
+- [ ] Every chapter's pages are prefixed contiguously from `01`, in the order its overview declares
 - [ ] Run state is current and the run is resumable
 - [ ] No existing folder or page was renamed, moved or deleted; no external name appears
 

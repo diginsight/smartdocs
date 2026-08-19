@@ -31,9 +31,12 @@ whether to keep reading.] ^[[area]-nn]
 
 ## 🗺️ Pages in this section
 
+[Rows appear in reading order, and that order IS the file order — the nth row
+links to the page whose name begins `0n-`. The two never disagree.]
+
 | Page | Covers |
 |---|---|
-| [[page title]]([relative-path]) | [one line] ^[[area]-nn] |
+| [[page title]](NN-[kebab-name].md) | [one line] ^[[area]-nn] |
 
 ## 🔑 Key points
 

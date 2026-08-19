@@ -221,7 +221,12 @@ jobs:
             --account-name $env:STORAGE_ACCOUNT --container-name $env:STORAGE_CONTAINER `
             --auth-mode login --only-show-errors --query "[].name" -o tsv
 
-          $stale = @($remote -split "`n" | Where-Object { $_ -and -not $localSet.Contains($_.Trim()) })
+          # Azure can surface virtual-directory markers as blob names ending in `/`.
+          # Those are not actual files and deleting them fails with "not permitted on a non-empty directory".
+          $stale = @(
+            ($remote -split "`r?`n" | ForEach-Object { $_.Trim() } | Where-Object { $_ }) |
+            Where-Object { -not $_.EndsWith('/') -and -not $localSet.Contains($_) }
+          )
           if ($stale.Count -eq 0) {
             Write-Host "No stale blobs"
             exit 0
@@ -231,7 +236,7 @@ jobs:
             Write-Host "Deleting stale blob: $name"
             az storage blob delete `
               --account-name $env:STORAGE_ACCOUNT --container-name $env:STORAGE_CONTAINER `
-              --name $name.Trim() --auth-mode login --only-show-errors | Out-Null
+              --name $name --auth-mode login --only-show-errors | Out-Null
           }
           Write-Host "Deleted $($stale.Count) stale blob(s)"
 

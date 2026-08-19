@@ -186,7 +186,7 @@ The prefix costs nothing in presentation. The sidebar label comes from the page'
 
 **The prefix sequence MUST match the chapter overview's Pages table**, which is where the reading order is declared in prose. The table and the file names are two renderings of one sequence; when they disagree, the sidebar contradicts the page the reader has just finished. Number contiguously from `01`, leaving no gaps.
 
-A page added later takes the next free number, or forces a renumber of the pages after it. Either way the rename and every inbound link are rewritten in the same edit — a stale link is the cost of getting this wrong twice.
+A page added later takes the **next free number** — appending never disturbs an existing name. Inserting one mid-sequence means renaming the pages after it, which is a confirm-first action: the rename and every inbound link are rewritten in the same edit, or the set is left with a stale link.
 
 ---
 
