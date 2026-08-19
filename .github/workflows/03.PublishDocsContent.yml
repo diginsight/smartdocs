@@ -221,12 +221,28 @@ jobs:
             --account-name $env:STORAGE_ACCOUNT --container-name $env:STORAGE_CONTAINER `
             --auth-mode login --only-show-errors --query "[].name" -o tsv
 
-          # Azure can surface virtual-directory markers as blob names ending in `/`.
-          # Those are not actual files and deleting them fails with "not permitted on a non-empty directory".
-          $stale = @(
-            ($remote -split "`r?`n" | ForEach-Object { $_.Trim() } | Where-Object { $_ }) |
-            Where-Object { -not $_.EndsWith('/') -and -not $localSet.Contains($_) }
-          )
+          # Azure can expose virtual-directory markers as names ending in `/` or as parent paths
+          # that prefix other blobs. Those are not real files and deleting them fails with
+          # "not permitted on a non-empty directory".
+          $remoteNames = @($remote -split "`r?`n" | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+          $directoryNames = [System.Collections.Generic.HashSet[string]]::new(
+            [System.StringComparer]::OrdinalIgnoreCase)
+          foreach ($name in $remoteNames) {
+            if ($name.EndsWith('/')) {
+              [void]$directoryNames.Add($name)
+              continue
+            }
+
+            foreach ($candidate in $remoteNames) {
+              if ($candidate -ne $name -and $candidate.StartsWith($name + '/', [System.StringComparison]::OrdinalIgnoreCase)) {
+                [void]$directoryNames.Add($name)
+                break
+              }
+            }
+          }
+
+          $stale = @($remoteNames |
+            Where-Object { -not $_.EndsWith('/') -and -not $directoryNames.Contains($_) -and -not $localSet.Contains($_) })
           if ($stale.Count -eq 0) {
             Write-Host "No stale blobs"
             exit 0
@@ -237,6 +253,11 @@ jobs:
             az storage blob delete `
               --account-name $env:STORAGE_ACCOUNT --container-name $env:STORAGE_CONTAINER `
               --name $name --auth-mode login --only-show-errors | Out-Null
+
+            if ($LASTEXITCODE -ne 0) {
+              Write-Warning "Skipping stale blob delete failure for '$name': Azure rejected a directory marker or a transient delete condition."
+              continue
+            }
           }
           Write-Host "Deleted $($stale.Count) stale blob(s)"
 
