@@ -12,7 +12,7 @@ argument-hint: 'topic="Your Article Topic" outline="key points to cover"'
 ## Goal
 Generate a comprehensive issue analysis from the current conversation, split into a **public document** and — when the repository is public — an **internal companion** carrying the identifying detail.
 
-The analysis is created as a **folder** under `src/docs/90.00-issues/<YYYYMM>/`, named `<YYYYMMDD>.<NN>-<kebab-slug>/`, containing read-ordered pages named `<NN>-<kebab-name>.md`. A single-page analysis is still a folder with one page, so a follow-up page can be added without renaming anything.
+**Canonical issue-folder path:** `src/docs/90.00-issues/` is the repository's fixed work-item root. All generated issue analyses MUST live under that root using the path pattern `src/docs/90.00-issues/<YYYYMM>/<YYYYMMDD>.<NN>-<kebab-slug>/`. Do not invent alternate roots such as `90.00-issue`, `issues/`, or a date-only folder. The `90.00-issues` name is the canonical namespace and `90.00-` remains the stable prefix for the issue area. A single-page analysis is still a folder with one page, so a follow-up page can be added without renaming anything.
 
 ## Instructions
 
