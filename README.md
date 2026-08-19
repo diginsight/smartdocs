@@ -1,6 +1,6 @@
 # smartdocs
 
-diginsight smartdocs provides hyper scale, dynamic, multisource markdown rendering 
+diginsight smartdocs provides **hyper scale**, **dynamic**, **multisource** markdown rendering 
 
 please check 
 (Diginsight SmartDocs)[https://docs-testmc-app-itn-01.azurewebsites.net/]
