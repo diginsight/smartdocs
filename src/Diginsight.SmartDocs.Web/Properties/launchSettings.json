@@ -1,45 +1,62 @@
 {
     "$schema": "https://json.schemastore.org/launchsettings.json",
-    "profiles": {
-        "http": {
-            "commandName": "Project",
-            "dotnetRunMessages": true,
-            "launchBrowser": true,
-            "applicationUrl": "http://localhost:5280",
-            "environmentVariables": {
-                "ASPNETCORE_ENVIRONMENT": "Development",
-                "AppsettingsEnvironmentName": "Development",
-                "Site__Spaces__0__Source": "FileSystem",
-                "Site__Spaces__0__FileSystem__RootPath": "..\\docs",
-                "Site__Spaces__0__FileSystem__WatchForChanges": "true"
-            }
-        },
-        "https": {
-            "commandName": "Project",
-            "dotnetRunMessages": true,
-            "launchBrowser": true,
-            "applicationUrl": "https://localhost:7280;http://localhost:5280",
-            "environmentVariables": {
-                "ASPNETCORE_ENVIRONMENT": "Development",
-                "AppsettingsEnvironmentName": "Development",
-                "Site__Spaces__0__Source": "FileSystem",
-                "Site__Spaces__0__FileSystem__RootPath": "..\\docs",
-                "Site__Spaces__0__FileSystem__WatchForChanges": "true"
-            }
-        },
-        "https - Testmc": {
-            "commandName": "Project",
-            "dotnetRunMessages": true,
-            "launchBrowser": true,
-            "applicationUrl": "https://localhost:7280;http://localhost:5280",
-            "environmentVariables": {
-                "ASPNETCORE_ENVIRONMENT": "Development",
-                // Reads the Testmc overlay from the sibling private repository at
-                // smartdocs.internal\src\Diginsight.SmartDocs.Web\appsettings.Testmc.json.
-                // Storage identity lives there, never here: this repository is public.
-                "AppsettingsEnvironmentName": "Testmc",
-                "ExternalConfigurationFolder": "..\\..\\..\\smartdocs.internal"
-            }
-        }
+  // A profile selects an environment and nothing else. The space itself is declared once, in full,
+  // by that environment's appsettings overlay — restating Site__Spaces__0__* here would be a third
+  // copy of the same value whose precedence is invisible from any of these files.
+  "profiles": {
+    "http": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "launchBrowser": true,
+      "applicationUrl": "http://localhost:5280",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "AppsettingsEnvironmentName": "Development"
+      }
+    },
+    "https": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "launchBrowser": true,
+      "applicationUrl": "https://localhost:7280;http://localhost:5280",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "AppsettingsEnvironmentName": "Development"
+      }
+    },
+    "https - devdocs": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "launchBrowser": true,
+      "applicationUrl": "https://localhost:7280;http://localhost:5280",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "AppsettingsEnvironmentName": "devdocs"
+      }
+    },
+    "https - devlearn": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "launchBrowser": true,
+      "applicationUrl": "https://localhost:7280;http://localhost:5280",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "AppsettingsEnvironmentName": "devlearn"
+      }
+    },
+    "https - Testmc": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "launchBrowser": true,
+      "applicationUrl": "https://localhost:7280;http://localhost:5280",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        // Reads the Testmc overlay from the sibling private repository at
+        // smartdocs.internal\src\Diginsight.SmartDocs.Web\appsettings.Testmc.json.
+        // Storage identity lives there, never here: this repository is public.
+        "AppsettingsEnvironmentName": "Testmc",
+        "ExternalConfigurationFolder": "..\\..\\..\\smartdocs.internal"
+      }
     }
+  }
 }
