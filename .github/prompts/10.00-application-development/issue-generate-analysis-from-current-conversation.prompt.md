@@ -70,7 +70,9 @@ The two signal pages take the next free ordinals **after** the case pages and **
 
 When the repository is public, each page gets a companion at the **same relative path** in the internal peer, named `<same-name>.internal.md`. Write the companion **first**.
 
-The public page carries a pointer to its companion — a backticked path, not a link — stating what the companion adds.
+The public page points at its companion from its **References section**, as a backticked path under an `### Internal sources` subheading — never from a heading, the table of contents, or an early section. Most readers of a public analysis cannot open the peer; for them a prominent pointer is a closed door that makes the analysis read as an abridgement. Where several pages have companions, the per-page table goes in the References section of `01-overview.md` only.
+
+In the body, at most **one short note** — typically that resources are named by role — and only where it changes how a passage reads.
 
 ### 4. Fill Content from Conversation Analysis
 Analyze the current debugging conversation and fill ALL sections of the issue report:
@@ -116,6 +118,8 @@ And, when the repository is public, that the split holds:
 - ✅ Zero sensitive values in any public page — scan, do not assume
 - ✅ Every companion written at the path-parallel location and **complete**, not a list of redactions
 - ✅ Every alias used publicly resolves in the alias registry
+- ✅ Every companion pointer sits in a **References section**, not in a heading, the table of contents, or ahead of the analysis
+- ✅ **Reader independence**: each public page reads as a complete account to someone with no peer access — read it straight through and check it never gestures at what it is not saying
 - ✅ Screenshots checked for in-image disclosure (address bars, window titles, terminal prompts)
 - ✅ **Correction test**: fixing an internal identifier would require no edit to any public page
 
@@ -127,6 +131,6 @@ Then state the signals captured, per page, with their targets — or explicitly 
 
 <!--
 prompt_metadata:
-  version: "1.1.0"
-  last_updated: "2026-08-18"
+  version: "1.2.0"
+  last_updated: "2026-08-21"
 -->

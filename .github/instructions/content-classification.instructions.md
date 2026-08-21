@@ -1,8 +1,8 @@
 ---
 description: Classification rules for every authored Markdown file — when content must be split into a public document and an internal companion, how the companion is named and located, and the repository-visibility conditional that switches the split off
 applyTo: '**/*.md'
-version: "1.0.0"
-last_updated: "2026-08-18"
+version: "1.1.0"
+last_updated: "2026-08-21"
 domain: "content-classification"
 context_dependencies:
   - ".copilot/context/05.00-content-classification/"
@@ -33,6 +33,10 @@ Ensure that no authored Markdown file discloses sensitive material, and that the
 - A value listed under `deliberately_public` in `repository.metadata.yml` MUST NOT be aliased.
 - A public document MUST NEVER quote content from an internal companion.
 - A public document MAY state that a companion exists, what it adds, and its path. Until the rendering application enforces authorization, that pointer MUST be written as a **backticked path, not a Markdown link**.
+- The companion pointer MUST be placed in the document's **References section** (or its terminal provenance section). It MUST NEVER occupy a heading, a table-of-contents entry, a section of its own, or any position before the document's substantive content.
+- Where several pages have companions, the per-page companion table MUST live in the References section of the **entry-point page only**, never repeated on each page.
+- The body MAY carry **at most one short note** about the split, and only where withholding changes how a passage reads — typically that resources are named by role. That note MUST NOT name the peer repository, repeat the companion path, or enumerate companions.
+- A public document MUST satisfy **reader independence**: it MUST read as a complete account for a reader with no access to the peer. It MUST NEVER be structured so that such a reader is repeatedly referred to material they cannot obtain.
 - When in doubt, the fact MUST be classified sensitive.
 
 ## Rules — internal companions
@@ -63,7 +67,8 @@ Ensure that no authored Markdown file discloses sensitive material, and that the
 - [ ] No sensitive value present in any public file, at any revision of this change
 - [ ] Resources named by role, readably
 - [ ] Internal companion written first, at the path-parallel location, and complete
-- [ ] Companion pointer present in the public document as a backticked path
+- [ ] Companion pointer present as a backticked path, **in the References section** — not in a heading, the table of contents, or before the substantive content
+- [ ] Public document passes **reader independence**: read straight through by someone with no peer access, it is a complete account
 - [ ] Existing companion fetched before modification, or the task aborted
 - [ ] Captured images checked for in-image disclosure
 

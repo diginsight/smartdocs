@@ -71,13 +71,24 @@ Frontmatter: `classification: internal` and `publish: false`.
 
 ## Step 6 — write the public document
 
-Use only role names. Add the companion pointer — a **backticked path, not a link**:
+Use only role names.
+
+**Put the companion pointer in the References section, at the end.** Never in a heading, the table of contents, or ahead of the substantive content. Most readers cannot open the peer; for them an early pointer is a closed door that makes the document read as an abridgement of something held elsewhere. It is provenance, like a source citation, so it goes where provenance goes — as a **backticked path, not a link**:
 
 ```markdown
-**Internal companion.** <what it adds> — `<same path>/<name>.internal.md` in the private peer repository.
+### Internal sources
+
+Not resolvable from this repository; listed for provenance.
+
+- **`<same path>/<name>.internal.md`** — <what it adds>
+- **`<alias registry path>`** — resolves the role names used above
 ```
 
-State what the companion adds, so a reader knows whether they need it.
+In the body, add **at most one short note**, and only where withholding changes how a passage reads — typically that resources are named by role, so the reader knows the convention rather than suspecting an omission. It must not name the peer, repeat the path, or list companions: none of that is actionable for a reader without access.
+
+Where several pages have companions, put the per-page table in the References section of the **entry-point page only**.
+
+**Reader-independence test.** Read the finished page as someone with no peer access. It must be a complete account, not a document that keeps gesturing at what it is not saying.
 
 ## Step 7 — verify before declaring done
 
@@ -85,7 +96,8 @@ State what the companion adds, so a reader knows whether they need it.
 - [ ] Companion exists at the path-parallel location and is complete
 - [ ] Every alias used publicly resolves in the registry
 - [ ] Captured images checked for in-image disclosure (address bars, window titles, terminal prompts)
-- [ ] Companion pointer present and formatted as a backticked path
+- [ ] Companion pointer present, formatted as a backticked path, and located **in the References section** — not in a heading, the table of contents, or before the substantive content
+- [ ] **Reader independence**: read straight through by someone with no peer access, the public document is a complete account
 - [ ] Public document survives the correction test: *would fixing an internal identifier require editing this public file?* If yes, an identifier leaked into it.
 
 ## Step 8 — report the split

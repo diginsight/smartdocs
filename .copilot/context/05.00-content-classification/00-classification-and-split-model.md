@@ -121,6 +121,16 @@ What a public document must never do is **quote** internal content or reproduce 
 
 Until the rendering application enforces authorization, the pointer is written as a **backticked path rather than a Markdown link**, because the target does not resolve in the public repository and a link would fail every link check. Once access control exists and both parts are served from one content store, the pointer becomes a real link that is simply absent for an unauthorized reader.
 
+### The pointer is provenance, so it belongs where provenance lives
+
+Most readers of a public document have **no access to the peer**. For them the pointer is not a route to more detail — it is a closed door. A closed door placed early, under its own heading, or in the table of contents does three things, all of them bad: it interrupts the argument before it has started, it implies the document is a partial account of something held elsewhere, and it invites the reader to go looking for a repository they cannot clone.
+
+So the pointer is **provenance metadata**, of the same kind as a source citation, and it is placed where provenance is placed: in the **References section**, at the end. A reader who needs it will look there; a reader who does not will never be stopped by it.
+
+The body carries at most one short note, and only where withholding actually changes how a passage reads — for example that resources are named by role. That note explains the *document's own convention*, which the reader can act on. It does not name the peer, repeat the path, or enumerate companions, because none of that is actionable for the reader in front of it.
+
+The test is **reader independence**: a reader with no access to the peer must be able to read the public document straight through as a complete account. If the document reads as an abridgement — if it keeps gesturing at what it is not saying — the split has been made visible where it should have been invisible. Aliasing is meant to make a document public *by construction*, not to make it feel censored.
+
 ---
 
 ## 📁 Intermediate folders are in scope
