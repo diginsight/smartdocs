@@ -323,24 +323,53 @@ jobs:
         env:
           PYTHONWARNINGS: ignore
         run: |
-          $rg = az webapp list --query "[?name=='$env:WEBAPP_NAME'].resourceGroup | [0]" -o tsv
-          if (-not $rg) { Write-Error "Could not resolve resource group for the target App Service"; exit 1 }
           Compress-Archive -Path "publish_smartdocs/*" -DestinationPath "smartdocs-deploy.zip" -Force
           $sizeMb = [math]::Round((Get-Item "smartdocs-deploy.zip").Length / 1MB, 1)
           Write-Host "Deploy payload: $sizeMb MB"
 
-          # A self-contained payload is ~75 MB, and the OneDeploy POST is occasionally reset
-          # mid-upload ("An existing connection was forcibly closed by the remote host"). Zip deploy
-          # replaces the whole site, so retrying is safe and leaves no half-applied state.
-          $deployed = $false
+          # Kudu basic authentication is disabled on these sites, so `az webapp deploy` — which
+          # publishes with basic credentials — gets 401. Kudu does accept the Entra token from the
+          # OIDC login above, so publish straight to OneDeploy with it. This keeps basic auth off.
+          $token = az account get-access-token --resource https://management.azure.com --query accessToken -o tsv
+          if ([string]::IsNullOrWhiteSpace($token)) { Write-Error "Could not acquire an Entra token"; exit 1 }
+          $headers = @{ Authorization = "Bearer $token" }
+          $base = "https://$env:WEBAPP_NAME.scm.azurewebsites.net"
+
+          # Identifies the deployment this run creates, so polling cannot report the previous one.
+          $previousId = try { (Invoke-RestMethod -Uri "$base/api/deployments/latest" -Headers $headers -TimeoutSec 120).id } catch { $null }
+
+          # async=true returns as soon as the upload lands: a synchronous publish of ~75 MB can
+          # outlast the App Service 230-second front-end timeout even when the deployment succeeds.
+          $uploaded = $false
           foreach ($attempt in 1..3) {
-            az webapp deploy --name $env:WEBAPP_NAME --resource-group $rg `
-              --src-path "smartdocs-deploy.zip" --type zip --only-show-errors
-            if ($LASTEXITCODE -eq 0) { $deployed = $true; break }
-            Write-Host "Deployment attempt $attempt failed (exit $LASTEXITCODE)"
-            if ($attempt -lt 3) { Start-Sleep -Seconds 30 }
+            try {
+              $response = Invoke-WebRequest -Uri "$base/api/publish?type=zip&async=true" -Method Post `
+                -Headers $headers -InFile "smartdocs-deploy.zip" -ContentType "application/octet-stream" `
+                -TimeoutSec 900 -UseBasicParsing
+              Write-Host "Upload accepted (HTTP $($response.StatusCode))"
+              $uploaded = $true
+              break
+            }
+            catch {
+              Write-Host "Upload attempt $attempt failed: $($_.Exception.Message)"
+              if ($attempt -lt 3) { Start-Sleep -Seconds 30 }
+            }
           }
-          if (-not $deployed) { Write-Error "App Service deployment failed after 3 attempts"; exit 1 }
+          if (-not $uploaded) { Write-Error "Could not upload the deployment package"; exit 1 }
+
+          # Kudu deployment status: 3 = failed, 4 = success.
+          foreach ($poll in 1..90) {
+            Start-Sleep -Seconds 10
+            try { $deployment = Invoke-RestMethod -Uri "$base/api/deployments/latest" -Headers $headers -TimeoutSec 120 }
+            catch { Write-Host "Status poll $poll failed: $($_.Exception.Message)"; continue }
+            if ($deployment.id -eq $previousId) { continue }
+            if (-not $deployment.complete) { continue }
+            if ($deployment.status -eq 4) { Write-Host "Deployment $($deployment.id) succeeded"; exit 0 }
+            Write-Error "Deployment $($deployment.id) failed: status=$($deployment.status) $($deployment.status_text) $($deployment.message)"
+            exit 1
+          }
+          Write-Error "Deployment did not complete within 15 minutes"
+          exit 1
 
       - name: Smoke check
         shell: pwsh
