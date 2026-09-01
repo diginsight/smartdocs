@@ -39,7 +39,8 @@ on:
       publish-release:
         description: >-
           Publish the build output as a GitHub Release. Both deploy workflows build the same commit,
-          so exactly one of them sets this, otherwise a single push would produce two releases.
+          so exactly one of them may set this, otherwise a single push would produce two releases.
+          Requires contents: write on this job and on the calling workflow.
         required: false
         default: false
         type: boolean
@@ -65,9 +66,12 @@ jobs:
     environment: ${{ inputs.deployment-environment }}
 
     # OIDC: request a short-lived federated token from GitHub rather than storing a client secret.
+    # contents stays read: a called workflow may not request more than its callers grant, and both
+    # deploy workflows grant read. Enabling publish-release means raising this AND both callers to
+    # contents: write.
     permissions:
       id-token: write
-      contents: write
+      contents: read
 
     steps:
       - name: Checkout repository
