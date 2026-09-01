@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "upstreams": [
+    {
+      "repository": "diginsight/telemetry",
+      "versionProperty": "DiginsightCoreVersion"
+    },
+    {
+      "repository": "diginsight/smartcache",
+      "versionProperty": "DiginsightSmartcacheVersion"
+    },
+    {
+      "repository": "diginsight/components",
+      "versionProperty": "DiginsightComponentsVersion"
+    }
+  ]
+}

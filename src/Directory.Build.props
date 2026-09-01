@@ -12,9 +12,10 @@
     <PackageProjectUrl>https://github.com/diginsight/smartdocs</PackageProjectUrl>
     <PackageTags>diginsight;documentation;smartdocs</PackageTags>
 
-    <DiginsightCoreVersion>3.7.*</DiginsightCoreVersion>
-    <DiginsightSmartcacheVersion>3.7.*</DiginsightSmartcacheVersion>
-    <DiginsightComponentsVersion>1.*</DiginsightComponentsVersion>
+    <!-- Exact pins: eng/Download-PackageRelease.ps1 maps each of these to an upstream GitHub Release tag. -->
+    <DiginsightCoreVersion>3.8.0.1</DiginsightCoreVersion>
+    <DiginsightSmartcacheVersion>3.8.0.1</DiginsightSmartcacheVersion>
+    <DiginsightComponentsVersion>1.0.0.110</DiginsightComponentsVersion>
 
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
     <IncludeSymbols>true</IncludeSymbols>

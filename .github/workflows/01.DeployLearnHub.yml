@@ -15,6 +15,7 @@ on:
       - src/Directory.Build.props
       - src/Directory.Build.targets
       - nuget.config
+      - eng/**
       - .github/workflows/00.BuildSmartDocsWeb.yml
       - .github/workflows/01.DeployLearnHub.yml
   workflow_dispatch:
@@ -40,3 +41,6 @@ jobs:
       runtime-identifier: win-x64
       internal-config-path: src/Diginsight.SmartDocs.Web/appsettings.Testmc.json
       deployment-environment: testmc
+      # Both deploy workflows build the same commit, so at most one may publish. Kept off until the
+      # release shape for a deployable web app (as opposed to packages) is decided.
+      publish-release: false

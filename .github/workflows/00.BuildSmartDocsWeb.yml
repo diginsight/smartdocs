@@ -36,6 +36,13 @@ on:
         required: false
         default: testmc
         type: string
+      publish-release:
+        description: >-
+          Publish the build output as a GitHub Release. Both deploy workflows build the same commit,
+          so exactly one of them sets this, otherwise a single push would produce two releases.
+        required: false
+        default: false
+        type: boolean
     secrets:
       SMARTDOCS_INTERNAL_READ_TOKEN:
         description: Token with Contents read access to diginsight/smartdocs.internal.
@@ -60,7 +67,7 @@ jobs:
     # OIDC: request a short-lived federated token from GitHub rather than storing a client secret.
     permissions:
       id-token: write
-      contents: read
+      contents: write
 
     steps:
       - name: Checkout repository
@@ -111,6 +118,32 @@ jobs:
           Write-Host "Using pre-installed .NET SDK: $v"
           if (-not ($v -like '10.*')) { Write-Error "Expected .NET 10 SDK, found $v"; exit 1 }
 
+      - name: Download upstream Diginsight releases
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # The Diginsight versions pinned in src/Directory.Build.props are resolved from the
+          # upstream GitHub Releases rather than nuget.org, so a coordinated change can be deployed
+          # before the packages have propagated. Fails closed: a missing or corrupt upstream release
+          # stops the build here instead of silently restoring an older version from nuget.org.
+          ./eng/Download-PackageRelease.ps1
+
+      - name: Compute version
+        shell: pwsh
+        env:
+          BUILD_NUMBER: ${{ github.run_number }}
+          BUILD_NUMBER_OFFSET: ${{ vars.BUILD_NUMBER_OFFSET }}
+          VERSION_PREFIX: ${{ vars.VERSION_PREFIX || '1.0.0' }}
+        run: |
+          # Note: this reusable workflow is called separately by 01 and 02, so each target gets its
+          # own run_number and therefore its own build number for the same commit. Treat the version
+          # as "which build produced this deployment", not as a cross-environment identity.
+          $offset = if ([string]::IsNullOrWhiteSpace($env:BUILD_NUMBER_OFFSET)) { 0 } else { [int] $env:BUILD_NUMBER_OFFSET }
+          $version = "$env:VERSION_PREFIX.$([int] $env:BUILD_NUMBER + $offset)"
+          Write-Host "Version: $version"
+          "PACKAGE_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
       - name: Publish Diginsight.SmartDocs.Web
         shell: pwsh
         env:
@@ -121,6 +154,7 @@ jobs:
           # "HTTP 500.32 - ANCM Failed to Load dll". The deploy step below sets the bitness to match.
           dotnet publish src/Diginsight.SmartDocs.Web/Diginsight.SmartDocs.Web.csproj `
             -c Release -r $env:RID --self-contained true `
+            "-p:Version=$env:PACKAGE_VERSION" `
             -o publish_smartdocs
           if (-not (Test-Path "publish_smartdocs/Diginsight.SmartDocs.Web.exe")) {
             Write-Error "publish_smartdocs/Diginsight.SmartDocs.Web.exe missing after publish"
@@ -153,6 +187,43 @@ jobs:
             $empty | ForEach-Object { Write-Error "Empty framework asset: $($_.FullName)" }
             Write-Error "Publish produced $($empty.Count) empty framework assets"
             exit 1
+          }
+
+      - name: Publish build output as a GitHub Release
+        if: ${{ inputs.publish-release }}
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Deliberately packaged BEFORE the configuration overlay is staged. This repository is
+          # public, and the overlay from smartdocs.internal carries storage identity and the App
+          # Service host name, so the deployed zip must never become a release asset. What is
+          # published here is the target-independent build output, which is what a rollback or an
+          # audit actually needs.
+          $tag = "v$env:PACKAGE_VERSION"
+          $asset = "smartdocs-$env:PACKAGE_VERSION.zip"
+          Compress-Archive -Path "publish_smartdocs/*" -DestinationPath $asset -Force
+
+          $overlay = Get-ChildItem -Path "publish_smartdocs" -Filter 'appsettings.*.json' -File
+          if ($overlay) {
+            Write-Error "Refusing to publish: environment overlay present in the payload ($($overlay.Name -join ', '))"
+            exit 1
+          }
+
+          (Get-FileHash -LiteralPath $asset -Algorithm SHA256).Hash.ToLowerInvariant() + "  $asset" |
+            Out-File -FilePath 'SHA256SUMS' -Encoding ascii
+
+          # Idempotent: a re-run must not replace an existing published artifact.
+          gh release view $tag --repo $env:GITHUB_REPOSITORY 2>$null | Out-Null
+          if ($LASTEXITCODE -eq 0) {
+            Write-Host "Release $tag already exists; leaving it untouched."
+          }
+          else {
+            gh release create $tag --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA `
+              --title $tag --notes "Automated SmartDocs.Web build $env:PACKAGE_VERSION." `
+              $asset 'SHA256SUMS'
+            if ($LASTEXITCODE -ne 0) { Write-Error "Could not create release $tag"; exit 1 }
+            Write-Host "Published release $tag"
           }
 
       - name: Stage configuration overlay and resolve deployment target

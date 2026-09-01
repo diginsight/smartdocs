@@ -1,0 +1,8 @@
+This folder is the `local-release` NuGet package source declared in nuget.config.
+
+It is filled by eng/Download-PackageRelease.ps1 with verified upstream Diginsight release assets, so
+a pinned version can be restored before it propagates to nuget.org.
+
+This marker file is load-bearing: NuGet fails with NU1301 when a configured folder source does not
+exist, and that error cannot be suppressed with NoWarn, RestoreNoWarn or WarningsNotAsErrors.
+Deleting it breaks restore for everyone, including people who never run the download script.

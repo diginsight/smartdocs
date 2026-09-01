@@ -1,14 +1,11 @@
 using Diginsight.Diagnostics;
 using Diginsight.Options;
 using Microsoft.Extensions.Options;
-using System.Diagnostics.CodeAnalysis;
 
 namespace Diginsight.SmartDocs.Web;
 
 public sealed class ObservabilityManager : EarlyLoggingManager
 {
-    private IServiceCollection? services;
-
     static ObservabilityManager()
     {
         _ = Observability.ActivitySource;
@@ -16,12 +13,6 @@ public sealed class ObservabilityManager : EarlyLoggingManager
 
     public ObservabilityManager() : base(static activitySource => activitySource == Observability.ActivitySource)
     {
-    }
-
-    [SuppressMessage("ReSharper", "ParameterHidesMember")]
-    protected override void AdditionalAttachTo(IServiceCollection services)
-    {
-        this.services = services;
     }
 
     protected override ILoggerFactory MakeEmergencyLoggerFactory()

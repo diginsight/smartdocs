@@ -17,6 +17,7 @@ on:
       - src/Directory.Build.props
       - src/Directory.Build.targets
       - nuget.config
+      - eng/**
       - .github/workflows/00.BuildSmartDocsWeb.yml
       - .github/workflows/02.DeployDocsSite.yml
   workflow_dispatch:
