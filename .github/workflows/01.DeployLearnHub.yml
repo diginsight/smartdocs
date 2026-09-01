@@ -12,8 +12,11 @@ on:
       - src/Diginsight.SmartDocs.Web/**
       - src/Diginsight.SmartDocs.Web.Client/**
       - src/Diginsight.SmartDocs.Web.Shared/**
+      # Documentation lives in src/docs and is published by 03; never redeploy the site for it.
+      - '!src/Diginsight.SmartDocs.Web*/**.md'
       - src/Directory.Build.props
       - src/Directory.Build.targets
+      - global.json
       - nuget.config
       - eng/**
       - .github/workflows/00.BuildSmartDocsWeb.yml

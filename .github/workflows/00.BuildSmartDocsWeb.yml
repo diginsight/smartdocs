@@ -198,6 +198,7 @@ jobs:
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
+          ENVIRONMENT_NAME: ${{ inputs.environment-name }}
         run: |
           # Deliberately packaged BEFORE the configuration overlay is staged. This repository is
           # public, and the overlay from smartdocs.internal carries storage identity and the App
@@ -208,9 +209,11 @@ jobs:
           $asset = "smartdocs-$env:PACKAGE_VERSION.zip"
           Compress-Archive -Path "publish_smartdocs/*" -DestinationPath $asset -Force
 
-          $overlay = Get-ChildItem -Path "publish_smartdocs" -Filter 'appsettings.*.json' -File
-          if ($overlay) {
-            Write-Error "Refusing to publish: environment overlay present in the payload ($($overlay.Name -join ', '))"
+          # Only the environment overlay is disqualifying. The repository's own tracked
+          # appsettings.<dev>.json files are part of a normal publish and carry nothing private.
+          $overlayName = "appsettings.$env:ENVIRONMENT_NAME.json"
+          if (Test-Path -LiteralPath (Join-Path "publish_smartdocs" $overlayName)) {
+            Write-Error "Refusing to publish: environment overlay $overlayName is present in the payload"
             exit 1
           }
 
