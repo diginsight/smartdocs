@@ -379,9 +379,20 @@ jobs:
           # A deploy that returns success while the host fails to start is the failure mode worth
           # catching here: the payload is self-contained, so a bitness or overlay mistake shows up
           # only on the first request.
+          if ([string]::IsNullOrWhiteSpace($env:WEBAPP_NAME)) {
+            Write-Error "WEBAPP_NAME was not resolved from the overlay"
+            exit 1
+          }
           $rg = az webapp list --query "[?name=='$env:WEBAPP_NAME'].resourceGroup | [0]" -o tsv
           # $host is a PowerShell automatic variable and cannot be assigned.
           $hostName = az webapp show --name $env:WEBAPP_NAME --resource-group $rg --query defaultHostName -o tsv
+          if ([string]::IsNullOrWhiteSpace($hostName)) {
+            # Both deploy workflows share this runner and its az CLI session, so a sibling job
+            # logging out can empty this lookup. The default hostname is deterministic, so derive it
+            # rather than probing https:/// ten times and reporting a misleading failure.
+            $hostName = "$env:WEBAPP_NAME.azurewebsites.net"
+            Write-Host "Hostname lookup returned nothing; using the default hostname"
+          }
           $url = "https://$hostName/"
           for ($i = 1; $i -le 10; $i++) {
             try {
