@@ -14,6 +14,10 @@ packages up while everything else continues to come from nuget.org.
 Upstreams and the MSBuild property that pins each of them are listed in eng/upstream-releases.json.
 Versions live only in src/Directory.Build.props and are never duplicated here.
 
+A pin may be exact (3.8.0.1) or floating (3.8.*, 1.*, *). A floating pin is resolved against the
+upstream's release list and always selects the newest matching stable release; prereleases are
+never selected by a floating pin.
+
 .EXAMPLE
 ./eng/Download-PackageRelease.ps1
 Downloads every upstream listed in eng/upstream-releases.json.
@@ -195,7 +199,82 @@ function Get-PinnedVersion {
         throw "'$Property' is not set in '$VersionPropsPath'."
     }
 
+    # A floating range is returned as written; the caller resolves it against the release list.
+    if (Test-FloatingVersion -Version $value) {
+        return $value
+    }
+
     return ConvertTo-NormalizedPackageVersion -Version $value
+}
+
+function Test-FloatingVersion {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [string] $Version
+    )
+
+    return [regex]::IsMatch($Version.Trim(), '^(?:\*|[0-9]+(?:\.[0-9]+){0,2}\.\*)$')
+}
+
+function Resolve-FloatingVersion {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [string] $Repository,
+
+        [Parameter(Mandatory)]
+        [string] $Pattern
+    )
+
+    $trimmed = $Pattern.Trim()
+    # Typed as an array so a one-component prefix does not unwrap to a scalar and an empty prefix
+    # does not collapse to $null, both of which make .Count throw under Set-StrictMode.
+    [string[]] $prefix = @()
+    if ($trimmed -ne '*') {
+        $prefix = [string[]] ($trimmed.Substring(0, $trimmed.Length - 2).Split('.'))
+    }
+
+    $listed = & gh release list --repo $Repository --limit 200 --json tagName
+    if ($LASTEXITCODE -ne 0) {
+        throw "Could not list the releases of '$Repository'."
+    }
+
+    $best = $null
+    $bestParts = $null
+    foreach ($tagName in @(($listed | ConvertFrom-Json).tagName)) {
+        if (-not $tagName.StartsWith('v', [System.StringComparison]::Ordinal)) { continue }
+        $candidate = $tagName.Substring(1)
+
+        # A floating range never selects a prerelease.
+        if (-not [regex]::IsMatch($candidate, '^[0-9]+(?:\.[0-9]+){0,3}$')) { continue }
+
+        $parts = [System.Collections.Generic.List[long]]::new()
+        foreach ($component in $candidate.Split('.')) { $parts.Add([long] $component) }
+        while ($parts.Count -lt 4) { $parts.Add(0L) }
+
+        $isMatch = $true
+        for ($i = 0; $i -lt $prefix.Count; $i++) {
+            if ($parts[$i] -ne [long] $prefix[$i]) { $isMatch = $false; break }
+        }
+        if (-not $isMatch) { continue }
+
+        if ($null -eq $bestParts) {
+            $best = $candidate
+            $bestParts = $parts
+            continue
+        }
+        for ($i = 0; $i -lt 4; $i++) {
+            if ($parts[$i] -gt $bestParts[$i]) { $best = $candidate; $bestParts = $parts; break }
+            if ($parts[$i] -lt $bestParts[$i]) { break }
+        }
+    }
+
+    if ($null -eq $best) {
+        throw "No GitHub Release in '$Repository' matches the floating version '$Pattern'."
+    }
+
+    return ConvertTo-NormalizedPackageVersion -Version $best
 }
 
 function Set-PinnedVersion {
@@ -483,6 +562,14 @@ try {
     foreach ($upstream in $upstreams) {
         $index++
         $packageVersion = Get-PinnedVersion -Property $upstream.VersionProperty
+        if (Test-FloatingVersion -Version $packageVersion) {
+            if ($offline) {
+                throw "Floating version '$packageVersion' for '$($upstream.Repository)' cannot be resolved with FromDirectory."
+            }
+            $resolvedVersion = Resolve-FloatingVersion -Repository $upstream.Repository -Pattern $packageVersion
+            Write-Host "Floating $($upstream.VersionProperty)=$packageVersion resolved to $resolvedVersion."
+            $packageVersion = $resolvedVersion
+        }
         $tag = Resolve-ReleaseTag -Repository $upstream.Repository -PackageVersion $packageVersion -Offline:$offline
         $upstreamPath = Join-Path $staging "$index-$($upstream.Repository -replace '[^A-Za-z0-9._-]', '-')"
         $null = New-Item -ItemType Directory -Path $upstreamPath -Force

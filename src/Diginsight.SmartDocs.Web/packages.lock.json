@@ -59,11 +59,11 @@
       },
       "Diginsight.Components": {
         "type": "Direct",
-        "requested": "[1.0.0.110, )",
-        "resolved": "1.0.0.110",
-        "contentHash": "jwRqFqd2zkLr9HFv7eccf+c4mMIP4sDpNMUrCctDUeqBON/YvuuVKARHpqjt8piZxyGB6hHJmVLE3K9kjTo0EQ==",
+        "requested": "[1.*, )",
+        "resolved": "1.0.0.111",
+        "contentHash": "jVHVoJgQUeTw8O+DDLCNn49MXeW/Z1jp+HijVQ0hnPE94AUQTPCFdU8d0ysNfDxgVuSYcSF46jaN9+BkeUAg9w==",
         "dependencies": {
-          "Diginsight.Components.Abstractions": "1.0.0.110",
+          "Diginsight.Components.Abstractions": "1.0.0.111",
           "Diginsight.Core": "3.8.0.1",
           "Diginsight.Diagnostics": "3.8.0.1",
           "Microsoft.Identity.Client": "4.88.0",
@@ -74,14 +74,14 @@
       },
       "Diginsight.Components.Azure": {
         "type": "Direct",
-        "requested": "[1.0.0.110, )",
-        "resolved": "1.0.0.110",
-        "contentHash": "Em5LcUI+VdIC28x+u1keAiQM2BPYOUfedqarhLKMglyeyjg2TwBHJHU2/UimuMyH91E5XRXSbbB7JQyFvPdMig==",
+        "requested": "[1.*, )",
+        "resolved": "1.0.0.111",
+        "contentHash": "Dai09ZlPVqMvJxtsHqwOrLSND7e1e9jdAuh/B6qx2cvI2zjpo4a3bhXSX8/AByvSaLZG8nDCcJBVACK2AMb0Gg==",
         "dependencies": {
           "Azure.Data.Tables": "12.12.0",
-          "Diginsight.Components": "1.0.0.110",
-          "Diginsight.Components.Azure.Abstractions": "1.0.0.110",
-          "Diginsight.Components.Configuration.Abstractions": "1.0.0.110",
+          "Diginsight.Components": "1.0.0.111",
+          "Diginsight.Components.Azure.Abstractions": "1.0.0.111",
+          "Diginsight.Components.Configuration.Abstractions": "1.0.0.111",
           "Diginsight.Core": "3.8.0.1",
           "Diginsight.Diagnostics": "3.8.0.1",
           "Microsoft.Azure.Cosmos": "3.62.1",
@@ -91,16 +91,16 @@
       },
       "Diginsight.Components.Configuration": {
         "type": "Direct",
-        "requested": "[1.0.0.110, )",
-        "resolved": "1.0.0.110",
-        "contentHash": "DF/roPJxeM0tShA53rkmfaqQCmjTx6LVZsmNe35ELjVwEuecwJrBCPBABr2pLXJKorbmlMDLkjIZDhsCPfdBGg==",
+        "requested": "[1.*, )",
+        "resolved": "1.0.0.111",
+        "contentHash": "GPL7oJyLt3p0qEmCQix6BFN7shuAZVI2Nvqu3gTgz9XvWnuCahax1lcegh1/CIh9BN7CYy9poDU2GOW0bSqaMw==",
         "dependencies": {
           "Azure.Core": "1.62.0",
           "Azure.Extensions.AspNetCore.Configuration.Secrets": "1.5.2",
           "Azure.Identity": "1.21.0",
           "Azure.Monitor.OpenTelemetry.AspNetCore": "1.6.0",
-          "Diginsight.Components.Azure": "1.0.0.110",
-          "Diginsight.Components.Configuration.Abstractions": "1.0.0.110",
+          "Diginsight.Components.Azure": "1.0.0.111",
+          "Diginsight.Components.Configuration.Abstractions": "1.0.0.111",
           "Diginsight.Core": "3.8.0.1",
           "Diginsight.Diagnostics": "3.8.0.1",
           "Diginsight.Diagnostics.AspNetCore": "3.8.0.1",
@@ -366,24 +366,24 @@
       },
       "Diginsight.Components.Abstractions": {
         "type": "Transitive",
-        "resolved": "1.0.0.110",
-        "contentHash": "0jY8zxuQKF7kEHa5Upj2LTbWh0Mwqkz4em5kyX1gYLxIAb9lPA6Q6uLDk+LjmOQnWnhax/gKHXJxTOl1m/qJ+w==",
+        "resolved": "1.0.0.111",
+        "contentHash": "lYw+dRL/huV/uhuwob9WqRCYTbblsEivLv8BHd1oUxiZH0VXWy7MWE4VyFhilrYrUQb/e+CzHi3jU4XtFa18/Q==",
         "dependencies": {
           "Microsoft.Identity.Client": "4.88.0"
         }
       },
       "Diginsight.Components.Azure.Abstractions": {
         "type": "Transitive",
-        "resolved": "1.0.0.110",
-        "contentHash": "4+YXBboqgFE2yb6pOoDKqZOCQzEjEP62A3qWKjubP3bvVQ0xgeZ+Vc+YwKolD4B4SRLmDZ/IVsZVvxqsKmJlgg==",
+        "resolved": "1.0.0.111",
+        "contentHash": "3KIMaPAYmbdf8ZMgVfxFoq8cEcwz+hkRkZ0P0NF+I/ahr3uRTgZjRGD1EplFKNQ/S2Fuxx8IItkcFMI3DPD9kQ==",
         "dependencies": {
           "Azure.Data.Tables": "12.12.0"
         }
       },
       "Diginsight.Components.Configuration.Abstractions": {
         "type": "Transitive",
-        "resolved": "1.0.0.110",
-        "contentHash": "u3r05bhTozyurKnHCN3J9qnTWIws40NyaWnG5azOTefKHNPRXEitEHtxYuGUntt8u6eO5jNC8vY8Ic2DYI4Utw==",
+        "resolved": "1.0.0.111",
+        "contentHash": "FHt724VF4ylqZ4BPCo2xtfPaPV82NBZS6yO88ppVzbXmjl4EDXFIk6BE261K+gaSA3xBLOJbnFaGFu0fku95Ew==",
         "dependencies": {
           "Diginsight.Core": "3.8.0.1",
           "Diginsight.Diagnostics": "3.8.0.1"
