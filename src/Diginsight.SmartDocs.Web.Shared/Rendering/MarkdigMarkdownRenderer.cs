@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.RegularExpressions;
+using Diginsight.SmartDocs.Web.Shared.Navigation;
 using Markdig;
 using Markdig.Renderers;
 using Markdig.Renderers.Html;
@@ -209,15 +210,6 @@ public sealed class MarkdigMarkdownRenderer : IMarkdownRenderer
 
     private static string ExtractTitle(string markdown)
     {
-        foreach (string line in markdown.Split('\n'))
-        {
-            string trimmed = line.TrimStart();
-            if (trimmed.StartsWith("# ", StringComparison.Ordinal))
-            {
-                return trimmed[2..].Trim();
-            }
-        }
-
-        return "Diginsight SmartDocs";
+        return FrontMatter.ResolveTitle(markdown) ?? string.Empty;
     }
 }

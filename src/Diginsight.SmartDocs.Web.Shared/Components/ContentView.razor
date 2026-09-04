@@ -3,9 +3,10 @@
 @inject TocState Toc
 @inject ArticleState Article
 @inject IJSRuntime JS
+@inject Diginsight.SmartDocs.Web.Shared.Sites.SiteShellState Site
 @implements IDisposable
 
-<PageTitle>@(_page?.Title ?? "Diginsight SmartDocs")</PageTitle>
+<PageTitle>@(!string.IsNullOrWhiteSpace(_page?.Title) ? _page.Title : Site.Title)</PageTitle>
 
 @if (_loading)
 {

@@ -28,7 +28,7 @@ public partial class ContentView
         Toc.SetEntries(_page?.Toc ?? Array.Empty<TocEntry>());
 
         // Push current article metadata to the footer status bar.
-        if (_page is not null)
+        if (_page is not null && !string.IsNullOrWhiteSpace(_page.Title))
         {
             Article.Set(_page.Title, _page.WordCount);
         }
