@@ -17,7 +17,7 @@ Activities this work item's conversations surfaced that were **never in scope** 
 📖 Record shape, kinds, sweep and priority derivation: `.github/skills/signal-capture/SKILL.md`
 
 <!-- Replace the backticked path above with a relative link from the instantiated page's own
-     location. From `src/docs/90.00-issues/<YYYYMM>/<work-item>/` that is
+     location. From a work-item folder five levels below the repository root that is
      `[signal-capture](../../../../../.github/skills/signal-capture/SKILL.md)`. -->
 
 ## 📡 Signals
@@ -27,7 +27,10 @@ Activities this work item's conversations surfaced that were **never in scope** 
 | 1 | `SIG-1` | [kind] | high | ready | [repository] | none found | `pending` |
 | — | `SIG-2` | [kind] | — | — | [repository] | [landing id] | `routed → [landing id]` |
 
-<!-- Ordering rule: relevance descending, then actionability descending, then identifier ascending.
+<!-- Ordering rule: `artifact-defect` first, then relevance descending, then actionability descending,
+     then identifier ascending. `artifact-defect` leads because every other kind describes work that is
+     waiting, while an artifact defect describes a generator that keeps producing defective work on
+     every future run until it is repaired.
      A signal that resolves to an existing landing carries no priority — its ordering lives in the
      plan that owns it. Show it last with `—` in the priority columns.
 
@@ -39,7 +42,7 @@ Activities this work item's conversations surfaced that were **never in scope** 
 <!-- Copy this block per record. All nine fields are required. NEVER add execution steps:
      they belong to the context that executes the signal, not the one that observed it. -->
 
-- **Kind** — one of `upstream-feedback` | `propagation-debt` | `divergent-commitment` | `investigation-lead` | `expression-defect`.
+- **Kind** — one of `upstream-feedback` | `propagation-debt` | `divergent-commitment` | `investigation-lead` | `expression-defect` | `artifact-defect`.
 - **Goal** — the one outcome this activity exists to achieve.
 - **Scope** — what it covers, stated tightly enough to size it.
 - **Why it matters** — the cost of not doing it.

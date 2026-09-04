@@ -7,7 +7,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 namespace Diginsight.SmartDocs.Web.Endpoints;
 
 /// <summary>
-/// Raw Markdown/asset passthrough endpoint (<c>/_content-raw/{**key}</c>) consumed by the WASM
+/// Raw Markdown/asset passthrough endpoint (<c>/_content/{**key}</c>) consumed by the WASM
 /// client's <c>HttpContentSource</c> to fetch content bytes from the server-side content store.
 /// </summary>
 public static class ContentEndpoints
@@ -19,7 +19,7 @@ public static class ContentEndpoints
 
     public static IEndpointRouteBuilder MapContentEndpoints(this IEndpointRouteBuilder app)
     {
-        app.MapGet("/_content-raw/{**key}", GetContentRawAsync);
+        app.MapGet("/_content/{**key}", GetContentRawAsync);
         return app;
     }
 

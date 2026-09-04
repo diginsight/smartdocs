@@ -9,7 +9,7 @@ namespace Diginsight.SmartDocs.Web.ContentSources;
 /// <summary>
 /// SmartCache decorator over an inner <see cref="IContentSource"/>. It caches the Markdown
 /// source-byte fetch — the expensive blob/file read that runs on every prerender and on every
-/// WASM navigation via <c>/_content-raw</c> — in-memory, optionally backed by Redis for
+/// WASM navigation via <c>/_content</c> — in-memory, optionally backed by Redis for
 /// distributed, multi-instance sharing.
 /// <para>
 /// Only text Markdown keys (<c>.md</c>/<c>.qmd</c>) are cached; binary assets (images, downloads)

@@ -12,17 +12,17 @@ source_sets:
 <!--
 verification_stamp:
   generated: "2026-08-18"
-  verified: "2026-08-18"
+  verified: "2026-09-04"
   gate_outcome: "pass-with-gaps"
   evidence:
     - dossier: "_evidence/smartdocs-web/code.md"
-      observed: "2026-08-18"
+      observed: "2026-09-04"
     - dossier: "_evidence/smartdocs-web/data.md"
       observed: "2026-08-18"
     - dossier: "_evidence/smartdocs-web/configuration.md"
       observed: "2026-08-18"
     - dossier: "_evidence/smartdocs-web-client/code.md"
-      observed: "2026-08-18"
+      observed: "2026-09-04"
     - dossier: "_evidence/smartdocs-web-shared/code.md"
       observed: "2026-08-18"
   open_gaps: 2
@@ -69,7 +69,7 @@ verification_stamp:
 | No candidate resolves | `Site:NotFoundPath` is declared as `404.html`. ^[configuration-05] What the host does with that value is not established — see below. |
 | The document declares `publish: false` or `draft: true` | `Hidden` is computed as `!publish \|\| draft` and the document is excluded from navigation. ^[smartdocs-web/code-22] |
 | The reader navigates away mid-request | An endpoint filter converts `OperationCanceledException` raised on the request's own `RequestAborted` token into HTTP 499 rather than a 500. ^[smartdocs-web/code-19] |
-| The request is for a raw asset rather than a page | `GET /_content-raw/{**key}` returns the bytes and content type directly, or 404 when absent. ^[smartdocs-web/code-10] |
+| The request is for a raw asset rather than a page | `GET /_content/{**key}` returns the bytes and content type directly, or 404 when absent. ^[smartdocs-web/code-10] |
 | An unhandled error occurs outside `Development` | The exception handler at `/error` takes it, in a fresh scope. ^[smartdocs-web/code-38] |
 
 ## 🧪 What proves it

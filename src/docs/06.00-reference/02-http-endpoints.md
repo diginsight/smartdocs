@@ -11,13 +11,13 @@ source_sets:
 <!--
 verification_stamp:
   generated: "2026-08-18"
-  verified: "2026-08-18"
+  verified: "2026-09-04"
   gate_outcome: "pass-with-gaps"
   evidence:
     - dossier: "_evidence/smartdocs-web/code.md"
-      observed: "2026-08-18"
+      observed: "2026-09-04"
     - dossier: "_evidence/smartdocs-web/security.md"
-      observed: "2026-08-18"
+      observed: "2026-09-04"
     - dossier: "_evidence/smartdocs-web/configuration.md"
       observed: "2026-08-18"
   open_gaps: 4
@@ -47,7 +47,7 @@ verification_stamp:
 
 | Route | Method | Returns |
 |---|---|---|
-| `/_content-raw/{**key}` | GET | The raw bytes and content type for a key; 404 when absent ^[code-10] |
+| `/_content/{**key}` | GET | The raw bytes and content type for a key; 404 when absent ^[code-10] |
 
 ### Navigation
 

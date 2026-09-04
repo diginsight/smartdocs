@@ -4,7 +4,8 @@ description: >
   Captures activities a conversation surfaced that were never in scope for the
   current goal — knowledge belonging to an authority document elsewhere, changes
   needing replication in a peer repository, commitments about other components,
-  subjects worth developing, and expression defects worth correcting. Defines the
+  subjects worth developing, expression defects worth correcting, and prompt-engineering
+  artifacts that failed to meet their own declared goal. Defines the
   signal record shape, the relevance/actionability priority derivation, and the
   detection sweep. Use when splitting a conversation into an issue analysis, when
   closing a work item, when an item is being routed away from a plan's park lot,
@@ -38,9 +39,23 @@ MUST NOT park a divergent item. A plan is terminal; a signal outlives it.
 
 ## Workflow
 
+### 0. Establish admissible evidence
+
+Before the sweep, state the current work-item goal and collect each candidate's source:
+
+- **Explicit commitment** — the user or conversation explicitly asked for work outside the goal.
+- **Verified fact** — a repository, platform, or runtime fact confirmed by a source appropriate to the claim.
+- **Fallback or inference** — a default rule, missing declaration, or agent interpretation.
+
+Only explicit commitments and verified facts may become signals. A fallback or inference may constrain the current work, but MUST NOT become a signal until its condition is independently verified.
+
+For repository visibility, use this evidence order: repository metadata, authenticated repository-host result, explicit user statement, then unknown. A missing metadata file invokes the content-classification safety fallback; it does **not** establish that the repository is public and does not by itself justify a metadata, split, or disclosure-audit signal.
+
+Reconcile every candidate against the work item's latest scope before writing: discard it when it is now in scope or completed, and route it when an existing plan owns it.
+
 ### 1. Sweep
 
-Ask the conversation all seven questions. NEVER substitute impression for the list:
+Ask the conversation all eight questions. NEVER substitute impression for the list:
 
 1. What did the conversation state should happen that is **not** this issue?
 2. What knowledge produced here has an **authority document elsewhere** it now contradicts or extends?
@@ -49,26 +64,32 @@ Ask the conversation all seven questions. NEVER substitute impression for the li
 5. What references a **path outside this workspace**?
 6. What subject did the conversation **open but not develop**?
 7. Where did a term, framing or explanation **land wrong and get corrected** — and what formulation would have avoided it?
+8. Which prompt, agent, instruction, skill, snippet, template, hook or context file **governed this conversation**, and did it fully meet its own declared goal?
 
 ### 2. Classify the kind
 
 | Kind | What it is | Typical landing |
 |---|---|---|
 | `upstream-feedback` | knowledge produced here belongs to an authority document elsewhere | a vision-amendment plan in the target |
-| `propagation-debt` | a change here must be replicated in a peer repository | a comparison-derived work list |
+| `propagation-debt` | a change here must be replicated in a peer repository | `pe-align-artifacts-across-repositories` |
 | `divergent-commitment` | a decision implying work in another component or repository | an existing plan, or a new one |
 | `investigation-lead` | a subject opened but not developed, deserving development rather than a decision | learning-hub content |
 | `expression-defect` | a term or framing that landed wrong, with the analysis and better formulation | writing and terminology guidance |
+| `artifact-defect` | a governing prompt-engineering artifact of any type underperformed its declared goal, or declared a goal that did not match what was wanted | `pe-review-execution-and-improve-artifacts` |
 
 ### 3. Resolve the existing landing FIRST
 
 MUST search for a plan, work item or backlog entry that already covers the goal **before** naming a new landing. A signal that duplicates tracked work is a worse failure than a lost one. When one is found, record it and set `state: routed → <landing>`; the signal then carries no priority, because its ordering lives in the plan that owns it.
 
+MUST NOT convert a generic instruction prerequisite, a conservative safety fallback, or a speculative compliance concern into `upstream-feedback`. It becomes a signal only when the conversation establishes a concrete mismatch and the target authority is known.
+
+MUST NOT convert a hypothetical improvement, a stylistic preference, or an artifact the conversation merely consulted into `artifact-defect`. It becomes a signal only when the conversation shows an **actual execution shortfall** — a correction turn where the developer supplied what the artifact should have produced, or an artifact that reported success over an incomplete outcome. An artifact that met its declared goal is not a defect, however improvable it looks.
+
 ### 4. Write the record
 
 | Field | Purpose |
 |---|---|
-| `kind` | one of the five above |
+| `kind` | one of the six above |
 | `goal` | the one outcome the activity exists to achieve |
 | `scope` | what it covers, tight enough to size it |
 | `why it matters` | the cost of not doing it |
@@ -89,6 +110,8 @@ MUST search for a plan, work item or backlog entry that already covers the goal 
 **Actionability** — readiness where it lands: `ready` landing resolved and work list derivable without judgement · `bounded` landing known, scope still to be shaped · `open` landing unknown or scope undefined.
 
 MUST order by **relevance descending**, then actionability descending, then identifier ascending. NEVER assign an order by impression. Identifiers are identity, not sequence — order is the listing position.
+
+**`artifact-defect` takes precedence over every other kind** and sorts ahead of the relevance ordering above, so PE-improvement signals lead the primary page. The rationale is compounding: every other signal describes work that is waiting, while an artifact defect describes a generator that keeps producing defective work on every future run until it is repaired. Within `artifact-defect`, the standard relevance-then-actionability ordering applies.
 
 ### 6. Place the record
 

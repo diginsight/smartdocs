@@ -13,7 +13,7 @@ scope:
     - "Working/intermediate artifact marking (publish: false) and _analysis/ working folder"
   excludes:
     - "Sidebar menu item transformation (see 07-sidebar-menu-rules.md)"
-    - "Runtime nav implementation (see DynamicNavBuilder / NavRules in src/Learn.Web)"
+    - "Runtime nav implementation (see DynamicNavBuilder / NavRules in src/Diginsight.SmartDocs.Web)"
 boundaries:
   - "MUST use hyphens (not spaces) as separator after numeric prefixes"
   - "MUST NOT use spaces in folder/file names"
@@ -74,13 +74,13 @@ Time-sensitive content uses date prefixes with hyphen separator:
 
 ### Ordering (runtime, dynamic navigation)
 
-Navigation is built at **runtime** by `DynamicNavBuilder` / `NavRules` (`src/Learn.Web`) from the live
+Navigation is built at **runtime** by `DynamicNavBuilder` / `NavRules` (`src/Diginsight.SmartDocs.Web`) from the live
 content hierarchy — there is no glob list or `_quarto.yml` to maintain, and no build step. Ordering is
 deterministic:
 
 - **Numeric-prefix folders** (`NN.NN-name`) sort **ascending by prefix**, keeping the numbered areas grouped.
-- **Date-prefixed content** (`YYYYMMDD-…`) under `01.00-news/` is presented **newest-first** (the builder
-  inverts date order for news); date folders elsewhere sort ascending.
+- **Date-prefixed content** (`YYYYMMDD-…`) is presented **newest-first**, everywhere in the tree — the rule
+  reads the name alone and makes no exception for `01.00-news/` or any other folder.
 - **`metadata.yml` `order:`** overrides the derived weight for any folder (ascending; joins the numeric group).
 - Ties break by name (ordinal).
 
@@ -206,7 +206,7 @@ Menu generation rules are defined separately to allow flexibility when actual fo
 - Numeric prefixes removed together with separator (hyphen OR space)
 - Date prefixes preserved in menu items
 - YAML `title:` field takes precedence over filename transformation
-- Runtime ordering is deterministic — news is presented newest-first automatically
+- Runtime ordering is deterministic — date-prefixed content is presented newest-first automatically
 
 ---
 
@@ -221,6 +221,6 @@ Menu generation rules are defined separately to allow flexibility when actual fo
 
 <!--
 context_metadata:
-  version: "1.2.0"
-  last_updated: "2026-07-20"
+  version: "1.3.0"
+  last_updated: "2026-09-04"
 -->

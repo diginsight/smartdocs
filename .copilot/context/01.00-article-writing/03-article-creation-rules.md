@@ -228,7 +228,7 @@ article_metadata:
 
 These principles guide decisions *before* you start writing. They determine what content to create, how to break it apart, and how to organize it for readers.
 
-📖 **Source:** [Article 02: Structure and Information Architecture](../../../03.00-tech/40.00-technical-writing/02-structure-and-information-architecture.md)
+📖 **Source:** [Article 02: Structure and Information Architecture](https://learn-testmc-app-itn-01.azurewebsites.net/03.00-tech/40.00-technical-writing/02-structure-and-information-architecture)
 
 ### Content-first design (G1)
 

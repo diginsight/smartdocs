@@ -1,8 +1,8 @@
 ---
 description: Base instructions for all Markdown files—essential structure, formatting, and validation rules. See article-writing.instructions.md for comprehensive writing guidance.
 applyTo: '*.md,[0-9]*/**/*.md,_*/**/*.md,docs/**/*.md,src/docs/**/*.md'
-version: "1.10.1"
-last_updated: "2026-06-06"
+version: "1.11.0"
+last_updated: "2026-08-23"
 domain: "article-writing"
 context_dependencies:
   - ".copilot/context/00.00-prompt-engineering/"
@@ -111,6 +111,46 @@ All Markdown files and PE artifacts **MUST** be saved as **UTF-8** (with or with
 - **NEVER** use `[System.Text.Encoding]::GetEncoding(1252)` or equivalent CP1252 conversions when processing Markdown files — multi-byte UTF-8 sequences (especially 4-byte emoji) are irreversibly replaced with `?`
 - When reading/writing files programmatically, always specify UTF-8 encoding explicitly
 - When fixing encoding issues, use string-level replacement maps rather than encoding round-trips through CP1252
+
+---
+
+## Readable Identifiers (CRITICAL)
+
+**RULE:** Any identifier a document **invents** for cross-reference MUST carry its meaning in the identifier itself. A bare ordinal or opaque prefix code that forces the reader to look up a legend is forbidden.
+
+Applies to every identifier authored in Markdown — rules, principles, decisions, gaps, workstreams, parked items, dimensions, options, risks, findings.
+
+| ❌ Opaque | ✅ Readable |
+|---|---|
+| `R1`, `R2` | `R1-write-once-one-grain`, `R2-emit-finest-grain` |
+| `D1`, `G9` | `D1-parity-authority`, `G9-tier-misdelegation` |
+| `WS-A`, `PL-1` | `WS-A-parameter-surface`, `PL-1-vision-matrix` |
+| `R-L4` | `external-knowledge` |
+
+**Form:** kebab-case, either `<slug>` or `<ordinal>-<slug>`. Keep the ordinal where ordering or existing cross-references depend on it; drop it where it carries no information.
+
+**Also required:** expand the meaning on first use in each document and link its definition. A readable identifier reduces lookups — it does not replace the definition.
+
+### Exempt — identifiers that mirror an external source
+
+An identifier the document did **not** invent MUST be reproduced verbatim and MUST NOT be "made readable":
+
+- **Data values** — enum members and column values (`T0`–`T5` in `normalization_tier`, status codes)
+- **Code identifiers** — class, procedure and table names (`S1ImportGithub`, `silver.s4_conform`)
+- **Provider / source field names** — `totals_by_cli`, `BilledCost`
+- **Externally-defined ids** — standard clause numbers, vision-canonical `P-1`…`P-4`, CVE ids
+
+The test: **did this document invent the code, or is it quoting one?** Invented → readable. Quoted → verbatim. Renaming a quoted identifier breaks the link to its source.
+
+### Per-family conventions
+
+The rule above is the floor. These files fix the specific form for their document family:
+
+| Document family | Authority |
+|---|---|
+| Plan files (`*.plan.md`) | `plan-marking.instructions.md` § Identifier Readability |
+| Use-case documents | `use-case-documents.instructions.md` (`D#-readable-id`) |
+| Vision documents | `vision-frontmatter.instructions.md` (pure kebab, no prefix codes) |
 
 ---
 

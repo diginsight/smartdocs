@@ -10,17 +10,25 @@ source_sets:
 <!--
 verification_stamp:
   generated: "2026-08-18"
-  verified: "2026-08-18"
-  gate_outcome: "pass-with-gaps"
+  verified: "2026-09-04"
+  gate_outcome: "pass"
   evidence:
     - dossier: "_evidence/smartdocs-web-shared/code.md"
-      observed: "2026-08-18"
+      observed: "2026-09-04"
     - dossier: "_evidence/smartdocs-web/code.md"
-      observed: "2026-08-18"
-  open_gaps: 3
+      observed: "2026-09-04"
+  open_gaps: 0
 -->
 
 # Folder metadata schema
+
+## 📚 Table of contents
+
+- [🎯 Purpose](#-purpose)
+- [📋 Members](#-members)
+- [🔑 Keys and constraints](#-keys-and-constraints)
+- [🔗 Used by](#-used-by)
+- [🔗 Related](#-related)
 
 ## 🎯 Purpose
 
@@ -39,12 +47,12 @@ Every key accepts more than one spelling. The alternatives are equivalent. ^[sma
 | `label` | `nav-label` | Display name ^[smartdocs-web/code-27] |
 | `short` | `nav-short` | Short display name ^[smartdocs-web/code-27] |
 | `icon` | `nav-icon` | Icon identifier ^[smartdocs-web/code-27] |
-| `order` | `nav-order` | Sort weight ^[smartdocs-web/code-27] |
+| `order` | `nav-order` | Sort weight, replacing the name-derived one ^[smartdocs-web/code-39] |
 | `hidden` | `nav-hidden` | The folder is skipped when this is declared ^[smartdocs-web/code-27] ^[smartdocs-web/code-26] |
 | `topbar-hidden` | `nav-topbar-hidden`, `hidden-topbar` | Top-bar visibility ^[smartdocs-web/code-27] |
 | `topbar-align` | `nav-topbar-align` | Top-bar alignment ^[smartdocs-web/code-27] |
-| `article-count` | `articles` | A declared article count ^[smartdocs-web/code-27] |
-| `latest-article` | `updated` | A declared latest-article date ^[smartdocs-web/code-27] |
+| `article-count` | `articles` | A seed article count, used until the folder has been counted ^[smartdocs-web/code-40] |
+| `latest-article` | `updated` | A seed latest-article date, used alongside the seed count ^[smartdocs-web/code-40] |
 
 ## 🔑 Keys and constraints
 
@@ -54,17 +62,17 @@ Every key accepts more than one spelling. The alternatives are equivalent. ^[sma
 
 **Both spellings of every key are read.** A bare key and its `nav-`-prefixed form are equivalent, so a folder may use either convention consistently. ^[smartdocs-web-shared/code-25]
 
+**A declared `order` replaces the name-derived sort key.** The value becomes the same kind of key a numeric prefix produces, so a folder declaring `order: 3` and a folder named `03.00-…` are ordered against one another on one scale, and a tie breaks on the lowercased folder name. ^[smartdocs-web/code-39]
+
+**A declared count is a seed, never an override.** A folder's article count and latest-article date are taken from the counting index whenever it holds a value for that path; `article-count` and `latest-article` are read only when it does not, and are then treated as a lower bound rather than a total. ^[smartdocs-web/code-40] The index reports nothing at all for a folder it has not yet counted, which is what sends such a folder to the declared seed instead of to zero. ^[smartdocs-web/code-41]
+
+**An unrecognised key is ignored silently.** Every line is matched by one expression and dispatched on the lowercased key; a key matching nothing has no effect, and the file is neither rejected nor reported — so a misspelled key reads exactly like an absent one. ^[smartdocs-web-shared/code-26]
+
+**A malformed value is discarded, not corrected.** `hidden` and `topbar-hidden` are true only for the literal `true`; a non-numeric `order` or `article-count` and an unparseable `latest-article` are left unset; and `topbar-align` is ignored unless it reads `left` or `right`. An empty or whitespace file yields no overrides at all. ^[smartdocs-web-shared/code-27]
+
 ## 🔗 Used by
 
 `DynamicNavBuilder`, which reads the file for each folder in a level. ^[smartdocs-web/code-26]
-
-## 🕳️ Open questions
-
-> **Not established**: what the sort key does with a declared `order`. The key is recorded as accepted by the metadata parser, but no record establishes that it overrides name-based ordering or changes the sort group, so this page does not state either. ^[gap]
-
-> **Not established**: how `article-count` and `latest-article` interact with computed aggregates. The keys are recorded as accepted; whether a declared value is used in preference to a walked subtree was not established. ^[gap]
-
-> **Not established**: what happens to an unrecognised key. Whether the parser ignores it or rejects the file was not established, so a misspelling's consequence is unknown. ^[gap]
 
 ## 🔗 Related
 

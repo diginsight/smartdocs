@@ -36,6 +36,8 @@ Defines HOW to mark status on plan items and sections. Complements `plan-executi
 
 ## Identifier Readability
 
+The plan-file instance of the repository-wide rule in `documentation.instructions.md` § Readable Identifiers, which governs **all** Markdown. This section fixes the plan-specific form.
+
 Applies to plan-local cross-reference ids (decisions, workstreams, gaps, parked items, open decisions).
 
 - MUST be self-descriptive: ordinal + kebab slug — `D1-parity-authority`, `WS-A-parameter-surface`, `G9-tier-misdelegation`, `PL-1-vision-matrix`
@@ -97,6 +99,6 @@ The suffix notation defined here is the canonical format for status marking acro
 
 <!--
 instruction_metadata:
-  version: "1.5.0"
-  last_updated: "2026-08-16"
+  version: "1.6.0"
+  last_updated: "2026-08-23"
 -->

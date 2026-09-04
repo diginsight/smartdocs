@@ -23,10 +23,10 @@ rationales:
 
 # Sidebar Menu Rules (Runtime Navigation)
 
-**Purpose**: Define rules for generating sidebar menu items from folder/file structures, independent of strict naming conventions. These rules are implemented by the **runtime navigation builder** (`DynamicNavBuilder` / `NavRules` in `src/Learn.Web`), which builds the live menu from the content hierarchy on each request — there is no menu file to maintain.
+**Purpose**: Define rules for generating sidebar menu items from folder/file structures, independent of strict naming conventions. These rules are implemented by the **runtime navigation builder** (`DynamicNavBuilder` / `NavRules` in `src/Diginsight.SmartDocs.Web`), which builds the live menu from the content hierarchy on each request — there is no menu file to maintain.
 
 **Referenced by**: 
-- `src/Learn.Web/Navigation/DynamicNavBuilder.cs` and `src/Learn.Web.Shared/Navigation/NavRules.cs` (implementation)
+- `src/Diginsight.SmartDocs.Web/Navigation/DynamicNavBuilder.cs` and `src/Diginsight.SmartDocs.Web.Shared/Navigation/NavRules.cs` (implementation)
 - Per-folder `metadata.yml` (label/short/icon/order/hidden/topbar-hidden/topbar-align overrides)
 
 ---
@@ -163,7 +163,7 @@ The runtime navigation builder discovers content automatically and orders it det
 are no globs or explicit lists to maintain:
 
 - **Numeric-prefix folders** (`NN.NN-name`) sort **ascending by prefix**.
-- **Date-prefixed content** under `01.00-news/` is presented **newest-first**; date folders elsewhere sort ascending.
+- **Date-prefixed content** sorts **newest-first**, everywhere in the tree — the rule reads the name alone and has no per-folder exception.
 - **`metadata.yml` `order:`** overrides the derived weight for a folder (ascending; joins the numeric group).
 - Ties break by name (ordinal).
 
@@ -191,13 +191,16 @@ When a folder contains only one meaningful article, **collapse to single menu en
 
 **Detection:** Folder contains exactly one `.md` file (excluding `readme.md`, `index.md` used for other purposes).
 
+**⚠️ An index does NOT survive a single sibling article.** When a folder holds an index/readme *and* exactly one other article, the **article** represents the folder and the index is not reachable from the menu. Give the folder a second article, or fold the index content into the article.
+
 ### Index Files
 
 | File | Behavior |
 |------|----------|
 | `index.md` | Represents parent folder (folder title used) |
 | `readme.md` / `README.md` | Represents parent folder (folder title used) |
-| `_index.md` | Hugo convention — treat as index |
+| `overview.md` | **Not** an index for menu purposes — it appears as an ordinary article, though `PageLoader` will still serve it for the bare folder URL |
+| `_index.md` | **Excluded**, not an index — the `_` prefix removes it before the index test is reached |
 
 ### Icon Selection
 
@@ -220,8 +223,10 @@ Choose Bootstrap Icons semantically:
 1. `DynamicNavBuilder` lists one level of the content hierarchy from the content source (filesystem or Blob).
 2. Working/asset folders (`_`/`.`-prefixed, `images/`) are skipped; `publish: false` files are excluded.
 3. Each remaining folder/file becomes a menu item, its label derived via the **Title Resolution Order** above.
-4. Items are ordered deterministically (numeric ascending; news newest-first); `metadata.yml` `order:` overrides.
+4. Items are ordered deterministically (numeric ascending; dates newest-first); `metadata.yml` `order:` overrides.
 5. `metadata.yml` supplies per-folder `label`/`short`/`icon`, and `hidden`/`topbar-hidden`/`topbar-align` control visibility and placement.
+
+The three exclusion mechanisms apply **in order**: an excluded *name* is discarded before anything is read, so neither `metadata.yml` nor front matter can bring it back; `hidden` in `metadata.yml` then removes a folder; and `publish: false` / `draft: true` removes a file last.
 
 Adding content = create the folder/file in the content source. It appears in the menu on the next request — no list to edit, no preview build, no commit to a navigation file.
 
@@ -238,8 +243,9 @@ Adding content = create the folder/file in the content source. It appears in the
 - [ ] YAML title takes precedence when available
 
 ### Navigation Strategy
-- [ ] News is presented newest-first (automatic)
+- [ ] Date-prefixed content is presented newest-first (automatic, everywhere)
 - [ ] Single-article folders collapsed
+- [ ] No folder relies on an index that a single sibling article would displace
 - [ ] Icons selected semantically (via metadata.yml or heuristic)
 
 ### Tolerance
@@ -252,7 +258,7 @@ Adding content = create the folder/file in the content source. It appears in the
 ## References
 
 - **Internal**: [06-folder-organization-and-navigation.md](./06-folder-organization-and-navigation.md) — Folder naming conventions (prescriptive)
-- **Implementation**: `src/Learn.Web/Navigation/DynamicNavBuilder.cs`, `src/Learn.Web.Shared/Navigation/NavRules.cs`
+- **Implementation**: `src/Diginsight.SmartDocs.Web/Navigation/DynamicNavBuilder.cs`, `src/Diginsight.SmartDocs.Web.Shared/Navigation/NavRules.cs`
 - **External**: [Bootstrap Icons](https://icons.getbootstrap.com/)
 
 ---
@@ -261,12 +267,13 @@ Adding content = create the folder/file in the content source. It appears in the
 
 | Version | Date | Changes | Author |
 |---------|------|---------|--------|
+| 2.1.0 | 2026-09-04 | Corrected against the implementation: project paths renamed to `Diginsight.SmartDocs.Web*`; `_index.md` is excluded, not an index; date ordering is newest-first everywhere, not only under news; added `overview.md` behaviour, index displacement by a single sibling article, and the exclusion-precedence note | System |
 | 2.0.0 | 2026-07-20 | Reframed for the runtime dynamic navigation builder (removed Quarto/glob/_quarto.yml); rules now map to DynamicNavBuilder/NavRules + metadata.yml | System |
 | 1.1.0 | 2026-01-31 | Added standard separator format rule for date prefixes (` - `) | System |
 | 1.0.0 | 2026-01-31 | Initial version — separated from 06-folder-organization-and-navigation.md | System |
 
 <!--
 context_metadata:
-  version: "2.0.0"
-  last_updated: "2026-07-20"
+  version: "2.1.0"
+  last_updated: "2026-09-04"
 -->

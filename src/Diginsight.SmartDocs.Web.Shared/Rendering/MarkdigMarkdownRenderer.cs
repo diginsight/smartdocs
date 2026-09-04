@@ -149,7 +149,7 @@ public sealed class MarkdigMarkdownRenderer : IMarkdownRenderer
         // Images (and other non-Markdown assets) are served as bytes by the content endpoint.
         if (isImage)
         {
-            return "/_content-raw/" + resolved;
+            return "/_content/" + resolved;
         }
 
         // Relative links to Markdown become in-app routes.
@@ -160,7 +160,7 @@ public sealed class MarkdigMarkdownRenderer : IMarkdownRenderer
         }
 
         // Any other relative asset (pdf, download, …) also goes through the content endpoint.
-        return "/_content-raw/" + resolved + fragment;
+        return "/_content/" + resolved + fragment;
     }
 
     private static bool IsRelative(string url)

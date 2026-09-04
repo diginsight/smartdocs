@@ -12,18 +12,18 @@ source_sets:
 <!--
 verification_stamp:
   generated: "2026-08-18"
-  verified: "2026-08-18"
+  verified: "2026-09-04"
   gate_outcome: "pass-with-gaps"
   evidence:
     - dossier: "_evidence/smartdocs-web/code.md"
-      observed: "2026-08-18"
+      observed: "2026-09-04"
     - dossier: "_evidence/smartdocs-web/configuration.md"
       observed: "2026-08-18"
     - dossier: "_evidence/smartdocs-web-client/code.md"
       observed: "2026-08-18"
     - dossier: "_evidence/smartdocs-web-shared/code.md"
-      observed: "2026-08-18"
-  open_gaps: 3
+      observed: "2026-09-04"
+  open_gaps: 2
 -->
 
 # Browsing the navigation tree
@@ -56,8 +56,8 @@ verification_stamp:
 3. `DynamicNavBuilder.BuildLevelAsync` lists the children of that prefix and scores them concurrently at the medium concurrency tier ^[smartdocs-web/code-23] — declared as eight in the settings file ^[configuration-12].
 4. Exclusions are applied: names beginning `_` or `.`, `*.changelog.md` files, and at the root only, `99.00-temp`. ^[smartdocs-web/code-24]
 5. Each surviving folder has its `metadata.yml` read through a head-only read, and the folder is skipped when it declares `hidden`. ^[smartdocs-web/code-26] Each surviving file has its front matter read; `Hidden` is `!publish || draft`. ^[smartdocs-web/code-22]
-6. Survivors are classified. A folder with subfolders, or with more than one article, becomes a section. A folder with exactly one article — or with only an index or readme — collapses into a leaf. Anything else yields nothing. ^[smartdocs-web/code-25]
-7. The level is sorted into three groups: numeric-prefixed names ascending, dated names newest first, then everything else alphabetically. ^[smartdocs-web/code-29]
+6. Survivors are classified. A folder with subfolders, or with more than one article, becomes a section. A folder with exactly one article — or with only an index or readme — collapses into a leaf. Anything else yields nothing. ^[smartdocs-web/code-25] When a folder holds an index *and* exactly one other article, the article represents it and the index does not appear. ^[smartdocs-web/code-43]
+7. The level is sorted into three groups: numeric-prefixed names ascending, dated names newest first, then everything else alphabetically. ^[smartdocs-web/code-29] A folder that declares `order` in its `metadata.yml` uses that value in place of its name-derived key and joins the numeric group. ^[smartdocs-web/code-39]
 8. At the root only, a Home entry is inserted at index 0. ^[smartdocs-web/code-31]
 9. The server returns the level, then starts a fire-and-forget warm of two levels deeper without waiting for it. ^[smartdocs-web/code-11]
 10. The client caches the level per prefix, so a level is fetched at most once per prefix per session. ^[smartdocs-web-client/code-06]
@@ -81,8 +81,6 @@ Nothing executes this flow automatically. Every step is readable in the source, 
 ## 🕳️ Open questions
 
 > **Not established**: no automated test covers navigation building, classification, ordering or the coverage state machine. Unit tests for `NavRules` and the level builder were sought across the solution and none was found. ^[gap]
-
-> **Not established**: how a folder's declared `order` interacts with the three sort groups. `metadata.yml` is recorded as accepting an `order` key, but no record establishes what the sort key does with it, so this page does not state that it overrides name-based ordering. ^[gap]
 
 > **Not established**: how quickly a content change reaches a connected client. The folder-metrics index schedules its work behind a 400 ms debounce (`FolderMetricsIndex.cs`, line 30), which is a lower bound on scheduling delay only — no dossier record covers it, and nothing here establishes the latency a reader actually sees. ^[gap]
 

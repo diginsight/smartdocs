@@ -76,7 +76,7 @@ You do NOT validate or fix yourself — you delegate to experts.
 - **NEVER modify files yourself** — delegate to instruction-builder
 - **NEVER bypass validation** — always validate before certification
 
-## � Out of Scope
+## 🚫 Out of Scope
 
 This prompt WILL NOT:
 - Create new instruction files — use `/pe-gra-instruction-file-design` or `/pe-gra-instruction-file-create-update`
@@ -85,7 +85,7 @@ This prompt WILL NOT:
 - Review context files — use `/pe-gra-context-information-review`
 - Review skill files — use `/pe-gra-skill-review`
 
-## �🔄 Error Recovery Workflows
+## 🔄 Error Recovery Workflows
 
 Every handoff can fail. Apply Principle 7 from `02.03-orchestrator-design-patterns.md`: **Retry → Escalate → Skip → Abort** at every transition.
 

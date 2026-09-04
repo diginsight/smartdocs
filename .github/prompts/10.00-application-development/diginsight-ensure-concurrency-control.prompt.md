@@ -1,6 +1,6 @@
 ---
 name: diginsight-ensure-concurrency-control
-description: "Review a project or folder and replace unbounded Task.WhenAll and no-concurrency sequential foreach loops with Diginsight.Components IParallelService (ForEachAsync/WhenAllAsync)"
+description: "Review a project or folder and replace unbounded Task.WhenAll and no-concurrency sequential foreach loops with Diginsight.Components IParallelService (ForEachAsync/WhenAllAsync), then declare the concurrency tiers in configuration"
 agent: agent
 model: claude-opus-4.6
 domain: "application-development"
@@ -17,7 +17,9 @@ argument-hint: 'path="src/MyProject" scope="services|repositories|all"'
 
 # Diginsight-Ensure-Concurrency-Control
 
-Review an existing .NET project (or a specified folder/scope) and bring independent async operations under **bounded, configurable concurrency** using `Diginsight.Components.IParallelService` — replacing unbounded `Task.WhenAll(...)` (infinite concurrency) and sequential `foreach`/`await` loops (no concurrency) with `ForEachAsync`/`WhenAllAsync` calls that use a named concurrency tier. Where each parallel branch does meaningful work, wrap it in its own Diginsight activity so bounded concurrency and observability land together. Preserve all business logic and results exactly; this is a concurrency-shape change, not a behavior change.
+Review an existing .NET project (or a specified folder/scope) and bring independent async operations under **bounded, configurable concurrency** using `Diginsight.Components.IParallelService` — replacing unbounded `Task.WhenAll(...)` (infinite concurrency) and sequential `foreach`/`await` loops (no concurrency) with `ForEachAsync`/`WhenAllAsync` calls that use a named concurrency tier. Where each parallel branch does meaningful work, wrap it in its own Diginsight activity so bounded concurrency and observability land together.
+
+A tier name is only half the change: a code-only migration leaves the effective bound at the library defaults (`Low` 3, `Medium` 6, `High` 12), which silently changes the real degree of parallelism a hand-rolled limit used to enforce. **The conversion is not complete until the tiers are declared in configuration and the local troubleshooting layer is capped.** Preserve all business logic and results exactly; this is a concurrency-shape and concurrency-configuration change, not a behavior change.
 
 ## Your Role
 
@@ -34,12 +36,16 @@ You are an **application concurrency and observability specialist** with expert 
 - Wrap the body of each parallel branch in its own `StartMethodActivity`/`StartRichActivity` when that branch performs meaningful work (matching the pattern from [diginsight-ensure-project-logging.prompt.md](./diginsight-ensure-project-logging.prompt.md)), so the concurrency batch and its observability land together
 - Migrate legacy ad hoc patterns already present in the codebase (raw `Parallel.ForEachAsync`, hand-rolled `SemaphoreSlim` throttling, local `TaskExtensions.WhenAllAsync`-style helpers) to `IParallelService` where they overlap in purpose — report each migration candidate before changing it
 - Preserve `ConfigureAwait(false)`, cancellation token propagation, and exception/result semantics exactly as in the original code
+- Record the **effective numeric bound** each legacy pattern enforced before replacement (e.g., `new SemaphoreSlim(10)` = 10) and report it against the resolved tier value after conversion, so a silent throughput change cannot pass as behavior-preserving
+- Declare the tiers in the base configuration layer under the `Diginsight:Components` section, so no tier silently resolves to a library default
+- Add `"MaxConcurrency": 1` to every local troubleshooting configuration layer (`appsettings.*.local.json`, and the local development profile) when the host composes configuration with `ConfigureAppConfiguration2`, so a developer can follow the flow serially
 
 ### ⚠️ Ask First
 - Before adding the `Diginsight.Components` package reference or the `AddParallelService(configuration)` registration if genuinely missing from the project
 - Before changing more than ~10 call sites in one pass — checkpoint with a summary and proposed batch plan
 - When it's unclear whether the operations in a loop/`WhenAll` call are truly independent (no shared mutable state, no ordering dependency) — confirm with the user rather than parallelizing something unsafe
 - When the per-operation cost/footprint of a candidate isn't clear from the code alone (e.g., an adapter call whose downstream cost is unknown) — propose a tier with rationale and confirm rather than guessing
+- Before overwriting tier values that are already declared in configuration, or when the tier value would change the effective bound a replaced hand-rolled limit enforced — report the before/after numbers and confirm
 
 ### 🚫 Never Do
 - **NEVER change business logic, return values, or exception behavior** — this is a concurrency-shape and observability change only
@@ -48,11 +54,16 @@ You are an **application concurrency and observability specialist** with expert 
 - **NEVER hardcode a numeric `MaxDegreeOfParallelism`** — always use `parallelService.LowConcurrency`/`MediumConcurrency`/`HighConcurrency`
 - **NEVER invent a second, competing concurrency-control abstraction** (e.g., a new custom throttling helper) when `IParallelService` is already registered in the solution
 - **NEVER instrument or parallelize trivial, near-instant, in-memory-only operations** — bounded concurrency and per-branch activities add value only when branches do real I/O or non-trivial work
+- **NEVER finish a conversion with the tiers left on undeclared library defaults** — a tier that exists only in code is not configurable concurrency control
+- **NEVER claim behavior preservation without comparing the pre-migration effective bound to the resolved tier value** — the tier name alone proves nothing about the actual degree of parallelism
 
 ## Response Management
 
 ### When `IParallelService` is not registered anywhere in the solution
 Search the whole solution (not just the target folder) for `AddParallelService`, `IParallelService`, and a `Diginsight.Components` package reference. If genuinely absent, report this and ask whether to add the package + `services.AddParallelService(configuration)` registration before touching any call site.
+
+### When `IParallelService` is registered but the tiers are not configured
+The library falls back to `Low` 3 / `Medium` 6 / `High` 12. Treat this as an incomplete conversion, not an acceptable default: add the `Diginsight:Components` section to the base configuration layer and the `MaxConcurrency` cap to the local layer, and report the resolved values.
 
 ### When a candidate loop/`WhenAll` call has ambiguous independence
 Read the full method body, including any captured/mutated variables. If two branches write to the same variable without clear isolation, or an iteration depends on the previous one's result, do NOT parallelize — report it as "not a concurrency-control candidate" with the reason.
@@ -77,9 +88,9 @@ Report exact errors with file/line, fix only the regressions introduced by the c
 **Input:** A `foreach` loop where each iteration appends to a running total or depends on the previous iteration's output.
 **Expected:** Leave sequential; report as "not parallelizable" with the specific dependency identified, do not force `IParallelService` onto it.
 
-### Test 4: `IParallelService` not registered in the project
-**Input:** A project using `Task.WhenAll` with no `AddParallelService` call anywhere in the solution.
-**Expected:** Stop, report the missing registration, and ask for confirmation before adding the package/registration or before converting any call site.
+### Test 4: `IParallelService` not registered or not configured
+**Input:** A project using `Task.WhenAll` with no `AddParallelService` call anywhere in the solution; or a project where `AddParallelService(configuration)` is wired but no `Diginsight:Components` section exists in any `appsettings*.json` layer.
+**Expected:** For the missing registration, stop and ask before adding the package/registration or converting any call site. For the missing configuration, do NOT accept the library defaults silently: add the tier values to the base layer and `MaxConcurrency: 1` to the local layer, and report the resolved effective bound per converted call site.
 
 ### Test 5: Parallel branch that performs meaningful I/O
 **Input:** Two independent repository calls being combined into a `WhenAllAsync`, each with non-trivial latency.
@@ -97,8 +108,9 @@ Bring the target project's (or specified scope's) concurrency handling to best p
 2. Find unbounded `Task.WhenAll` calls and no-concurrency sequential loops over independent async work
 3. Convert genuinely independent operations to `parallelService.WhenAllAsync`/`ForEachAsync` with a named concurrency tier
 4. Add per-branch Diginsight activities where a branch performs meaningful work
-5. Leave non-independent operations sequential, with a documented reason
-6. Report a validation summary and leave the project buildable
+5. Declare the concurrency tiers in configuration and cap the local troubleshooting layer
+6. Leave non-independent operations sequential, with a documented reason
+7. Report a validation summary and leave the project buildable
 
 ## Process
 
@@ -109,12 +121,14 @@ Bring the target project's (or specified scope's) concurrency handling to best p
 1. **Registration discovery** — `grep_search` for `AddParallelService`, `IParallelService`, `Diginsight.Components` package reference across the solution. Read the DI registration call site to confirm it's wired.
 2. **Pattern inventory** — `grep_search` for `Task.WhenAll(`, sequential `foreach` loops containing an `await` call, raw `Parallel.ForEachAsync(`, and any local hand-rolled throttling helpers (e.g., `SemaphoreSlim`-based extension methods) in the target scope.
 3. **Scope resolution** — resolve the `path`/`scope` argument to a concrete file set. If not given, ask which project/folder to review.
-4. **Independence classification** — for each candidate, read the surrounding method body and classify:
+4. **Configuration discovery** — `file_search` for `appsettings*.json` in the host project and `grep_search` for an existing `Diginsight:Components` section. Identify the layering: the base layer, the per-environment layers, and any local layer (`appsettings.*.local.json`, local development profile) that `ConfigureAppConfiguration2` composes on top. Record which layers exist, because the tier values and the `MaxConcurrency` cap belong in different ones.
+5. **Effective-bound capture** — for every legacy pattern found, record the numeric bound it currently enforces. This is the baseline the post-conversion tier value is compared against.
+6. **Independence classification** — for each candidate, read the surrounding method body and classify:
    - **Independent** (safe to parallelize): no shared mutable state across branches/iterations, no ordering dependency
    - **Dependent** (must stay sequential): shared accumulator, ordering-sensitive, or one iteration depends on a previous result
    - **Legacy pattern** (already parallel, but not via `IParallelService`): raw `Parallel.ForEachAsync`, custom `SemaphoreSlim` wrapper, local `WhenAllAsync` helper
 
-**Output:** A discovery report — registration status, classified candidate list (convert / leave-sequential-with-reason / migrate-legacy) — presented to the user before editing.
+**Output:** A discovery report — registration status, configuration-layer inventory, per-pattern effective bound, classified candidate list (convert / leave-sequential-with-reason / migrate-legacy) — presented to the user before editing.
 
 ### Phase 2: Conversion
 
@@ -144,9 +158,36 @@ For each legacy pattern (raw `Parallel.ForEachAsync`, custom throttling helper):
 1. Confirm behavioral equivalence (same effective bound, same cancellation behavior) before replacing with the `IParallelService` equivalent.
 2. Replace only after confirming with the user in ambiguous cases (per boundaries above).
 
+**Configuration — required to complete the conversion.** `AddParallelService(configuration)` binds the `Diginsight:Components` section, so the tiers live there and nowhere else. Declare them in the base layer, choosing values that keep the migrated call sites at or above the effective bound they replaced:
+
+```jsonc
+"Diginsight": {
+  "Components": {
+    "LowConcurrency": 4,
+    "MediumConcurrency": 8,
+    "HighConcurrency": 12
+  }
+}
+```
+
+Then cap the local troubleshooting layer. `MaxConcurrency` clamps **every** tier, so one setting makes the whole application flow serial and readable while a developer steps through it — without editing any call site:
+
+```jsonc
+"Diginsight": {
+  "Components": {
+    "MaxConcurrency": 1
+    // "LowConcurrency": 4,
+    // "MediumConcurrency": 8,
+    // "HighConcurrency": 12
+  }
+}
+```
+
+`ParallelService` is a singleton that caches each tier on first read, so configuration takes effect at startup only — state this when reporting, so nobody expects a hot reload.
+
 Use `multi_replace_string_in_file` to batch same-file edits; checkpoint every ~10 call sites with a running summary.
 
-**Output:** List of files/call sites converted, concurrency tier chosen per site with rationale, and any left-sequential decisions with reasons.
+**Output:** List of files/call sites converted, concurrency tier chosen per site with rationale, configuration files updated with the resolved tier values, and any left-sequential decisions with reasons.
 
 ### Phase 3: Validation
 
@@ -159,7 +200,10 @@ Use `multi_replace_string_in_file` to batch same-file edits; checkpoint every ~1
    - Cancellation tokens and `ConfigureAwait(false)` preserved
    - Meaningful branches carry their own activity
    - Sequential-by-necessity loops were left untouched, with the reason documented in the summary
-3. Summarize: files changed, call sites converted, legacy patterns migrated, candidates left sequential (with reason), and any open questions raised during the review.
+   - The base configuration layer declares `LowConcurrency`/`MediumConcurrency`/`HighConcurrency` under `Diginsight:Components`
+   - Every local troubleshooting layer sets `MaxConcurrency: 1`
+   - Each migrated legacy pattern reports its pre-migration bound next to the resolved tier value
+3. Summarize: files changed, call sites converted, legacy patterns migrated, configuration layers updated with their resolved values, candidates left sequential (with reason), and any open questions raised during the review.
 
 **Output:** A validation report (✅ PASSED / ⚠️ ISSUES / ❌ FAILED) with the summary above.
 

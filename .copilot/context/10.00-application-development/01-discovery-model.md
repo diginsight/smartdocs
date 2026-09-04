@@ -11,6 +11,7 @@ scope:
     - "Artifact families: artifact-type roots, the derivation ladder and family tiering"
     - "Priority taxonomy and what it drives"
     - "Layout mode: single-component versus multi-component"
+    - "Chapter mapping: which existing folder realises which chapter, and the unmapped state"
     - "Purpose derivation and its evidence requirement"
     - "Persistence location and staleness detection"
   excludes:
@@ -114,6 +115,24 @@ Priority drives **both placement and processing order**. A 🔴 Core component w
 | **multi-component** | anything else | chapters gain a component pivot below them |
 
 The chapter set is **identical** in both modes — only the pivot changes (📖 `04-documentation-structure.md`).
+
+---
+
+## 📑 Chapter mapping
+
+Layout mode says how a chapter is subdivided. Chapter mapping says **which existing folder is that chapter** — a separate question, and the one that decides where a page lands.
+
+Discovery MUST enumerate the documentation root and, for each folder, read its `metadata.yml` to record `label` and `order`. The result is one of three states per folder:
+
+| State | Meaning | Consequence |
+|---|---|---|
+| **mapped** | `metadata.yml` declares a chapter | a placement target |
+| **unmapped** | folder exists, no `metadata.yml` | recorded and surfaced; **never** a placement target until mapped |
+| **outside the set** | mapped, but to no canonical chapter | legitimate; carries no page shape |
+
+A folder name MUST NOT be used to infer a chapter, however closely it resembles a canonical name — folder naming varies across repositories while the chapter set does not (📖 `04-documentation-structure.md` § Folder naming varies by repository).
+
+A documentation root with **no `metadata.yml` anywhere** is the common starting state, not an error. Every folder is then unmapped, discovery has no placement target, and the run MUST stop at the registry checkpoint with a proposed mapping rather than writing pages into folders it guessed at.
 
 ---
 

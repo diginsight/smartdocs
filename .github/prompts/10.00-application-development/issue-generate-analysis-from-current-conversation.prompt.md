@@ -45,11 +45,13 @@ Understand the enhanced structure including:
 
 ### 2.5. Sweep the conversation for signals — MANDATORY
 
-Run 📖 `.github/skills/signal-capture/SKILL.md` against the conversation **before** the split.
+Run 📖 `.github/skills/signal-capture/SKILL.md` after step 0 resolves repository visibility and before writing the issue pages.
 
-The split that follows asks the conversation *what happened*. It never asks *what else the conversation revealed*, so anything outside the issue is lost the moment the payload rolls over. The sweep is the only step that asks. Run all seven of its questions; do not substitute an impression that there was nothing.
+The split that follows asks the conversation *what happened*. It never asks *what else the conversation revealed*, so anything outside the issue is lost the moment the payload rolls over. The sweep is the only step that asks. Run all eight of its questions; do not substitute an impression that there was nothing.
 
-The skill owns the record shape, the kinds, the priority derivation and the page split. This prompt owns only the timing: **before** step 3, so the pages it produces can take their ordinals in the same pass.
+The eighth question asks whether the prompt-engineering artifacts that **governed this conversation** met their own declared goals. Any `artifact-defect` signal it yields takes the **leading position** on `<NN>-signals.md`, ahead of the relevance ordering that governs every other kind: other signals describe work that is waiting, while an artifact defect describes a generator that keeps producing defective work on every future run until it is repaired. Route each one to `pe-review-execution-and-improve-artifacts`.
+
+The skill owns the evidence gate, record shape, kinds, priority derivation, and page split. A classification fallback caused by missing metadata is a constraint for the current authoring run, not a signal, unless its underlying repository fact is independently verified. This prompt owns only the timing: before step 3, so the pages it produces can take their ordinals in the same pass.
 
 ### 3. Create New Issue Document
 
@@ -112,7 +114,13 @@ And, for every captured signal:
 - ✅ Carries **no execution steps** — those belong to the context that executes it
 - ✅ Names an existing landing, or states "none found" after actually looking
 - ✅ Reads as a complete work item without the conversation or this work item's folder
-- ✅ Sits on the page and in the position its relevance and actionability dictate, not where judgement put it
+- ✅ Sits on the page and in the position its kind, relevance and actionability dictate, not where judgement put it — `artifact-defect` first, then relevance descending
+
+And, for every `artifact-defect` signal:
+- ✅ Names the **governing artifact** by path, not by description
+- ✅ States the **shortfall** against that artifact's own declared goal, quoted rather than paraphrased
+- ✅ States whether the artifact **self-certified success** over the incomplete outcome
+- ✅ Rests on an actual execution shortfall — a correction turn or a demonstrated false-pass — never a hypothetical improvement
 
 And, when the repository is public, that the split holds:
 - ✅ Zero sensitive values in any public page — scan, do not assume
@@ -129,8 +137,10 @@ State which pages are public, which are internal, where the internal ones were w
 
 Then state the signals captured, per page, with their targets — or explicitly state that the sweep found none. Silence is indistinguishable from not having run the sweep.
 
+Report `artifact-defect` signals **first and separately**, naming the governing artifact, the shortfall against its declared goal, and whether it self-certified. When the sweep found none, state that explicitly: "no artifact defect surfaced — the governing artifacts met their declared goals." An unreported artifact defect leaves a generator producing defective work on every future run.
+
 <!--
 prompt_metadata:
-  version: "1.2.0"
-  last_updated: "2026-08-21"
+  version: "1.3.0"
+  last_updated: "2026-09-04"
 -->

@@ -10,6 +10,8 @@ scope:
     - "Page-shape catalogue and its template binding"
     - "Major versus minor placement by component priority"
     - "Mapping chapters onto existing folders through metadata.yml"
+    - "The authored documentation root, and why a root-level docs/ folder is not one"
+    - "Cross-repository folder-naming conventions and how a chapter is resolved across them"
     - "Chapter folder naming and the numeric prefix that carries the order"
     - "Page file naming and the numeric prefix that carries the reading order"
     - "Placement tie-breakers"
@@ -20,6 +22,8 @@ scope:
 boundaries:
   - "The chapter set is FIXED — a stream MUST NOT invent, merge or rename a chapter"
   - "NEVER rename an existing folder to realise a chapter — use metadata.yml"
+  - "NEVER infer a chapter from a folder name — resolve it from metadata.yml, and record an unmapped folder rather than guessing"
+  - "NEVER treat a repository-root docs/ folder as an authoring target — it is generated site output"
   - "NEVER create a new chapter folder without its NN.00- numeric prefix"
   - "NEVER create a page file without its NN- numeric prefix — the chapter's own index.md is the only exception"
   - "NEVER leave the page prefix sequence disagreeing with the chapter overview's Pages table"
@@ -29,6 +33,7 @@ rationales:
   - "A fixed chapter set is what lets a reader move between two documented repositories without relearning the layout"
   - "Deriving the template count from page shapes rather than chapters prevents eleven near-identical templates or one template stretched over incompatible content"
   - "Realising chapters through metadata.yml keeps existing folder names and their inbound links intact"
+  - "Resolving a chapter from declared metadata rather than a folder name is what lets one stream serve repositories whose documentation folders were named years apart"
   - "Carrying the order in the folder name makes the chapter sequence survive a lost or mistyped metadata.yml, which otherwise degrades to alphabetical order silently"
   - "Pages have no metadata.yml equivalent at all, so the file name is the only carrier of reading order — without a prefix a chapter presents itself alphabetically, which routinely puts its overview page last"
 ---
@@ -146,13 +151,29 @@ Chapters are realised through per-folder `metadata.yml`, so **existing folders k
 | `icon` | the chapter's navigation icon |
 | `hidden` | excludes a folder from navigation without deleting it |
 
-### Worked example — this repository
+### The documentation root
 
-`src/docs/` holds one content folder outside the chapter set.
+`src/docs/` is the authored documentation root in every repository this stream serves. A `docs/` folder at the repository root, where one exists, is **generated site output** — never an authoring target, and never a placement destination.
+
+### Folder naming varies by repository; the chapter set does not
+
+The eleven chapters are fixed, but the folders that realise them are not: a repository that predates this model carries whatever names it grew. Three conventions are in active use.
+
+| Convention | Shape | Example |
+|---|---|---|
+| Canonical | `NN.00-kebab-name` | `03.00-architecture`, `08.00-validation` |
+| Dotted-numeric | `NN.NN-kebab-name`, chapter set of its own | `01.01-architecture`, `70.00-validation` |
+| Spaced legacy | `NN. Title Case` | `00. Getting Started`, `01. Concepts` |
+
+All three sort correctly, because every one carries a leading number. **None of them is a defect, and none is renamed to match the canonical form** — the boundary against renaming applies to all of them equally.
+
+A stream MUST therefore resolve a chapter by reading `metadata.yml`, never by matching a folder name against the canonical list. Where `metadata.yml` is absent the chapter mapping is **undeclared, not absent**: discovery records the folder as unmapped and proposes a `metadata.yml`, rather than inferring a chapter from the folder's name.
 
 | Existing folder | `metadata.yml` | Result |
 |---|---|---|
-| `90.00-issues/` | `label: Issues`, `order: 90` | **not** one of the eleven — working documents (plans, investigations) that sit outside the chapter set; the `90` prefix keeps it last |
+| `03.00-architecture/` | `label: Architecture`, `order: 3` | realises chapter 3 under its canonical name |
+| `01. Concepts/` | `label: Concepts`, `order: 3` | realises chapter 3 under a legacy name, unrenamed |
+| `90.00-issues/` | `label: Issues`, `order: 90` | **not** one of the eleven — working documents that sit outside the chapter set; the `90` prefix keeps it last |
 
 The numeric prefix is not a chapter privilege: **every** folder under `src/docs/` carries one, chapter or not. `metadata.yml` supplies the display label, so the prefix never has to read well.
 
