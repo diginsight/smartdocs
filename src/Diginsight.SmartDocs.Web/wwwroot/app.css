@@ -1508,11 +1508,17 @@ body {
     opacity: calc(var(--glow) * 0.55);
 }
 
+/* Lift the chrome above the ambient wash. The topbar needs a higher layer than the body
+   because its dropdown menus must escape over the page content below it. */
 .page > .topbar,
 .page > .body,
 .page > .bottombar {
     position: relative;
     z-index: 1;
+}
+
+.page > .topbar {
+    z-index: 3;
 }
 
 /* ---------- sidebar: sort + pin affordances ---------- */
@@ -2257,4 +2263,171 @@ body {
 
 .page[data-density="compact"] .tl-item {
     padding: 0.28rem 0.5rem;
+}
+
+/* ==========================================================================
+   Borderless surfaces
+   ==========================================================================
+   One rule: a hairline is an affordance, not a divider.
+
+   Panels, rails and cards separate themselves by background and elevation, so
+   the outline is dropped everywhere it merely traced a region. A 1px border is
+   kept only where it marks the edge of something the reader can act on —
+   buttons, chips, inputs and selects — plus table cells, where the grid itself
+   carries the meaning.
+
+   This block is deliberately an override at the end of the sheet rather than
+   an edit spread through the rules above: the intent stays readable in one
+   place, and reverting the look is a single deletion.
+   ========================================================================== */
+
+/* ---------- shell: tint instead of line ---------- */
+.sidebar,
+.toc-pane {
+    background: var(--sidebar);
+}
+
+.sidebar-resizer {
+    border-left: none;
+}
+
+.bottombar {
+    border-top: none;
+    background: var(--sidebar);
+}
+
+.sidebar-toolbar {
+    border-bottom: none;
+    /* The toolbar is sticky over a scrolling tree, so it has to stay opaque. */
+    background: var(--sidebar);
+}
+
+/* The nested-level guide rail reads as decoration once the icons are gone. */
+.nav-list .nav-list,
+.dropdown-list .dropdown-list {
+    border-left: none;
+}
+
+/* ---------- floating panels: elevation instead of line ---------- */
+.dropdown-menu,
+.search-box,
+.notify-panel,
+.drawer {
+    border: none;
+}
+
+.dropdown-menu {
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.28);
+}
+
+.notify-panel {
+    box-shadow: -20px 0 50px -28px rgba(0, 0, 0, 0.55);
+}
+
+.search-input-row,
+.notify-head,
+.notify-count,
+.drawer-head {
+    border-bottom: none;
+}
+
+.drawer-head,
+.notify-head {
+    background: var(--sidebar);
+}
+
+.notify-item {
+    border: none;
+    background: var(--sidebar);
+}
+
+.dropdown-sep hr {
+    display: none;
+}
+
+/* ---------- reading surfaces ---------- */
+.hero,
+.filterbar,
+.card,
+.nav-pinned,
+.card-meta {
+    border: none;
+}
+
+.filterbar {
+    /* Sticky over the scrolling grid: keep it opaque and let elevation carry it. */
+    box-shadow: 0 8px 20px -18px rgba(0, 0, 0, 0.55);
+}
+
+.card:hover {
+    border: none;
+    box-shadow: var(--elev);
+}
+
+.card-meta {
+    padding-top: 0.15rem;
+}
+
+.filterbar-sep {
+    background: none;
+    width: 0.5rem;
+}
+
+/* ---------- interactive edges: kept ----------
+   Restated rather than left implicit, so a later reader can see at a glance
+   which elements are meant to keep an outline. */
+.chip,
+.filter-select,
+.mini-btn,
+.load-more,
+.seg,
+.palette-card,
+.nav-sort select,
+.sidebar-search,
+.toc-reopen,
+.markdown-body th,
+.markdown-body td {
+    border: 1px solid var(--border);
+}
+
+/* .icon-btn is the topbar's own control: it sits on the accent bar, where an outline would box in
+   every action. Its hover wash is the affordance, so it keeps no border. */
+
+/* The same class is reused for the drawer's close button, which sits on a panel rather than on the
+   accent bar and therefore needs the panel's own foreground colours. */
+.drawer-head .icon-btn,
+.drawer-head .icon-btn .bi {
+    color: var(--muted);
+}
+
+.drawer-head .icon-btn:hover {
+    background: var(--hover);
+}
+
+.drawer-head .icon-btn:hover,
+.drawer-head .icon-btn:hover .bi {
+    color: var(--fg);
+}
+
+/* Top-level sidebar rows separated by rhythm rather than by a rule. */
+.nav-top > li {
+    border-bottom: none;
+}
+
+.nav-top > li > .nav-link,
+.nav-top > li > details > summary {
+    border-radius: var(--radius-sm);
+}
+
+.nav-sep hr {
+    display: none;
+}
+
+.chip.is-on,
+.palette-card.is-on {
+    border-color: transparent;
+}
+
+.palette-card.is-on {
+    border-color: var(--brand);
 }

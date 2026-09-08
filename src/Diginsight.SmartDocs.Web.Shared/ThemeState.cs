@@ -35,6 +35,9 @@ public sealed class ThemeState
 
     public string ThemeId { get; private set; } = DefaultLight;
 
+    private string lastLight = DefaultLight;
+    private string lastDark = DefaultDark;
+
     public ThemeOption Current => Options.FirstOrDefault(o => o.Id == ThemeId) ?? Options[0];
 
     public bool Dark => Current.Dark;
@@ -49,11 +52,27 @@ public sealed class ThemeState
         }
 
         ThemeId = id;
+
+        // Remember the choice per side so the light/dark button can return to it. Without this the
+        // flip would always land on the two defaults, silently discarding a reader who had picked,
+        // say, Forest as their dark palette.
+        if (Dark)
+        {
+            lastDark = id;
+        }
+        else
+        {
+            lastLight = id;
+        }
+
         Changed?.Invoke();
     }
 
-    /// <summary>Quick light/dark flip used by the standalone topbar button.</summary>
-    public void Toggle() => SetTheme(Dark ? DefaultLight : DefaultDark);
+    /// <summary>
+    /// Quick light/dark flip used by the standalone topbar button. Returns to the reader's most
+    /// recent theme on the other side rather than to the built-in default.
+    /// </summary>
+    public void Toggle() => SetTheme(Dark ? lastLight : lastDark);
 
     public void Reset() => SetTheme(DefaultLight);
 }

@@ -9,10 +9,6 @@
             {
                 <div class="topmenu-item @(IsOpen(node) ? "open" : null)">
                     <button class="topmenu-btn" type="button" @onclick="() => ToggleAsync(node)">
-                        @if (!string.IsNullOrEmpty(node.Icon))
-                        {
-                            <i class="bi bi-@node.Icon"></i>
-                        }
                         <span>@ShortFor(node)</span>
                         <span class="caret">▾</span>
                     </button>
@@ -28,10 +24,6 @@
             else if (node.Route is not null)
             {
                 <a class="topmenu-link" href="@node.Route">
-                    @if (!string.IsNullOrEmpty(node.Icon))
-                    {
-                        <i class="bi bi-@node.Icon"></i>
-                    }
                     <span>@ShortFor(node)</span>
                 </a>
             }
