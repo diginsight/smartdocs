@@ -50,6 +50,12 @@ public sealed class DynamicNavBuilder(
                 string childPath = path.Length == 0 ? n.Text : $"{path} › {n.Text}";
                 await WalkAsync(n.Prefix, childPath, leaves, ct);
             }
+            else if (prefix.Length == 0 && n.Route == NavRules.HomeRoute)
+            {
+                // The Home entry is a shortcut to the root document, not a document of its own.
+                // Listing it would both duplicate that document and inflate the library count.
+                continue;
+            }
             else if (!string.IsNullOrEmpty(n.Route))
             {
                 leaves.Add(new NavLeaf(n.Text, n.Route, path, n.Date, n.Author));
@@ -78,10 +84,11 @@ public sealed class DynamicNavBuilder(
             .Select(x => x.Node)
             .ToList();
 
-        // The site root gets a leading Home link.
+        // The site root gets a leading Home link. It points at "home" rather than at "" because the
+        // library occupies the root route; "home" resolves to the same root document.
         if (prefix.Length == 0)
         {
-            result.Insert(0, new NavChild("Home", string.Empty, null, "house-fill", false, false));
+            result.Insert(0, new NavChild("Home", NavRules.HomeRoute, null, "house-fill", false, false));
         }
 
         activity?.SetOutput(new { count = result.Count });

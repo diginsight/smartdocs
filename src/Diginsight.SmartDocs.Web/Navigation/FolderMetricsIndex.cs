@@ -309,6 +309,11 @@ public sealed class FolderMetricsIndex(
                 latest = Newer(latest, sub.Latest);
                 anyContribution = true;
             }
+            else if (prefix.Length == 0 && child.Route == NavRules.HomeRoute)
+            {
+                // Shortcut to the root document, not a document: see DynamicNavBuilder.WalkAsync.
+                continue;
+            }
             else if (!string.IsNullOrEmpty(child.Route))
             {
                 count++;

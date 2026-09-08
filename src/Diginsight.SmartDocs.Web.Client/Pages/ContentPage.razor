@@ -1,4 +1,7 @@
-@page "/"
+@page "/home"
 @page "/{*path}"
 
+@* The library now owns "/", so the site's root document needs a route of its own. "/home" is a
+   literal, so it wins over the catch-all below and arrives with a null Path — which is exactly
+   what asks the loader for the root index.md/readme.md, whichever the site happens to use. *@
 <ContentView Path="@Path" />

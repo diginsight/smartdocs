@@ -1,12 +1,15 @@
+@page "/"
 @page "/explore"
 @using System.Globalization
+@using Diginsight.SmartDocs.Web.Shared.Sites
 @inject INavProvider Provider
 @inject PreferencesState Prefs
 @inject NavStats Stats
 @inject LibraryQueryState Query
+@inject SiteShellState Site
 @implements IDisposable
 
-<PageTitle>Explore</PageTitle>
+<PageTitle>@Site.Title</PageTitle>
 
 <div class="explore">
     <section class="hero">

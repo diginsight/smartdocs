@@ -14,6 +14,14 @@ public readonly record struct SortTuple(int Group, double Num, string Text);
 /// </summary>
 public static class NavRules
 {
+    /// <summary>
+    /// Route of the synthetic "Home" menu entry, which points at the site's root document.
+    /// <para>It is a navigation shortcut rather than an article: the flat index deliberately skips
+    /// it, so the library count stays a count of documents. Kept in sync by hand with the
+    /// <c>@page "/home"</c> literal on the content page, which cannot read a constant.</para>
+    /// </summary>
+    public const string HomeRoute = "home";
+
     // Date prefix: YYYYMM or YYYYMMDD, optional ".NN" same-day sub-index.
     private static readonly Regex DateRx = new(
         @"^(?<date>20\d{2}(?:0[1-9]|1[0-2])(?:\d{2})?(?:\.\d+)?)(?:[-_\s]+(?<rest>.*))?$",

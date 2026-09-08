@@ -19,8 +19,15 @@ public partial class MainLayout
         ? "bi-lightbulb-fill"
         : Site.Branding.IconClass;
 
-    private bool IsExploring =>
-        NavMgr.ToBaseRelativePath(NavMgr.Uri).TrimEnd('/').StartsWith("explore", StringComparison.OrdinalIgnoreCase);
+    // The library answers on both "/" and "/explore", so the switch has to recognise either.
+    private bool IsExploring
+    {
+        get
+        {
+            string rel = NavMgr.ToBaseRelativePath(NavMgr.Uri).Split('?', '#')[0].Trim('/');
+            return rel.Length == 0 || rel.Equals("explore", StringComparison.OrdinalIgnoreCase);
+        }
+    }
 
     private string SearchPlaceholder => Stats.HasData && Stats.TotalCoverage == Coverage.Complete
         ? $"Search {Stats.TotalArticles:N0} articles…"
