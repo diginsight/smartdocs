@@ -33,11 +33,10 @@
                     @onclick="() => GoToLibrary(LibraryView.Timeline)">Timeline</button>
         </div>
 
-        <AboutMenu />
         <button class="icon-btn" title="Notifications" @onclick="() => _notifyOpen = !_notifyOpen">
             <i class="bi bi-bell"></i>
         </button>
-        <button class="icon-btn" title="Reading preferences" @onclick="() => _prefsOpen = true">
+        <button class="icon-btn" title="Preferences and about" @onclick="() => _prefsOpen = true">
             <i class="bi bi-sliders"></i>
         </button>
         <button class="theme-btn" title="Toggle light/dark" @onclick="() => Theme.Toggle()">

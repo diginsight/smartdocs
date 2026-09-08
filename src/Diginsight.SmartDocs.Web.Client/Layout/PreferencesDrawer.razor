@@ -42,6 +42,10 @@
                         }
                     </select>
                 </div>
+                <div class="pref-row">
+                    <span class="spacer"></span>
+                    <button class="link-btn" @onclick="() => Theme.Reset()">Reset theme</button>
+                </div>
             </section>
 
             <section class="pref-group">
@@ -128,6 +132,17 @@
                     <span>@Prefs.Favourites.Count favourite @(Prefs.Favourites.Count == 1 ? "article" : "articles")</span>
                     <span class="spacer"></span>
                     <button class="link-btn" @onclick="() => Prefs.ResetAll()">Reset all</button>
+                </div>
+            </section>
+
+            @* About lived in the last topbar dropdown. The drawer already owned the palette, so the
+               menu was carrying two links and a reset — not enough to justify a menu of its own. *@
+            <section class="pref-group">
+                <h3>About</h3>
+                <div class="pref-row">
+                    <a class="link-btn" href="@NavRules.HomeRoute" @onclick="Close" @onclick:preventDefault="false">About this site</a>
+                    <span class="spacer"></span>
+                    <a class="link-btn" href="_content/LICENSE" target="_blank" rel="noopener">License</a>
                 </div>
             </section>
         </div>

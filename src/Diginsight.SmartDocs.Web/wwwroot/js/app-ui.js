@@ -387,3 +387,136 @@ window.appUi = {
         }
     });
 })();
+
+/* ---------------------------------------------------------------------------
+   In-page anchors: scroll instead of navigating away.
+
+   App.razor declares <base href="/">, and the HTML spec resolves a fragment-only
+   href against the document base — not against the current URL. So every "#section"
+   link (the table of contents, and any anchor an author writes inside an article)
+   resolved to "/#section" and threw the reader out of the article onto the site
+   root, without scrolling anywhere.
+
+   Handled here rather than by rewriting hrefs, because it has to cover links that
+   come from rendered Markdown as well as the ones the app renders itself.
+   --------------------------------------------------------------------------- */
+(function () {
+    function fragmentOf(anchor) {
+        var raw = anchor.getAttribute('href');
+        return raw && raw.length > 1 && raw.charAt(0) === '#' ? raw.slice(1) : null;
+    }
+
+    function find(id) {
+        var decoded;
+        try { decoded = decodeURIComponent(id); } catch (e) { decoded = id; }
+        return document.getElementById(decoded)
+            || document.getElementById(id)
+            || document.querySelector('[name="' + CSS.escape(decoded) + '"]');
+    }
+
+    function reveal(target, id, smooth) {
+        target.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto', block: 'start' });
+
+        // Move the caret so the heading is where keyboard and screen-reader users continue from.
+        var restore = target.getAttribute('tabindex');
+        if (restore === null) { target.setAttribute('tabindex', '-1'); }
+        target.focus({ preventScroll: true });
+        if (restore === null) { target.removeAttribute('tabindex'); }
+
+        // replaceState, not the hash: assigning location.hash would hand the URL back to the
+        // router and undo the whole point. This keeps the address copyable.
+        try {
+            history.replaceState(null, '', location.pathname + location.search + '#' + id);
+        } catch (e) { /* ignore */ }
+    }
+
+    function scrollerOf(el) {
+        var e = el.parentElement;
+        while (e) {
+            if (/auto|scroll/.test(getComputedStyle(e).overflowY)) { return e; }
+            e = e.parentElement;
+        }
+        return null;
+    }
+
+    function settled(target) {
+        var box = scrollerOf(target);
+        if (!box) { return true; }
+
+        // A scroller that cannot scroll yet is not "already at the end" - it is a page that has not
+        // finished arriving. Conflating the two made a single early scroll look successful while
+        // the reader was still sitting at the top of the article.
+        var overflows = box.scrollHeight - box.clientHeight > 1;
+        var atTop = Math.abs(target.getBoundingClientRect().top - box.getBoundingClientRect().top) < 4;
+        var atEnd = overflows && box.scrollTop >= box.scrollHeight - box.clientHeight - 1;
+
+        return atTop || atEnd;
+    }
+
+    // Reaching the section once is not enough. The article arrives after the runtime boots, it
+    // keeps growing as images lay out, and the runtime later replaces the rendered article - which
+    // puts the reader back at the top. So keep re-asserting the requested section until the budget
+    // runs out, and let any real gesture from the reader end the watch immediately.
+    var cancelWatch = null;
+
+    function honour(id, budgetMs) {
+        var done = false;
+        var deadline = Date.now() + budgetMs;
+        function stop() { done = true; }
+
+        // Only one section can be the destination: without this, clicking a second entry while the
+        // first watch is still running leaves two watches fighting over the same scroller.
+        if (cancelWatch) { cancelWatch(); }
+        cancelWatch = stop;
+
+        function tick() {
+            if (done) { return; }
+
+            var target = find(id);
+            if (target && !settled(target)) { reveal(target, id, false); }
+
+            if (Date.now() > deadline) { stop(); } else { setTimeout(tick, 120); }
+        }
+
+        window.addEventListener('wheel', stop, { passive: true, once: true });
+        window.addEventListener('keydown', stop, { once: true });
+
+        tick();
+    }
+
+    // On window, not document: capture travels window -> document -> element, so a window-level
+    // capture listener is guaranteed to see the click before the router's document-level one,
+    // whichever script happened to load first.
+    window.addEventListener('click', function (e) {
+        if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) {
+            return;
+        }
+
+        var anchor = e.target && e.target.closest ? e.target.closest('a[href]') : null;
+        if (!anchor || anchor.target === '_blank') { return; }
+
+        var id = fragmentOf(anchor);
+        if (!id) { return; }
+
+        // Always take the click, even when the heading cannot be found this instant: the runtime
+        // swaps the rendered article in and out, and during that gap the browser's own handling
+        // would resolve "#section" against the base href and throw the reader onto the site root.
+        // stopPropagation is needed too, because the router listens for document clicks as well.
+        e.preventDefault();
+        e.stopPropagation();
+
+        var target = find(id);
+        if (target) {
+            reveal(target, id, true);
+            honour(id, 8000);
+        } else {
+            try { history.replaceState(null, '', location.pathname + location.search + '#' + id); } catch (err) { /* ignore */ }
+            honour(id, 8000);
+        }
+    }, true);
+
+    // A pasted or reloaded "…#section" URL has to land on the section too.
+    if (location.hash && location.hash.length > 1) {
+        honour(location.hash.slice(1), 25000);
+    }
+})();
