@@ -5,6 +5,7 @@
 @inject SidebarState Sidebar
 @inject NavigationManager NavMgr
 @inject NavStats Stats
+@inject PreferencesState Prefs
 @inject IJSRuntime JS
 @inject IServiceProvider Services
 @implements IDisposable
@@ -59,6 +60,18 @@
         </div>
     </div>
 
+    @if (!Sidebar.Collapsed && string.IsNullOrWhiteSpace(_query))
+    {
+        <div class="nav-sort">
+            <label for="nav-sort-select">Order</label>
+            <select id="nav-sort-select" value="@Prefs.Sort" @onchange="OnSortChanged">
+                <option value="@nameof(NavSort.Curated)">Curated</option>
+                <option value="@nameof(NavSort.Count)">Most content</option>
+                <option value="@nameof(NavSort.Recent)">Recently updated</option>
+                <option value="@nameof(NavSort.Alpha)">A → Z</option>
+            </select>
+        </div>
+    }
     @if (_root is null)
     {
         <p class="nav-loading"><em>Loading menu…</em></p>
@@ -101,12 +114,33 @@
     }
     else
     {
+        @if (PinnedRoots.Count > 0)
+        {
+            <div class="nav-pinned">
+                <div class="nav-group-label">Pinned</div>
+                <ul class="nav-list nav-top" role="tree">
+                    @foreach (NavChild node in PinnedRoots)
+                    {
+                        <DynNavNode Node="node" CurrentRoute="@_current" @key="node.Text" />
+                    }
+                </ul>
+            </div>
+            <div class="nav-group-label">All sections</div>
+        }
+
         <ul class="nav-list nav-top" role="tree">
-            @foreach (NavChild node in _root)
+            @foreach (NavChild node in VisibleRoots)
             {
-                <DynNavNode Node="node" CurrentRoute="@_current" />
+                <DynNavNode Node="node" CurrentRoute="@_current" @key="node.Text" />
             }
         </ul>
+
+        @if (Prefs.Hidden.Count > 0)
+        {
+            <button class="link-btn" style="margin:.5rem var(--pad-x)" @onclick="() => Prefs.ClearHidden()">
+                Show @Prefs.Hidden.Count hidden
+            </button>
+        }
     }
 </div>
 </div>

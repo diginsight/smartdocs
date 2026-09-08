@@ -1,7 +1,9 @@
 namespace Diginsight.SmartDocs.Web.Shared;
 
-/// <summary>A selectable site theme. <see cref="Accent"/> and <see cref="Bg"/> drive the picker swatch.</summary>
-public sealed record ThemeOption(string Id, string Name, bool Dark, string Accent, string Bg);
+/// <summary>A selectable site theme. <see cref="Accent"/> and <see cref="Bg"/> drive the picker swatch.
+/// <para><see cref="Signature"/> marks the four expressive palettes that ship with the reading
+/// experience; they are grouped ahead of the plain Bootswatch-derived themes in the picker.</para></summary>
+public sealed record ThemeOption(string Id, string Name, bool Dark, string Accent, string Bg, bool Signature = false);
 
 /// <summary>
 /// Shared, per-circuit theme state. The layout applies the selected theme as a CSS class
@@ -11,12 +13,16 @@ public sealed record ThemeOption(string Id, string Name, bool Dark, string Accen
 /// </summary>
 public sealed class ThemeState
 {
-    public const string DefaultLight = "cosmo";
-    public const string DefaultDark = "github-dark";
+    public const string DefaultLight = "editorial";
+    public const string DefaultDark = "aurora";
 
-    /// <summary>Curated light + dark themes, in menu order.</summary>
+    /// <summary>Curated light + dark themes, in menu order. Signature palettes come first.</summary>
     public static readonly IReadOnlyList<ThemeOption> Options = new[]
     {
+        new ThemeOption("aurora", "Aurora", true, "#7c5cff", "#0b0f1c", Signature: true),
+        new ThemeOption("editorial", "Editorial", false, "#b4530a", "#fbf9f5", Signature: true),
+        new ThemeOption("forest", "Forest", true, "#4ade80", "#0d1512", Signature: true),
+        new ThemeOption("graphite", "Graphite", false, "#3f5871", "#f4f5f7", Signature: true),
         new ThemeOption("cosmo", "Cosmo", false, "#1f6feb", "#ffffff"),
         new ThemeOption("sandstone", "Sandstone", false, "#2f6f7d", "#fcfbf7"),
         new ThemeOption("solarized-light", "Solarized Light", false, "#268bd2", "#fdf6e3"),

@@ -8,19 +8,26 @@
 @inject NavStats Stats
 @inject ArticleState Article
 @inject SiteShellState Site
+@inject PreferencesState Prefs
 @inject HttpClient Http
 
-<div class="page theme-@Theme.ThemeId">
+<div class="page theme-@Theme.ThemeId" data-density="@Prefs.Density" data-font="@Prefs.Font">
+    <div class="ambient" aria-hidden="true"><span></span><span></span><span></span></div>
+
     <header class="topbar">
         <a class="brand" href=""><i class="bi @BrandIconClass"></i> <span>@Site.Title</span></a>
         <TopMenu Placement="TopMenu.Group.Left" />
         <TopMenu Placement="TopMenu.Group.Right" />
         <AboutMenu />
+        <a class="icon-btn" title="Explore the library" href="explore"><i class="bi bi-compass"></i></a>
         <button class="icon-btn" title="Search" @onclick="() => _searchOpen = true">
             <i class="bi bi-search"></i>
         </button>
         <button class="icon-btn" title="Notifications" @onclick="() => _notifyOpen = !_notifyOpen">
             <i class="bi bi-bell"></i>
+        </button>
+        <button class="icon-btn" title="Reading preferences" @onclick="() => _prefsOpen = true">
+            <i class="bi bi-sliders"></i>
         </button>
         <button class="theme-btn" title="Toggle light/dark" @onclick="() => Theme.Toggle()">
             @(Theme.Dark ? "☀️" : "🌙")
@@ -29,6 +36,7 @@
 
     <SearchOverlay Open="_searchOpen" OnClose="() => _searchOpen = false" />
     <NotificationPanel Open="_notifyOpen" OnClose="() => _notifyOpen = false" />
+    <PreferencesDrawer Open="_prefsOpen" OnClose="() => _prefsOpen = false" />
 
     <div class="body">
         <nav class="sidebar @(Sidebar.Collapsed ? "rail" : null)">

@@ -1,3 +1,4 @@
+using Diginsight.SmartDocs.Web.Shared;
 using Diginsight.SmartDocs.Web.Shared.Navigation;
 using Microsoft.AspNetCore.Components;
 
@@ -22,6 +23,13 @@ public partial class DynNavNode
     // re-opening a section the user has explicitly collapsed while staying on the same article.
     private string? _autoOpenedForRoute;
 
+    // Child levels honour the reader's order and hidden set. Pinning is deliberately a top-level-only
+    // gesture — a pinned rail nested inside every folder would add noise without adding reach.
+    private IReadOnlyList<NavChild> VisibleChildren =>
+        NavOrdering.Sort(_children ?? [], Prefs.Sort)
+                   .Where(c => !Prefs.IsHidden(c.Text))
+                   .ToList();
+
     private bool InActiveBranch =>
         Node.Prefix is not null && !string.IsNullOrEmpty(CurrentRoute) &&
         (string.Equals(CurrentRoute, Node.Route, StringComparison.OrdinalIgnoreCase) ||
@@ -31,6 +39,7 @@ public partial class DynNavNode
     {
         Sidebar.ExpandAllRequested += OnExpandAll;
         Sidebar.RefreshCountsRequested += OnRefreshCounts;
+        Prefs.Changed += OnPrefsChanged;
     }
 
     protected override async Task OnParametersSetAsync()
@@ -166,9 +175,12 @@ public partial class DynNavNode
         await InvokeAsync(StateHasChanged);
     }
 
+    private void OnPrefsChanged() => InvokeAsync(StateHasChanged);
+
     public void Dispose()
     {
         Sidebar.ExpandAllRequested -= OnExpandAll;
         Sidebar.RefreshCountsRequested -= OnRefreshCounts;
+        Prefs.Changed -= OnPrefsChanged;
     }
 }

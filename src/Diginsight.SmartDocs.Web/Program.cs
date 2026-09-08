@@ -173,6 +173,7 @@ public class Program
             services.AddScoped<TocState>();
             services.AddScoped<ThemeState>();
             services.AddScoped<SidebarState>();
+            services.AddScoped<PreferencesState>();
             services.AddScoped<NavStats>();
             services.AddScoped<ArticleState>();
             // Dynamic, spec-compliant menu built on demand from the live content hierarchy.

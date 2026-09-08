@@ -339,3 +339,28 @@ window.appUi = {
         });
     };
 })();
+
+/* ---------------------------------------------------------------------------
+   Reading-preferences mirror.
+   The Blazor PreferencesState is authoritative; localStorage is only a mirror
+   read once on first interactive render. Every call is defensive because
+   storage can be unavailable (private mode, disabled cookies) and a throw here
+   would break the layout's OnAfterRenderAsync.
+   --------------------------------------------------------------------------- */
+(function () {
+    window.appUi = window.appUi || {};
+
+    window.appUi.prefsLoad = function (key) {
+        try { return localStorage.getItem(key); } catch (e) { return null; }
+    };
+
+    window.appUi.prefsSave = function (key, json) {
+        try { localStorage.setItem(key, json); } catch (e) { /* ignore */ }
+        return true;
+    };
+
+    window.appUi.prefsClear = function (key) {
+        try { localStorage.removeItem(key); } catch (e) { /* ignore */ }
+        return true;
+    };
+})();

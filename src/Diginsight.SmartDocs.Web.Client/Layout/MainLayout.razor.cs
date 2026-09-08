@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
 using Diginsight.SmartDocs.Web.Shared.Navigation;
+using Diginsight.SmartDocs.Web.Shared;
 using Diginsight.SmartDocs.Web.Shared.Sites;
 using System.Net.Http.Json;
 
@@ -10,6 +11,7 @@ public partial class MainLayout
 {
     private bool _searchOpen;
     private bool _notifyOpen;
+    private bool _prefsOpen;
     private DotNetObjectReference<MainLayout>? _selfRef;
 
     private string BrandIconClass => string.IsNullOrWhiteSpace(Site.Branding.IconClass)
@@ -76,6 +78,8 @@ public partial class MainLayout
         // count query, and refreshes are debounced so they never impact rendering.
         Stats.Changed += OnStatsChanged;
         Article.Changed += OnArticleChanged;
+        Prefs.Changed += OnPrefsChanged;
+        Prefs.PersistRequested += OnPrefsPersistRequested;
 
         if (!Site.IsConfigured)
         {
@@ -88,6 +92,26 @@ public partial class MainLayout
     }
 
     private void OnSiteChanged() => InvokeAsync(StateHasChanged);
+
+    private void OnPrefsChanged() => InvokeAsync(StateHasChanged);
+
+    // Mirror the new value to localStorage. Fire-and-forget: a storage failure must never block a
+    // preference from taking effect in the running session, which is the authoritative copy.
+    private void OnPrefsPersistRequested(PreferencesData data) => _ = InvokeAsync(async () =>
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("appUi.prefsSave", PreferencesState.StorageKey, PreferencesState.Serialize(data));
+        }
+        catch (JSException)
+        {
+            /* storage unavailable */
+        }
+        catch (InvalidOperationException)
+        {
+            /* JS not available during prerender */
+        }
+    });
 
     private void OnArticleChanged() => InvokeAsync(StateHasChanged);
 
@@ -125,6 +149,11 @@ public partial class MainLayout
         {
             string? saved = await JS.InvokeAsync<string?>("localStorage.getItem", "lh-theme");
             Theme.SetTheme(saved);
+
+            // Hydrate reading preferences before the first interactive paint so density and font do
+            // not visibly snap after the shell has already been drawn.
+            Prefs.Hydrate(await JS.InvokeAsync<string?>("appUi.prefsLoad", PreferencesState.StorageKey));
+
             await JS.InvokeVoidAsync("appUi.initResizer");
             await JS.InvokeVoidAsync("appUi.initTocResizer");
             _selfRef = DotNetObjectReference.Create(this);
@@ -139,6 +168,8 @@ public partial class MainLayout
         Site.Changed -= OnSiteChanged;
         Stats.Changed -= OnStatsChanged;
         Article.Changed -= OnArticleChanged;
+        Prefs.Changed -= OnPrefsChanged;
+        Prefs.PersistRequested -= OnPrefsPersistRequested;
         _selfRef?.Dispose();
     }
 }

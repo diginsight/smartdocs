@@ -4,6 +4,7 @@
 @inject SidebarState Sidebar
 @inject NavigationManager NavMgr
 @inject NavStats Stats
+@inject PreferencesState Prefs
 @implements IDisposable
 
 @if (Node.IsSection)
@@ -19,6 +20,17 @@
                     }
                 </span>
                 <span class="nav-label">@Node.Text</span>
+                @if (Prefs.ShowCounts && Node.ArticleCount is > 0)
+                {
+                    <span class="nav-count @(Node.CountCoverage == Coverage.Partial ? "is-partial" : null)"
+                          title="@Node.ArticleCount articles">@Node.ArticleCount</span>
+                }
+                <button class="nav-pin @(Prefs.IsPinned(Node.Text) ? "is-on" : null)"
+                        title="@(Prefs.IsPinned(Node.Text) ? "Unpin section" : "Pin section to top")"
+                        @onclick:stopPropagation="true" @onclick:preventDefault="true"
+                        @onclick="() => Prefs.TogglePinned(Node.Text)">
+                    <i class="bi bi-pin-angle-fill"></i>
+                </button>
                 <span class="nav-twisty" role="button" aria-label="Expand or collapse" @onclick:stopPropagation="true"
                       @onclick:preventDefault="true" @onclick="ToggleOpenOnly"></span>
             </summary>
@@ -31,7 +43,7 @@
                 else
                 {
                     <ul class="nav-list" role="group">
-                        @foreach (NavChild child in _children)
+                        @foreach (NavChild child in VisibleChildren)
                         {
                             <DynNavNode Node="child" CurrentRoute="@CurrentRoute" ParentPrefix="@Node.Prefix"
                                         ParentLabel="@Node.Text" ParentCount="@Node.ArticleCount"

@@ -11,7 +11,6 @@ namespace Diginsight.SmartDocs.Web.Client.Layout;
 public partial class DynNav
 {
     private const int MaxResults = 200;
-    private static readonly StringComparison OIC = StringComparison.OrdinalIgnoreCase;
 
     private IReadOnlyList<NavChild>? _root;
     private string _current = string.Empty;
@@ -26,10 +25,18 @@ public partial class DynNav
     // every content change.
     private NavHubClient? _hub;
 
+    private (List<NavChild> Pinned, List<NavChild> Others) PartitionedRoots =>
+        NavOrdering.Partition(NavOrdering.Sort(_root ?? [], Prefs.Sort), Prefs);
+
+    private List<NavChild> PinnedRoots => PartitionedRoots.Pinned;
+
+    private List<NavChild> VisibleRoots => PartitionedRoots.Others;
+
     protected override async Task OnInitializedAsync()
     {
         _current = CurrentRoute();
         NavMgr.LocationChanged += OnLocationChanged;
+        Prefs.Changed += OnPrefsChanged;
         _root = await Provider.GetChildrenAsync(string.Empty);
         PublishRootStats();
         _scrollPending = true;
@@ -165,6 +172,16 @@ public partial class DynNav
 
     private void ClearSearch() => _query = string.Empty;
 
+    private void OnPrefsChanged() => InvokeAsync(StateHasChanged);
+
+    private void OnSortChanged(ChangeEventArgs e)
+    {
+        if (Enum.TryParse(e.Value?.ToString(), ignoreCase: true, out NavSort sort))
+        {
+            Prefs.SetSort(sort);
+        }
+    }
+
     // Esc exits search mode and drops back to the tree, revealing/scrolling the active article.
     private void OnKeyDown(KeyboardEventArgs e)
     {
@@ -175,16 +192,29 @@ public partial class DynNav
         }
     }
 
-    private static List<NavLeaf> Filter(IReadOnlyList<NavLeaf> index, string query) =>
-        index.Where(l => l.Text.Contains(query, OIC) || l.Path.Contains(query, OIC))
-             .Take(MaxResults)
-             .ToList();
+    // Every whitespace-separated token must match somewhere in the title or the breadcrumb, so the
+    // words a reader half-remembers find the article even when they are not adjacent in the title.
+    private static List<NavLeaf> Filter(IReadOnlyList<NavLeaf> index, string query)
+    {
+        string[] tokens = NavOrdering.Tokenize(query);
+        if (tokens.Length == 0)
+        {
+            return [];
+        }
 
-    // Wraps every case-insensitive occurrence of the query in a highlight <mark>.
+        return index.Where(l => NavOrdering.Matches(l, tokens)).Take(MaxResults).ToList();
+    }
+
+    // Wraps every matched token occurrence in a highlight <mark>. Ranges are pre-merged, so
+    // overlapping tokens produce one mark rather than nested ones.
     private RenderFragment Highlight(string text, string query) => builder =>
     {
-        query = query?.Trim() ?? string.Empty;
-        if (query.Length == 0 || string.IsNullOrEmpty(text))
+        string[] tokens = NavOrdering.Tokenize(query);
+        List<(int Start, int Length)> ranges = tokens.Length == 0
+            ? []
+            : NavOrdering.HighlightRanges(text, tokens);
+
+        if (ranges.Count == 0)
         {
             builder.AddContent(0, text);
             return;
@@ -192,25 +222,23 @@ public partial class DynNav
 
         int seq = 0;
         int pos = 0;
-        while (pos < text.Length)
+        foreach ((int start, int length) in ranges)
         {
-            int idx = text.IndexOf(query, pos, OIC);
-            if (idx < 0)
+            if (start > pos)
             {
-                builder.AddContent(seq++, text[pos..]);
-                break;
-            }
-
-            if (idx > pos)
-            {
-                builder.AddContent(seq++, text[pos..idx]);
+                builder.AddContent(seq++, text[pos..start]);
             }
 
             builder.OpenElement(seq++, "mark");
             builder.AddAttribute(seq++, "class", "nav-search-hl");
-            builder.AddContent(seq++, text.Substring(idx, query.Length));
+            builder.AddContent(seq++, text.Substring(start, length));
             builder.CloseElement();
-            pos = idx + query.Length;
+            pos = start + length;
+        }
+
+        if (pos < text.Length)
+        {
+            builder.AddContent(seq++, text[pos..]);
         }
     };
 
@@ -245,6 +273,7 @@ public partial class DynNav
     public void Dispose()
     {
         NavMgr.LocationChanged -= OnLocationChanged;
+        Prefs.Changed -= OnPrefsChanged;
         if (_hub is not null)
         {
             _hub.MetadataChanged -= OnAggregatesPushed;

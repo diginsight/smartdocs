@@ -1,0 +1,289 @@
+@page "/explore"
+@using System.Globalization
+@inject INavProvider Provider
+@inject PreferencesState Prefs
+@inject NavStats Stats
+@implements IDisposable
+
+<PageTitle>Explore</PageTitle>
+
+<div class="explore">
+    <section class="hero">
+        <p class="hero-eyebrow">Learning Hub</p>
+        <h1>Everything you have <em>learned</em>, in one place.</h1>
+        <p>
+            Browse the whole library by section, recency or author — then keep what matters with
+            favourites, pins and a look that is yours.
+        </p>
+        <div class="hero-stats">
+            <div class="hero-stat">
+                <b>@_all.Count.ToString("N0")</b>
+                <span>Articles</span>
+            </div>
+            <div class="hero-stat">
+                <b>@_sections.Count.ToString("N0")</b>
+                <span>Sections</span>
+            </div>
+            <div class="hero-stat">
+                <b>@_authorCount.ToString("N0")</b>
+                <span>Authors</span>
+            </div>
+            <div class="hero-stat">
+                <b>@(_latest?.ToString("dd MMM yyyy", CultureInfo.InvariantCulture) ?? "—")</b>
+                <span>Last update</span>
+            </div>
+        </div>
+    </section>
+
+    @if (_loading)
+    {
+        <p class="empty">Loading the library…</p>
+    }
+    else
+    {
+        <div class="filterbar">
+            <button class="chip @(_section is null ? "is-on" : null)" @onclick="() => SetSection(null)">
+                All <b>@_all.Count</b>
+            </button>
+            @foreach ((string name, int count) in _sections)
+            {
+                <button class="chip @(_section == name ? "is-on" : null)" @onclick="() => SetSection(name)">
+                    @name <b>@count</b>
+                </button>
+            }
+
+            <span class="filterbar-sep"></span>
+
+            <select class="filter-select" value="@_recency" @onchange="OnRecencyChanged">
+                <option value="any">Any time</option>
+                <option value="30">Last 30 days</option>
+                <option value="90">Last 90 days</option>
+                <option value="365">Last year</option>
+            </select>
+
+            <select class="filter-select" value="@_author" @onchange="OnAuthorChanged">
+                <option value="">Any author</option>
+                @foreach (string a in _authors)
+                {
+                    <option value="@a">@a</option>
+                }
+            </select>
+
+            <select class="filter-select" value="@_sort" @onchange="OnSortChanged">
+                <option value="recent">Newest first</option>
+                <option value="oldest">Oldest first</option>
+                <option value="title">Title A → Z</option>
+                <option value="section">By section</option>
+            </select>
+
+            <button class="chip @(_favOnly ? "is-on" : null)" @onclick="() => Set(() => _favOnly = !_favOnly)">
+                <i class="bi bi-star-fill"></i> Favourites <b>@Prefs.Favourites.Count</b>
+            </button>
+
+            <button class="chip @(Prefs.DatedOnly ? "is-on" : null)"
+                    title="Only show articles that carry a publication date"
+                    @onclick="() => Prefs.SetDatedOnly(!Prefs.DatedOnly)">
+                <i class="bi bi-calendar3"></i> Dated only
+            </button>
+
+            <span class="spacer"></span>
+
+            <div class="seg">
+                <button class="@(_view == "cards" ? "is-on" : null)" @onclick='() => Set(() => _view = "cards")'>Cards</button>
+                <button class="@(_view == "timeline" ? "is-on" : null)" @onclick='() => Set(() => _view = "timeline")'>Timeline</button>
+            </div>
+
+            <span class="filter-count">@Results.Count.ToString("N0") shown</span>
+        </div>
+
+        @if (Results.Count == 0)
+        {
+            <p class="empty">
+                Nothing matches these filters.
+                <button class="link-btn" @onclick="ResetFilters">Reset them</button>
+            </p>
+        }
+        else if (_view == "timeline")
+        {
+            <div class="timeline">
+                @foreach (IGrouping<string, NavLeaf> month in Results.Take(_take).GroupBy(MonthKey))
+                {
+                    <div class="tl-month">@month.Key</div>
+                    @foreach (NavLeaf a in month)
+                    {
+                        <a class="tl-item" href="@a.Route">
+                            <span class="tl-date">@(a.Date?.ToString("dd MMM", CultureInfo.InvariantCulture) ?? "—")</span>
+                            <span class="tl-title">@a.Text</span>
+                            <span class="tl-sec">@SectionOf(a)</span>
+                        </a>
+                    }
+                }
+            </div>
+        }
+        else
+        {
+            <div class="cards">
+                @foreach (NavLeaf a in Results.Take(_take))
+                {
+                    <a class="card" href="@a.Route">
+                        <span class="card-sec">@SectionOf(a)</span>
+                        <h3>@a.Text</h3>
+                        <span class="card-path">@a.Path</span>
+                        <span class="card-meta">
+                            <span>@(a.Date?.ToString("dd MMM yyyy", CultureInfo.InvariantCulture) ?? "Undated")</span>
+                            @if (!string.IsNullOrEmpty(a.Author))
+                            {
+                                <span>· @a.Author</span>
+                            }
+                        </span>
+                        <button class="fav @(Prefs.IsFavourite(a.Route) ? "is-on" : null)"
+                                title="@(Prefs.IsFavourite(a.Route) ? "Remove from favourites" : "Add to favourites")"
+                                @onclick:preventDefault="true" @onclick:stopPropagation="true"
+                                @onclick="() => Prefs.ToggleFavourite(a.Route)">
+                            <i class="bi @(Prefs.IsFavourite(a.Route) ? "bi-star-fill" : "bi-star")"></i>
+                        </button>
+                    </a>
+                }
+            </div>
+        }
+
+        @if (Results.Count > _take)
+        {
+            <button class="load-more" @onclick="() => _take += PageSize">
+                Show @Math.Min(PageSize, Results.Count - _take) more
+            </button>
+        }
+    }
+</div>
+
+@code {
+    private const int PageSize = 48;
+
+    private IReadOnlyList<NavLeaf> _all = [];
+    private List<(string Name, int Count)> _sections = [];
+    private List<string> _authors = [];
+    private int _authorCount;
+    private DateTimeOffset? _latest;
+    private bool _loading = true;
+
+    private string? _section;
+    private string _recency = "any";
+    private string _author = string.Empty;
+    private string _sort = "recent";
+    private string _view = "cards";
+    private bool _favOnly;
+    private int _take = PageSize;
+
+    // Recomputed per render rather than cached: the filter inputs are a handful of fields over a
+    // list of ~1k items, which is far cheaper than the invalidation bookkeeping a cache would need.
+    private List<NavLeaf> Results
+    {
+        get
+        {
+            IEnumerable<NavLeaf> q = _all;
+
+            if (_section is not null)
+            {
+                q = q.Where(a => SectionOf(a) == _section);
+            }
+
+            if (!string.IsNullOrEmpty(_author))
+            {
+                q = q.Where(a => a.Author == _author);
+            }
+
+            if (_favOnly)
+            {
+                q = q.Where(a => Prefs.IsFavourite(a.Route));
+            }
+
+            // "Dated only" and a recency window both require a date; the window additionally bounds it.
+            if (Prefs.DatedOnly || _view == "timeline")
+            {
+                q = q.Where(a => a.Date is not null);
+            }
+
+            if (int.TryParse(_recency, out int days))
+            {
+                DateTimeOffset cutoff = DateTimeOffset.UtcNow.AddDays(-days);
+                q = q.Where(a => a.Date is { } d && d >= cutoff);
+            }
+
+            return _sort switch
+            {
+                // Undated articles sort last in both directions: an absent date is unknown, not old.
+                "oldest" => q.OrderBy(a => a.Date is null).ThenBy(a => a.Date).ToList(),
+                "title" => q.OrderBy(a => a.Text, StringComparer.OrdinalIgnoreCase).ToList(),
+                "section" => q.OrderBy(SectionOf, StringComparer.OrdinalIgnoreCase)
+                              .ThenBy(a => a.Text, StringComparer.OrdinalIgnoreCase).ToList(),
+                _ => q.OrderBy(a => a.Date is null).ThenByDescending(a => a.Date).ToList(),
+            };
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        Prefs.Changed += OnPrefsChanged;
+
+        _all = await Provider.GetIndexAsync();
+
+        _sections = _all.GroupBy(SectionOf)
+                        .Select(g => (g.Key, g.Count()))
+                        .OrderByDescending(t => t.Item2)
+                        .ToList();
+
+        _authors = _all.Select(a => a.Author)
+                       .Where(a => !string.IsNullOrWhiteSpace(a))
+                       .Select(a => a!)
+                       .Distinct(StringComparer.OrdinalIgnoreCase)
+                       .OrderBy(a => a, StringComparer.OrdinalIgnoreCase)
+                       .ToList();
+
+        _authorCount = _authors.Count;
+        _latest = _all.Max(a => a.Date);
+        _loading = false;
+    }
+
+    // The breadcrumb's first segment is the top-level section; a leaf sitting at the root has none.
+    private static string SectionOf(NavLeaf a)
+    {
+        if (string.IsNullOrEmpty(a.Path))
+        {
+            return "Root";
+        }
+
+        int i = a.Path.IndexOf('\u203a');
+        return (i < 0 ? a.Path : a.Path[..i]).Trim();
+    }
+
+    private static string MonthKey(NavLeaf a) =>
+        a.Date?.ToString("MMMM yyyy", CultureInfo.InvariantCulture) ?? "Undated";
+
+    // Any filter change invalidates the current page window; otherwise "show more" would carry over
+    // into a narrower result set and reveal the whole thing at once.
+    private void Set(Action change)
+    {
+        change();
+        _take = PageSize;
+    }
+
+    private void OnRecencyChanged(ChangeEventArgs e) => Set(() => _recency = e.Value?.ToString() ?? "any");
+
+    private void OnAuthorChanged(ChangeEventArgs e) => Set(() => _author = e.Value?.ToString() ?? string.Empty);
+
+    private void OnSortChanged(ChangeEventArgs e) => Set(() => _sort = e.Value?.ToString() ?? "recent");
+
+    private void SetSection(string? name) => Set(() => _section = _section == name ? null : name);
+
+    private void ResetFilters() => Set(() =>
+    {
+        _section = null;
+        _recency = "any";
+        _author = string.Empty;
+        _favOnly = false;
+    });
+
+    private void OnPrefsChanged() => InvokeAsync(StateHasChanged);
+
+    public void Dispose() => Prefs.Changed -= OnPrefsChanged;
+}

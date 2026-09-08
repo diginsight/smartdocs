@@ -1,0 +1,186 @@
+@* Reading-preferences drawer: palette, density, reading font, sidebar ordering, and per-section
+   pin / hide. Every control writes straight through PreferencesState (or ThemeState for the
+   palette), which persists itself — there is no apply/cancel step. *@
+@inject ThemeState Theme
+@inject PreferencesState Prefs
+@inject INavProvider Provider
+@implements IDisposable
+
+@if (Open)
+{
+    <button class="drawer-scrim" aria-label="Close preferences" @onclick="Close"></button>
+
+    <aside class="drawer" role="dialog" aria-label="Reading preferences" @onkeydown="OnKeyDown" tabindex="-1">
+        <div class="drawer-head">
+            <i class="bi bi-sliders"></i>
+            <h2>Preferences</h2>
+            <button class="icon-btn" title="Close" @onclick="Close"><i class="bi bi-x-lg"></i></button>
+        </div>
+
+        <div class="drawer-body">
+            <section class="pref-group">
+                <h3>Palette</h3>
+                <div class="palette-grid">
+                    @foreach (ThemeOption o in ThemeState.Options.Where(o => o.Signature))
+                    {
+                        <button class="palette-card @(Theme.ThemeId == o.Id ? "is-on" : null)"
+                                @onclick="() => Theme.SetTheme(o.Id)">
+                            <span class="palette-dot"
+                                  style="background:linear-gradient(135deg,@o.Bg 0 48%,@o.Accent 52% 100%)"></span>
+                            <span>@o.Name</span>
+                        </button>
+                    }
+                </div>
+                <div class="pref-row" style="margin-top:.6rem">
+                    <span>Classic themes</span>
+                    <span class="spacer"></span>
+                    <select class="filter-select" value="@ClassicValue" @onchange="OnClassicChanged">
+                        <option value="">Choose…</option>
+                        @foreach (ThemeOption o in ThemeState.Options.Where(o => !o.Signature))
+                        {
+                            <option value="@o.Id">@o.Name</option>
+                        }
+                    </select>
+                </div>
+            </section>
+
+            <section class="pref-group">
+                <h3>Reading</h3>
+                <div class="pref-row">
+                    <span>Density</span>
+                    <span class="spacer"></span>
+                    <div class="seg">
+                        <button class="@On(Prefs.Density == "comfortable")" @onclick='() => Prefs.SetDensity("comfortable")'>Comfortable</button>
+                        <button class="@On(Prefs.Density == "compact")" @onclick='() => Prefs.SetDensity("compact")'>Compact</button>
+                    </div>
+                </div>
+                <div class="pref-row">
+                    <span>Body font</span>
+                    <span class="spacer"></span>
+                    <div class="seg">
+                        <button class="@On(Prefs.Font == "sans")" @onclick='() => Prefs.SetFont("sans")'>Sans</button>
+                        <button class="@On(Prefs.Font == "serif")" @onclick='() => Prefs.SetFont("serif")'>Serif</button>
+                    </div>
+                </div>
+            </section>
+
+            <section class="pref-group">
+                <h3>Navigation</h3>
+                <div class="pref-row">
+                    <span>Order sections by</span>
+                    <span class="spacer"></span>
+                    <select class="filter-select" value="@Prefs.Sort" @onchange="OnSortChanged">
+                        <option value="@nameof(NavSort.Curated)">Curated</option>
+                        <option value="@nameof(NavSort.Count)">Most content</option>
+                        <option value="@nameof(NavSort.Recent)">Recently updated</option>
+                        <option value="@nameof(NavSort.Alpha)">A → Z</option>
+                    </select>
+                </div>
+                <div class="pref-row">
+                    <span>Show article counts</span>
+                    <span class="spacer"></span>
+                    <div class="seg">
+                        <button class="@On(Prefs.ShowCounts)" @onclick="() => Prefs.SetShowCounts(true)">On</button>
+                        <button class="@On(!Prefs.ShowCounts)" @onclick="() => Prefs.SetShowCounts(false)">Off</button>
+                    </div>
+                </div>
+            </section>
+
+            <section class="pref-group">
+                <h3>Sections</h3>
+                @if (_sections is null)
+                {
+                    <p class="filter-count">Loading…</p>
+                }
+                else
+                {
+                    <div class="pref-sections">
+                        @foreach (NavChild s in _sections)
+                        {
+                            <div class="pref-section @(Prefs.IsHidden(s.Text) ? "is-hidden" : null)">
+                                <span class="name">@s.Text</span>
+                                <span class="filter-count">@(s.ArticleCount ?? 0)</span>
+                                <button class="mini-btn @(Prefs.IsPinned(s.Text) ? "is-on" : null)"
+                                        title="@(Prefs.IsPinned(s.Text) ? "Unpin" : "Pin to top")"
+                                        @onclick="() => Prefs.TogglePinned(s.Text)">
+                                    <i class="bi bi-pin-angle-fill"></i>
+                                </button>
+                                <button class="mini-btn @(Prefs.IsHidden(s.Text) ? "is-on" : null)"
+                                        title="@(Prefs.IsHidden(s.Text) ? "Show" : "Hide from menu")"
+                                        @onclick="() => Prefs.ToggleHidden(s.Text)">
+                                    <i class="bi @(Prefs.IsHidden(s.Text) ? "bi-eye-slash-fill" : "bi-eye")"></i>
+                                </button>
+                            </div>
+                        }
+                    </div>
+                    @if (Prefs.Hidden.Count > 0)
+                    {
+                        <button class="link-btn" style="margin-top:.5rem" @onclick="() => Prefs.ClearHidden()">
+                            Show all @Prefs.Hidden.Count hidden
+                        </button>
+                    }
+                }
+            </section>
+
+            <section class="pref-group">
+                <h3>Saved</h3>
+                <div class="pref-row">
+                    <span>@Prefs.Favourites.Count favourite @(Prefs.Favourites.Count == 1 ? "article" : "articles")</span>
+                    <span class="spacer"></span>
+                    <button class="link-btn" @onclick="() => Prefs.ResetAll()">Reset all</button>
+                </div>
+            </section>
+        </div>
+    </aside>
+}
+
+@code {
+    [Parameter] public bool Open { get; set; }
+
+    [Parameter] public EventCallback OnClose { get; set; }
+
+    private IReadOnlyList<NavChild>? _sections;
+
+    private string ClassicValue => ThemeState.Options.Any(o => o.Id == Theme.ThemeId && !o.Signature) ? Theme.ThemeId : string.Empty;
+
+    private static string? On(bool active) => active ? "is-on" : null;
+
+    protected override void OnInitialized()
+    {
+        Theme.Changed += OnStateChanged;
+        Prefs.Changed += OnStateChanged;
+    }
+
+    // The section list is only needed once the drawer is actually opened, so the fetch is deferred
+    // until then rather than paid on every page load.
+    protected override async Task OnParametersSetAsync()
+    {
+        if (Open && _sections is null)
+        {
+            IReadOnlyList<NavChild> roots = await Provider.GetChildrenAsync(string.Empty);
+            _sections = roots.Where(r => r.IsSection).ToList();
+        }
+    }
+
+    private void OnStateChanged() => InvokeAsync(StateHasChanged);
+
+    private void OnSortChanged(ChangeEventArgs e)
+    {
+        if (Enum.TryParse(e.Value?.ToString(), ignoreCase: true, out NavSort sort))
+        {
+            Prefs.SetSort(sort);
+        }
+    }
+
+    private void OnClassicChanged(ChangeEventArgs e) => Theme.SetTheme(e.Value?.ToString());
+
+    private Task OnKeyDown(KeyboardEventArgs e) => e.Key == "Escape" ? Close() : Task.CompletedTask;
+
+    private Task Close() => OnClose.InvokeAsync();
+
+    public void Dispose()
+    {
+        Theme.Changed -= OnStateChanged;
+        Prefs.Changed -= OnStateChanged;
+    }
+}

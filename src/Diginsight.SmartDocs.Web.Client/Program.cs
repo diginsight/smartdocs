@@ -18,6 +18,7 @@ builder.Services.AddScoped<PageLoader>();
 builder.Services.AddScoped<TocState>();
 builder.Services.AddScoped<ThemeState>();
 builder.Services.AddScoped<SidebarState>();
+builder.Services.AddScoped<PreferencesState>();
 builder.Services.AddScoped<NavStats>();
 builder.Services.AddScoped<ArticleState>();
 builder.Services.AddScoped<SiteShellState>();
