@@ -7,6 +7,7 @@ using Diginsight.SmartCache;
 using Diginsight.SmartCache.Externalization.Http;
 using Diginsight.SmartCache.Externalization.Redis;
 using Diginsight.SmartCache.Externalization.ServiceBus;
+using Diginsight.SmartDocs.Web.Caching;
 using Diginsight.SmartDocs.Web.Components;
 using Diginsight.SmartDocs.Web.ContentSources;
 using Diginsight.SmartDocs.Web.Endpoints;
@@ -145,6 +146,12 @@ public class Program
             // because the navigation builders capture them; the space is therefore chosen by an explicit
             // argument, never by a scoped factory reading the current request — that would be a captive
             // dependency on the server and would have no counterpart at all in the browser.
+            // How stale an answer may be when no invalidation call arrived. Bound eagerly, like the
+            // site options above, because the content sources are built here rather than resolved.
+            var freshness = new ContentFreshnessOptions();
+            configuration.GetSection("ContentFreshness").Bind(freshness);
+            services.AddSingleton(freshness);
+
             services.AddSingleton(sp => new SpaceContentRegistry(
                 spaceRegistry.All.Select(space =>
                 {
@@ -154,6 +161,7 @@ public class Program
                         physical,
                         lister,
                         sp.GetRequiredService<ISmartCache>(),
+                        freshness,
                         sp.GetRequiredService<ILogger<CachedContentSource>>());
                     return new SpaceContentAccess(space, cached, cached);
                 })));
@@ -185,6 +193,7 @@ public class Program
                 sp.GetRequiredService<DynamicNavBuilder>(),
                 sp.GetRequiredService<ISmartCache>(),
                 sp.GetRequiredService<IParallelService>(),
+                freshness,
                 sp.GetRequiredService<ILogger<CachedDynamicNavBuilder>>()));
             services.AddSingleton<INavBuilder>(sp => sp.GetRequiredService<CachedDynamicNavBuilder>());
             services.AddScoped<INavProvider, ServerNavProvider>();
