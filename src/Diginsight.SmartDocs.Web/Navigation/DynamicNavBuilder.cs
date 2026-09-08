@@ -136,7 +136,8 @@ public sealed class DynamicNavBuilder(
                 ?? NavRules.Label(Path.GetFileNameWithoutExtension(entry.Name));
             return (NavRules.SortKey(entry.Name),
                 new NavChild(label, Route(entry.Path), null, null, false, false,
-                    Date: FrontMatter.ParseDate(fm.Date), Author: fm.Author));
+                    Date: FrontMatter.ParseDate(fm.Date) ?? NavRules.DateFromName(Path.GetFileNameWithoutExtension(entry.Name)),
+                    Author: fm.Author));
         }
 
         return null;
@@ -163,6 +164,7 @@ public sealed class DynamicNavBuilder(
             (int? articleCount, DateTimeOffset? latestUtc, Coverage coverage) = FolderAggregate(folder.Path, meta);
             return new NavChild(meta.Label ?? NavRules.Label(folder.Name), href, folder.Path, icon, true, true,
                 meta.Short, meta.TopbarHidden, meta.TopbarAlign,
+                Date: NavRules.DateFromName(folder.Name),
                 ArticleCount: articleCount, LatestArticleUtc: latestUtc, CountCoverage: coverage);
         }
 
@@ -183,12 +185,11 @@ public sealed class DynamicNavBuilder(
         }
 
         string? title = FrontMatter.ResolveTitle(head);
-        string label = meta.Label ?? (title is not null
-            ? NavRules.WithDatePrefix(folder.Name, title)
-            : NavRules.Label(folder.Name));
+        string label = meta.Label ?? title ?? NavRules.Label(folder.Name);
         string route = single == index ? Route(folder.Path) : Route(single.Path);
         return new NavChild(label, route, null, meta.Icon, false, false,
-            Date: FrontMatter.ParseDate(singleFm.Date), Author: singleFm.Author);
+            Date: FrontMatter.ParseDate(singleFm.Date) ?? NavRules.DateFromName(folder.Name),
+            Author: singleFm.Author);
     }
 
     /// <summary>

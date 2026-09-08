@@ -1,3 +1,5 @@
+using System.Globalization;
+
 namespace Diginsight.SmartDocs.Web.Shared.Navigation;
 
 /// <summary>
@@ -78,11 +80,15 @@ public static class NavOrdering
         (query ?? string.Empty).Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
     /// <summary>
-    /// Matches an article when <em>every</em> token appears somewhere in its title or breadcrumb.
+    /// Matches an article when <em>every</em> token appears somewhere in its title, breadcrumb or date.
     /// <para>
     /// AND-of-tokens rather than one contiguous substring: readers type the words they remember, not
     /// the exact title, so "copilot agent" must find "Agents in GitHub Copilot" — which a substring
     /// match cannot do.
+    /// </para>
+    /// <para>
+    /// The date is matched in both the written and the compact form, because titles no longer carry
+    /// their name prefix: a reader who types "20260813" or "2026-08-13" would otherwise find nothing.
     /// </para>
     /// </summary>
     public static bool Matches(NavLeaf leaf, string[] tokens)
@@ -90,7 +96,8 @@ public static class NavOrdering
         foreach (string t in tokens)
         {
             if (leaf.Text.Contains(t, StringComparison.OrdinalIgnoreCase) ||
-                leaf.Path.Contains(t, StringComparison.OrdinalIgnoreCase))
+                leaf.Path.Contains(t, StringComparison.OrdinalIgnoreCase) ||
+                MatchesDate(leaf.Date, t))
             {
                 continue;
             }
@@ -99,6 +106,17 @@ public static class NavOrdering
         }
 
         return true;
+    }
+
+    private static bool MatchesDate(DateTimeOffset? date, string token)
+    {
+        if (date is not { } d || token.Length < 4)
+        {
+            return false;
+        }
+
+        return d.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture).Contains(token, StringComparison.Ordinal)
+            || d.ToString("yyyyMMdd", CultureInfo.InvariantCulture).Contains(token, StringComparison.Ordinal);
     }
 
     /// <summary>

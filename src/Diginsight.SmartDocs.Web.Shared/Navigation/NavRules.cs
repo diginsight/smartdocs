@@ -33,26 +33,48 @@ public static class NavRules
     private static readonly Regex LeadingNum = new(@"^(\d+(?:\.\d+)?)", RegexOptions.Compiled);
     private static readonly Regex Spaces = new(@"\s+", RegexOptions.Compiled);
 
-    /// <summary>Display label for a folder or file base-name (extension already removed).</summary>
+    /// <summary>
+    /// Display label for a folder or file base-name (extension already removed).
+    /// <para>A date prefix is <em>not</em> part of the label: it is carried separately as
+    /// <see cref="NavChild.Date"/> so every surface can lay title and date out on its own terms
+    /// instead of reading a date out of the middle of a sentence. The prefix survives as the label
+    /// only when it is the entire name, which would otherwise leave nothing to show.</para>
+    /// </summary>
     public static string Label(string rawName)
     {
         Match d = DateRx.Match(rawName);
         if (d.Success)
         {
-            string date = DisplayDate(d.Groups["date"].Value);
             string rest = d.Groups["rest"].Success ? Titleize(d.Groups["rest"].Value) : string.Empty;
-            return rest.Length > 0 ? $"{date} - {rest}" : date;
+            return rest.Length > 0 ? rest : DisplayDate(d.Groups["date"].Value);
         }
 
         Match n = NumRx.Match(rawName);
         return Titleize(n.Success ? n.Groups["rest"].Value : rawName);
     }
 
-    /// <summary>Prepend a folder's preserved date prefix to a title resolved from article metadata.</summary>
-    public static string WithDatePrefix(string rawFolderName, string resolvedTitle)
+    /// <summary>
+    /// The date encoded in a folder/file name prefix, as a date. Used as the fallback when an
+    /// article carries no <c>date:</c> in its front matter, so a name-dated article is still
+    /// sortable and filterable rather than "Undated".
+    /// </summary>
+    public static DateTimeOffset? DateFromName(string rawName)
     {
-        string? date = DateToken(rawFolderName);
-        return date is null ? resolvedTitle : $"{DisplayDate(date)} - {resolvedTitle}";
+        if (DateToken(rawName) is not { } token)
+        {
+            return null;
+        }
+
+        string digits = DisplayDate(token);
+        // YYYYMM names denote a month; anchoring them at day 1 keeps them orderable against
+        // full dates without inventing precision the name does not carry.
+        string normalised = digits.Length == 6 ? digits + "01" : digits;
+
+        return DateTimeOffset.TryParseExact(
+            normalised, "yyyyMMdd", CultureInfo.InvariantCulture,
+            DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out DateTimeOffset parsed)
+            ? parsed
+            : null;
     }
 
     // Drop the same-day ".NN" sub-index from the displayed date (kept only for sorting).

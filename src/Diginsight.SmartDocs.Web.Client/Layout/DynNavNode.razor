@@ -1,3 +1,4 @@
+@using System.Globalization
 @* Recursive, lazily-loaded menu node. Sections fetch their children the first time they open
    (or when they contain the active route, or when expand-all is active). *@
 @inject INavProvider Provider
@@ -19,7 +20,17 @@
                         <i class="bi bi-@Node.Icon"></i>
                     }
                 </span>
-                <span class="nav-label">@Node.Text</span>
+                @if (Node.Date is { } sectionOn)
+                {
+                    <span class="nav-label is-dated">
+                        <span class="nav-date">@sectionOn.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)</span>
+                        <span class="nav-title">@Node.Text</span>
+                    </span>
+                }
+                else
+                {
+                    <span class="nav-label">@Node.Text</span>
+                }
                 @if (Prefs.ShowCounts && Node.ArticleCount is > 0)
                 {
                     <span class="nav-count @(Node.CountCoverage == Coverage.Partial ? "is-partial" : null)"
@@ -59,12 +70,29 @@ else if (Node.Route is not null)
 {
     <li role="treeitem" @onmouseover="OnPointerEnter" @onmouseover:stopPropagation="true" @onmouseleave="OnPointerLeave"
         @onfocusin="OnPointerEnter" @onfocusout="OnPointerLeave">
-        <NavLink class="nav-link" href="@Node.Route" Match="NavLinkMatch.All" tabindex="0">
-            @if (!string.IsNullOrEmpty(Node.Icon))
+        <NavLink class="@(Node.Date is not null ? "nav-link is-dated" : "nav-link")" href="@Node.Route"
+                 Match="NavLinkMatch.All" tabindex="0">
+            @if (Node.Date is { } on)
             {
-                <span class="nav-ico"><i class="bi bi-@Node.Icon"></i></span>
+                @* Icon and date share the meta line: an icon stranded above a two-line title reads
+                   as a bullet, and dropping it would break the rows that rely on it for meaning. *@
+                <span class="nav-meta">
+                    @if (!string.IsNullOrEmpty(Node.Icon))
+                    {
+                        <span class="nav-ico"><i class="bi bi-@Node.Icon"></i></span>
+                    }
+                    <span class="nav-date">@on.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)</span>
+                </span>
+                <span class="nav-title">@Node.Text</span>
             }
-            <span>@Node.Text</span>
+            else
+            {
+                @if (!string.IsNullOrEmpty(Node.Icon))
+                {
+                    <span class="nav-ico"><i class="bi bi-@Node.Icon"></i></span>
+                }
+                <span class="nav-title">@Node.Text</span>
+            }
         </NavLink>
     </li>
 }

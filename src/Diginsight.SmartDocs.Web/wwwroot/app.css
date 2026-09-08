@@ -2635,3 +2635,89 @@ body {
         display: none;
     }
 }
+
+/* ============================================================
+   Dated lists — a headline stack, not a wrapped sentence
+   ------------------------------------------------------------
+   Date-prefixed entries used to read "20260813 - MAI-Thinking-1 …": every line opened with eight
+   digits, the title wrapped two or three times, and neighbouring entries touched. The date is now
+   carried as data, so it can sit above the title as a small label and let the title start at the
+   left margin. Separation is whitespace only — the earlier pass removed decorative rules, and the
+   reference layout has none either.
+   ============================================================ */
+.nav-link.is-dated {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.1rem;
+    padding: 0.42rem 0.5rem 0.46rem;
+}
+
+.nav-date {
+    font-size: 0.66rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    color: var(--brand);
+    /* Lining figures keep the date column optically aligned down the list. */
+    font-variant-numeric: tabular-nums;
+}
+
+.nav-link.is-dated .nav-title {
+    font-size: 0.83rem;
+    line-height: 1.34;
+    color: var(--fg);
+}
+
+/* The active row paints its own background, so both lines have to leave the brand colour. */
+.nav-link.is-dated.active .nav-date,
+.nav-link.is-dated.active .nav-title {
+    color: var(--on-brand);
+}
+
+.nav-link.is-dated.active .nav-date {
+    opacity: 0.85;
+}
+
+/* The meta line keeps the icon next to the date instead of stranding it above the title. */
+.nav-link.is-dated .nav-meta {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    min-width: 0;
+}
+
+/* Breathing room between entries, tightened again when the reader asks for a dense tree. */
+.nav-list li + li > .nav-link.is-dated {
+    margin-top: 0.28rem;
+}
+
+.page[data-density="compact"] .nav-link.is-dated {
+    padding: 0.28rem 0.5rem 0.3rem;
+}
+
+.page[data-density="compact"] .nav-list li + li > .nav-link.is-dated {
+    margin-top: 0.1rem;
+}
+
+.page[data-density="compact"] .nav-link.is-dated .nav-title,
+.page[data-density="compact"] .nav-section > details > summary .nav-title {
+    line-height: 1.24;
+}
+
+
+/* A dated section stacks the same way, so folders and articles share one rhythm. */
+.nav-label.is-dated {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+    min-width: 0;
+}
+
+.nav-section > details > summary:has(.nav-label.is-dated) {
+    padding-top: 0.4rem;
+    padding-bottom: 0.42rem;
+}
+
+.nav-section > details > summary .nav-title {
+    font-size: 0.83rem;
+    line-height: 1.34;
+}
