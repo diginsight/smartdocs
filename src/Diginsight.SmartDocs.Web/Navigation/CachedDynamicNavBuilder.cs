@@ -24,6 +24,11 @@ public sealed class CachedDynamicNavBuilder(
 
     private int _warming;
 
+    // Set by every warm request and drained by the running warm. Without it a request that lands
+    // while a warm is in flight is lost - and that is the damaging case, because the warm in flight
+    // is repopulating entries the newer invalidation has already dropped.
+    private int _warmRequested;
+
     /// <summary>Current nav version; bumps on <see cref="Invalidate()"/>.</summary>
     public static long Version => Interlocked.Read(ref _version);
 
@@ -92,11 +97,15 @@ public sealed class CachedDynamicNavBuilder(
     /// Rebuilds the index and every level away from the request path, after an invalidation has just
     /// dropped them. Without this, making the publish-time invalidation reliable would simply move
     /// the cost onto a reader: the index walks every article — around 14 seconds on a 1,100-article
-    /// site — and whoever arrived first would wait for it. Returns immediately; a warm already in
-    /// flight is left to finish rather than being duplicated.
+    /// site — and whoever arrived first would wait for it. Returns immediately; concurrent requests
+    /// collapse onto the warm already in flight, which then runs one more pass so that entries it
+    /// had populated before the newer invalidation dropped them are rebuilt too.
     /// </summary>
     public void WarmInBackground()
     {
+        // Record the request before claiming the slot, so a warm already running picks it up.
+        Interlocked.Exchange(ref _warmRequested, 1);
+
         if (Interlocked.Exchange(ref _warming, 1) == 1)
         {
             return;
@@ -104,21 +113,30 @@ public sealed class CachedDynamicNavBuilder(
 
         _ = Task.Run(async () =>
         {
-            try
+            do
             {
-                await GetIndexAsync();
-                await WarmAllLevelsAsync();
-            }
-            catch (Exception ex)
-            {
-                // Warming is an optimisation: a failure here costs the next reader time, not
-                // correctness, so it must never take the invalidation down with it.
-                logger.LogWarning(ex, "Nav warm-up after invalidation failed");
-            }
-            finally
-            {
+                while (Interlocked.Exchange(ref _warmRequested, 0) == 1)
+                {
+                    try
+                    {
+                        await GetIndexAsync();
+                        await WarmAllLevelsAsync();
+                    }
+                    catch (Exception ex)
+                    {
+                        // Warming is an optimisation: a failure here costs the next reader time, not
+                        // correctness, so it must never take the invalidation down with it.
+                        logger.LogWarning(ex, "Nav warm-up after invalidation failed");
+                    }
+                }
+
                 Interlocked.Exchange(ref _warming, 0);
+
+                // A request that arrived between draining the flag and releasing the slot would
+                // otherwise be lost, so reclaim the slot and drain again. If another caller claimed
+                // it first, that caller runs the warm instead.
             }
+            while (Volatile.Read(ref _warmRequested) == 1 && Interlocked.Exchange(ref _warming, 1) == 0);
         });
     }
 
