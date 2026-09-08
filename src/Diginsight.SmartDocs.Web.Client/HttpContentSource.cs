@@ -7,8 +7,44 @@ namespace Diginsight.SmartDocs.Web.Client;
 /// Client-side content source: fetches raw Markdown from the server's <c>/_content/{key}</c>
 /// endpoint. Storage credentials never reach the browser — the server owns them.
 /// </summary>
-public sealed class HttpContentSource(HttpClient http) : IContentSource
+public sealed class HttpContentSource(HttpClient http) : IContentSource, IContentPathResolver
 {
+    /// <summary>Matches <c>ContentEndpoints.ContentKeyHeader</c>, which the client cannot reference.</summary>
+    private const string ContentKeyHeader = "X-Content-Key";
+
+    /// <summary>
+    /// Asks the server to walk the candidate file names where the files actually are. Probing them
+    /// from here cost a round trip — and a 404 in the browser console — for every name that did not
+    /// exist, which for a section folder was most of them.
+    /// </summary>
+    public async Task<ContentResolution> ResolveAsync(string? routePath, CancellationToken ct = default)
+    {
+        string path = (routePath ?? string.Empty).Replace('\\', '/').Trim('/');
+        using HttpResponseMessage response = await http.GetAsync(
+            path.Length == 0 ? "_page" : $"_page/{path}", ct);
+
+        // A section folder with no page of its own answers 204; a server that predates this
+        // endpoint answers 404, and then probing the candidates here is the only way through.
+        if (response.StatusCode == HttpStatusCode.NoContent)
+        {
+            return ContentResolution.Nothing;
+        }
+
+        if (!response.IsSuccessStatusCode ||
+            !response.Headers.TryGetValues(ContentKeyHeader, out IEnumerable<string>? keys))
+        {
+            // Without the key the base directory would be a guess, and every relative image on the
+            // page would quietly break; reporting nothing sends PageLoader back to probing.
+            return ContentResolution.Unhandled;
+        }
+
+        byte[] bytes = await response.Content.ReadAsByteArrayAsync(ct);
+        string etag = response.Headers.ETag?.Tag ?? string.Empty;
+        return ContentResolution.Found(
+            keys.First(),
+            new ContentResult(bytes, response.Content.Headers.ContentType?.ToString(), etag));
+    }
+
     public async Task<ContentResult?> GetAsync(string contentKey, CancellationToken ct = default)
     {
         using HttpResponseMessage response = await http.GetAsync($"_content/{contentKey}", ct);

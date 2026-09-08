@@ -12,22 +12,39 @@ public sealed class PageLoader(IContentSource source, IMarkdownRenderer renderer
 {
     public async Task<RenderedPage?> LoadAsync(string? routePath, CancellationToken ct = default)
     {
+        // Over HTTP each miss below is a wasted round trip, so a source that can walk the
+        // candidates where the files are answers the whole route in one call instead. Only a
+        // resolver that cannot answer at all falls through to probing.
+        if (source is IContentPathResolver resolver)
+        {
+            ContentResolution resolution = await resolver.ResolveAsync(routePath, ct);
+            if (resolution.Handled)
+            {
+                return resolution.Content is { } found ? Render(found.Key, found.Content) : null;
+            }
+        }
+
         foreach (string key in Candidates(routePath))
         {
             ContentResult? result = await source.GetAsync(key, ct);
             if (result is not null)
             {
-                string markdown = Encoding.UTF8.GetString(result.Bytes);
-                string contentDir = key.Contains('/') ? key[..key.LastIndexOf('/')] : string.Empty;
-                return renderer.Render(markdown, contentDir);
+                return Render(key, result);
             }
         }
 
         return null;
     }
 
+    private RenderedPage Render(string key, ContentResult result)
+    {
+        string markdown = Encoding.UTF8.GetString(result.Bytes);
+        string contentDir = key.Contains('/') ? key[..key.LastIndexOf('/')] : string.Empty;
+        return renderer.Render(markdown, contentDir);
+    }
+
     /// <summary>Candidate source files for a request path, tried in order.</summary>
-    private static IEnumerable<string> Candidates(string? routePath)
+    public static IEnumerable<string> Candidates(string? routePath)
     {
         string path = (routePath ?? string.Empty).Replace('\\', '/').Trim('/');
 
