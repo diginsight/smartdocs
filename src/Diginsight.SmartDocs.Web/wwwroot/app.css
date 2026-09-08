@@ -919,7 +919,7 @@ body {
 .dynnav.is-collapsed .sidebar-panel {
     display: none;
     position: fixed;
-    top: 62px;
+    top: var(--topbar-h, 54px);
     left: 0;
     bottom: 0;
     width: var(--sidebar-width);
@@ -2463,8 +2463,14 @@ body {
    every page, so the bar now carries only what the tree cannot give: a search
    across the whole library and the switch between its two views.
    =========================================================================== */
+/* Published as a variable because anything docked under the bar has to follow it; the collapsed
+   menu's flyout was still anchored to the taller bar this rule replaced and hung 8px too low. */
+:root {
+    --topbar-h: 54px;
+}
+
 .topbar {
-    min-height: 54px;
+    min-height: var(--topbar-h);
     padding: 0.45rem 0.75rem;
     gap: 0.6rem;
 }
@@ -2901,4 +2907,97 @@ body {
 .nav-top > li > .nav-link.is-dated .nav-date {
     color: var(--muted);
     font-weight: 500;
+}
+
+/* ============================================================
+   Closing the navigation — a movement, not a jump
+   ------------------------------------------------------------
+   Collapsing swapped the sidebar between 300px and a 3rem rail with nothing in between, so the
+   reading column jumped a quarter of the window sideways. The flyout that stands in for the tree
+   was driven by display:none -> display:block on :hover, and display cannot be animated: it
+   snapped, and with no intent delay it blinked whenever a pointer merely crossed the rail on its
+   way somewhere else. The button that reopens the menu sits inside that hidden panel, so a closed
+   sidebar offered no visible way back — the orphaned .rail-toggle rule above is what remains of
+   the button that used to provide one.
+   ============================================================ */
+
+.sidebar {
+    transition: width 0.17s ease, flex-basis 0.17s ease;
+}
+
+/* Dragging writes a new width on every pointer move; easing that would make the handle elastic. */
+html.is-resizing .sidebar {
+    transition: none;
+}
+
+.dynnav.is-collapsed .sidebar-panel {
+    display: block;
+    visibility: hidden;
+    opacity: 0;
+    transform: translateX(-10px);
+    box-shadow: 14px 0 36px -26px rgba(0, 0, 0, 0.55);
+    /* Leaving starts later than arriving: clipping the corner of the panel on the way to the
+       article should not shut it, and a pointer merely passing the rail should not open it. */
+    transition: opacity 0.18s ease 0.35s, transform 0.18s ease 0.35s, visibility 0s linear 0.53s;
+}
+
+.dynnav.is-collapsed:hover .sidebar-panel,
+.dynnav.is-collapsed:focus-within .sidebar-panel {
+    visibility: visible;
+    opacity: 1;
+    transform: none;
+    transition: opacity 0.18s ease 0.2s, transform 0.18s ease 0.2s, visibility 0s linear 0.2s;
+}
+
+/* Set while the pointer is still sitting where the panel would appear, right after the menu was
+   collapsed; see the guard in app-ui.js. Keyboard focus deliberately still opens the flyout. */
+html.nav-no-flyout .dynnav.is-collapsed:hover .sidebar-panel {
+    visibility: hidden;
+    opacity: 0;
+    transform: translateX(-10px);
+    transition: none;
+}
+
+/* The rail has to say where you are, since the labels are gone. */
+.rail-btn {
+    position: relative;
+}
+
+.rail-btn.active::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0.3rem;
+    bottom: 0.3rem;
+    width: 2px;
+    border-radius: 2px;
+    background: var(--brand);
+}
+
+/* The two always-visible actions are held apart from the section icons by space rather than by a
+   rule, so the rail keeps the borderless look of the rest of the shell. */
+.rail-actions {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.15rem;
+    margin-bottom: 0.6rem;
+}
+
+.rail-actions .rail-toggle {
+    color: var(--muted);
+}
+
+.rail-actions .rail-toggle:hover {
+    color: var(--fg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+    .sidebar,
+    .dynnav.is-collapsed .sidebar-panel,
+    .dynnav.is-collapsed:hover .sidebar-panel,
+    .dynnav.is-collapsed:focus-within .sidebar-panel {
+        transition: none;
+    }
 }

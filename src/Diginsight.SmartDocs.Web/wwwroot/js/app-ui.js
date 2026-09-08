@@ -18,6 +18,7 @@ window.appUi = {
         var dragging = false;
         var minWidth = 180;
         var maxWidth = 640;
+        var defaultWidth = '300px';
 
         function clientX(e) {
             return e.touches && e.touches.length ? e.touches[0].clientX : e.clientX;
@@ -32,6 +33,7 @@ window.appUi = {
         function stop() {
             if (!dragging) { return; }
             dragging = false;
+            document.documentElement.classList.remove('is-resizing');
             document.body.style.userSelect = '';
             document.body.style.cursor = '';
             try {
@@ -40,20 +42,27 @@ window.appUi = {
             } catch (e) { /* ignore */ }
         }
 
-        resizer.addEventListener('mousedown', function () {
+        // The sidebar eases its width when it opens and closes; while the handle is being dragged
+        // that easing would lag a pointer that is already somewhere else, so it is suspended.
+        function begin() {
             dragging = true;
+            document.documentElement.classList.add('is-resizing');
+        }
+
+        resizer.addEventListener('mousedown', function () {
+            begin();
             document.body.style.userSelect = 'none';
             document.body.style.cursor = 'col-resize';
         });
-        resizer.addEventListener('touchstart', function () { dragging = true; }, { passive: true });
+        resizer.addEventListener('touchstart', begin, { passive: true });
         window.addEventListener('mousemove', onMove);
         window.addEventListener('touchmove', onMove, { passive: true });
         window.addEventListener('mouseup', stop);
         window.addEventListener('touchend', stop);
 
         resizer.addEventListener('dblclick', function () {
-            document.documentElement.style.setProperty('--sidebar-width', '280px');
-            try { localStorage.setItem('lh-sidebar-width', '280px'); } catch (e) { /* ignore */ }
+            document.documentElement.style.setProperty('--sidebar-width', defaultWidth);
+            try { localStorage.setItem('lh-sidebar-width', defaultWidth); } catch (e) { /* ignore */ }
         });
     },
 
@@ -89,6 +98,7 @@ window.appUi = {
         function stop() {
             if (!dragging) { return; }
             dragging = false;
+            document.documentElement.classList.remove('is-resizing');
             document.body.style.userSelect = '';
             document.body.style.cursor = '';
             try {
@@ -519,4 +529,46 @@ window.appUi = {
     if (location.hash && location.hash.length > 1) {
         honour(location.hash.slice(1), 25000);
     }
+})();
+
+// Collapsing the menu leaves the pointer resting on the toolbar — exactly where the hover flyout
+// is about to appear — so the tree vanished and instantly sprang back as a floating panel over the
+// article. The flyout is held back until the pointer has left the strip once under its own steam.
+(function () {
+    var root = document.documentElement;
+    var px = -1;
+
+    window.addEventListener('mousemove', function (e) { px = e.clientX; }, { passive: true, capture: true });
+
+    function panelRight() {
+        var p = document.querySelector('.dynnav.is-collapsed .sidebar-panel');
+        return p ? p.getBoundingClientRect().right : 320;
+    }
+
+    function onMove(e) {
+        if (e.clientX > panelRight() + 4) { disarm(); }
+    }
+
+    function disarm() {
+        root.classList.remove('nav-no-flyout');
+        window.removeEventListener('mousemove', onMove);
+    }
+
+    function arm() {
+        // On a cold load the pointer has never been seen; suppressing then would swallow a
+        // deliberate hover, so the guard only applies when the pointer really is over the strip.
+        if (px < 0 || px > panelRight() || root.classList.contains('nav-no-flyout')) { return; }
+        root.classList.add('nav-no-flyout');
+        window.addEventListener('mousemove', onMove);
+    }
+
+    var wasCollapsed = null;
+    new MutationObserver(function () {
+        var nav = document.querySelector('.dynnav');
+        if (!nav) { return; }
+        var collapsed = nav.classList.contains('is-collapsed');
+        if (collapsed === wasCollapsed) { return; }
+        wasCollapsed = collapsed;
+        if (collapsed) { arm(); } else { disarm(); }
+    }).observe(document.body, { subtree: true, attributes: true, attributeFilter: ['class'] });
 })();

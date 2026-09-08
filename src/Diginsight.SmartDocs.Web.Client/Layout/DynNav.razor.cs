@@ -15,6 +15,8 @@ public partial class DynNav
     private IReadOnlyList<NavChild>? _root;
     private string _current = string.Empty;
     private bool _scrollPending;
+    private ElementReference _filterBox;
+    private bool _focusFilterPending;
 
     private string _query = string.Empty;
     private IReadOnlyList<NavLeaf>? _index;
@@ -156,6 +158,14 @@ public partial class DynNav
         }
     }
 
+    // The rail's magnifier reopens the menu and lands in the filter box, so searching from a
+    // collapsed sidebar is one click rather than open-then-aim.
+    private void OpenAndFilter()
+    {
+        _focusFilterPending = true;
+        Sidebar.SetCollapsed(false);
+    }
+
     private async Task OnSearchInput(ChangeEventArgs e)
     {
         _query = e.Value?.ToString() ?? string.Empty;
@@ -263,6 +273,12 @@ public partial class DynNav
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        if (_focusFilterPending && !Sidebar.Collapsed)
+        {
+            _focusFilterPending = false;
+            try { await _filterBox.FocusAsync(); } catch { /* prerender */ }
+        }
+
         if (_scrollPending && _root is { Count: > 0 } && string.IsNullOrEmpty(_query) && !Sidebar.Collapsed)
         {
             _scrollPending = false;
