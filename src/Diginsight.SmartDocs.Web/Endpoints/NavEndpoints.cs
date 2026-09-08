@@ -130,6 +130,10 @@ public static class NavEndpoints
         // so sidebar counts and the footer total update live without polling.
         publisher.PublishChangeAsync(path ?? string.Empty);
 
+        // Rebuild what was just dropped before a reader asks for it. The caller is a publish
+        // pipeline waiting on this response, so the warm runs behind it rather than inside it.
+        nav.WarmInBackground();
+
         return Results.Ok(new { version = CachedDynamicNavBuilder.Version });
     }
 }
