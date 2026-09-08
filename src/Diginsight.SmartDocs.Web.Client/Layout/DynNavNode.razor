@@ -13,6 +13,12 @@
         <details open="@_open">
             <summary tabindex="0" @onclick:preventDefault="true" @onclick="OnSummaryActivate" @onmouseover="OnPointerEnter"
                      @onmouseleave="OnPointerLeave" @onfocusin="OnPointerEnter" @onfocusout="OnPointerLeave">
+                <span class="nav-ico">
+                    @if (!string.IsNullOrEmpty(Node.Icon))
+                    {
+                        <i class="bi bi-@Node.Icon"></i>
+                    }
+                </span>
                 <span class="nav-label">@Node.Text</span>
                 @if (Prefs.ShowCounts && Node.ArticleCount is > 0)
                 {
@@ -54,6 +60,10 @@ else if (Node.Route is not null)
     <li role="treeitem" @onmouseover="OnPointerEnter" @onmouseover:stopPropagation="true" @onmouseleave="OnPointerLeave"
         @onfocusin="OnPointerEnter" @onfocusout="OnPointerLeave">
         <NavLink class="nav-link" href="@Node.Route" Match="NavLinkMatch.All" tabindex="0">
+            @if (!string.IsNullOrEmpty(Node.Icon))
+            {
+                <span class="nav-ico"><i class="bi bi-@Node.Icon"></i></span>
+            }
             <span>@Node.Text</span>
         </NavLink>
     </li>

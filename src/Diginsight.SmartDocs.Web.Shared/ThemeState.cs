@@ -16,6 +16,9 @@ public sealed class ThemeState
     public const string DefaultLight = "azure";
     public const string DefaultDark = "aurora";
 
+    /// <summary>The theme a reader sees before they have expressed any preference.</summary>
+    public const string Initial = DefaultDark;
+
     /// <summary>Curated light + dark themes, in menu order. Signature palettes come first.</summary>
     public static readonly IReadOnlyList<ThemeOption> Options = new[]
     {
@@ -34,7 +37,7 @@ public sealed class ThemeState
         new ThemeOption("solarized-dark", "Solarized Dark", true, "#2aa198", "#002b36"),
     };
 
-    public string ThemeId { get; private set; } = DefaultLight;
+    public string ThemeId { get; private set; } = Initial;
 
     private string lastLight = DefaultLight;
     private string lastDark = DefaultDark;
@@ -75,5 +78,5 @@ public sealed class ThemeState
     /// </summary>
     public void Toggle() => SetTheme(Dark ? lastLight : lastDark);
 
-    public void Reset() => SetTheme(DefaultLight);
+    public void Reset() => SetTheme(Initial);
 }

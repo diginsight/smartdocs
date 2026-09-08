@@ -1,4 +1,6 @@
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Routing;
+using Microsoft.AspNetCore.Components.Web;
 using Microsoft.JSInterop;
 using Diginsight.SmartDocs.Web.Shared.Navigation;
 using Diginsight.SmartDocs.Web.Shared;
@@ -9,7 +11,6 @@ namespace Diginsight.SmartDocs.Web.Client.Layout;
 
 public partial class MainLayout
 {
-    private bool _searchOpen;
     private bool _notifyOpen;
     private bool _prefsOpen;
     private DotNetObjectReference<MainLayout>? _selfRef;
@@ -17,6 +18,41 @@ public partial class MainLayout
     private string BrandIconClass => string.IsNullOrWhiteSpace(Site.Branding.IconClass)
         ? "bi-lightbulb-fill"
         : Site.Branding.IconClass;
+
+    private bool IsExploring =>
+        NavMgr.ToBaseRelativePath(NavMgr.Uri).TrimEnd('/').StartsWith("explore", StringComparison.OrdinalIgnoreCase);
+
+    private string SearchPlaceholder => Stats.HasData && Stats.TotalCoverage == Coverage.Complete
+        ? $"Search {Stats.TotalArticles:N0} articles…"
+        : "Search the library…";
+
+    // Searching is only meaningful on the surface that renders results, so typing anywhere else
+    // takes the reader there rather than silently filtering a page they cannot see.
+    private void OnSearchInput(ChangeEventArgs e)
+    {
+        Query.SetQuery(e.Value?.ToString());
+        if (Query.HasQuery && !IsExploring)
+        {
+            NavMgr.NavigateTo("explore");
+        }
+    }
+
+    private void OnSearchKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Escape")
+        {
+            Query.Clear();
+        }
+    }
+
+    private void GoToLibrary(LibraryView view)
+    {
+        Query.SetView(view);
+        if (!IsExploring)
+        {
+            NavMgr.NavigateTo("explore");
+        }
+    }
 
     private string SectionLine
     {
@@ -80,6 +116,8 @@ public partial class MainLayout
         Article.Changed += OnArticleChanged;
         Prefs.Changed += OnPrefsChanged;
         Prefs.PersistRequested += OnPrefsPersistRequested;
+        Query.Changed += OnQueryChanged;
+        NavMgr.LocationChanged += OnLocationChanged;
 
         if (!Site.IsConfigured)
         {
@@ -92,6 +130,20 @@ public partial class MainLayout
     }
 
     private void OnSiteChanged() => InvokeAsync(StateHasChanged);
+
+    private void OnQueryChanged() => InvokeAsync(StateHasChanged);
+
+    // Leaving the library drops the query, so returning later starts from the whole collection
+    // rather than from a filter the reader has long since forgotten setting.
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
+    {
+        if (!IsExploring)
+        {
+            Query.Clear();
+        }
+
+        InvokeAsync(StateHasChanged);
+    }
 
     private void OnPrefsChanged() => InvokeAsync(StateHasChanged);
 
@@ -170,6 +222,8 @@ public partial class MainLayout
         Article.Changed -= OnArticleChanged;
         Prefs.Changed -= OnPrefsChanged;
         Prefs.PersistRequested -= OnPrefsPersistRequested;
+        Query.Changed -= OnQueryChanged;
+        NavMgr.LocationChanged -= OnLocationChanged;
         _selfRef?.Dispose();
     }
 }

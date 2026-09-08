@@ -9,6 +9,8 @@
 @inject ArticleState Article
 @inject SiteShellState Site
 @inject PreferencesState Prefs
+@inject LibraryQueryState Query
+@inject NavigationManager NavMgr
 @inject HttpClient Http
 
 <div class="page theme-@Theme.ThemeId" data-density="@Prefs.Density" data-font="@Prefs.Font">
@@ -16,13 +18,22 @@
 
     <header class="topbar">
         <a class="brand" href=""><i class="bi @BrandIconClass"></i> <span>@Site.Title</span></a>
-        <TopMenu Placement="TopMenu.Group.Left" />
-        <TopMenu Placement="TopMenu.Group.Right" />
-        <AboutMenu />
-        <a class="icon-btn" title="Explore the library" href="explore"><i class="bi bi-compass"></i></a>
-        <button class="icon-btn" title="Search" @onclick="() => _searchOpen = true">
+
+        <div class="topsearch">
             <i class="bi bi-search"></i>
-        </button>
+            <input type="search" placeholder="@SearchPlaceholder" aria-label="Search the library"
+                   value="@Query.Query" @oninput="OnSearchInput" @onkeydown="OnSearchKeyDown" />
+            <kbd>/</kbd>
+        </div>
+
+        <div class="viewseg">
+            <button class="@(IsExploring && Query.View == LibraryView.Cards ? "is-on" : null)"
+                    @onclick="() => GoToLibrary(LibraryView.Cards)">Explore</button>
+            <button class="@(IsExploring && Query.View == LibraryView.Timeline ? "is-on" : null)"
+                    @onclick="() => GoToLibrary(LibraryView.Timeline)">Timeline</button>
+        </div>
+
+        <AboutMenu />
         <button class="icon-btn" title="Notifications" @onclick="() => _notifyOpen = !_notifyOpen">
             <i class="bi bi-bell"></i>
         </button>
@@ -34,7 +45,6 @@
         </button>
     </header>
 
-    <SearchOverlay Open="_searchOpen" OnClose="() => _searchOpen = false" />
     <NotificationPanel Open="_notifyOpen" OnClose="() => _notifyOpen = false" />
     <PreferencesDrawer Open="_prefsOpen" OnClose="() => _prefsOpen = false" />
 

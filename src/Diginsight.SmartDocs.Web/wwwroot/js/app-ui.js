@@ -364,3 +364,26 @@ window.appUi = {
         return true;
     };
 })();
+
+/* ---------------------------------------------------------------------------
+   "/" focuses the library search box, matching the hint rendered beside it.
+   Ignored while the caret is already in a field, so typing a slash into prose
+   or into the search box itself behaves normally.
+   --------------------------------------------------------------------------- */
+(function () {
+    document.addEventListener('keydown', function (e) {
+        if (e.key !== '/' || e.metaKey || e.ctrlKey || e.altKey) { return; }
+
+        var t = e.target;
+        if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) {
+            return;
+        }
+
+        var box = document.querySelector('.topsearch input');
+        if (box) {
+            e.preventDefault();
+            box.focus();
+            box.select();
+        }
+    });
+})();

@@ -2456,3 +2456,182 @@ body {
 .palette-card.is-on {
     border-color: var(--brand);
 }
+
+/* ===========================================================================
+   Compact library topbar
+   The dropdown menus duplicated the sidebar tree while dominating the top of
+   every page, so the bar now carries only what the tree cannot give: a search
+   across the whole library and the switch between its two views.
+   =========================================================================== */
+.topbar {
+    min-height: 54px;
+    padding: 0.45rem 0.75rem;
+    gap: 0.6rem;
+}
+
+.brand {
+    font-size: 1.02rem;
+    gap: 0.5rem;
+    margin-right: 0.35rem;
+}
+
+.brand .bi {
+    font-size: 1.15rem;
+}
+
+/* ---- inline search ---- */
+.topsearch {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex: 1 1 auto;
+    /* Wide enough to feel like the primary action, but yielding before the controls
+       to its right are pushed off the bar. */
+    max-width: 620px;
+    min-width: 0;
+    padding: 0 0.7rem;
+    height: 34px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.14);
+    color: #fff;
+    transition: background 0.15s ease, box-shadow 0.15s ease;
+}
+
+.topsearch:focus-within {
+    background: rgba(255, 255, 255, 0.22);
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.35);
+}
+
+.topsearch .bi {
+    font-size: 0.9rem;
+    opacity: 0.8;
+    flex: 0 0 auto;
+}
+
+.topsearch input {
+    flex: 1 1 auto;
+    min-width: 0;
+    border: 0;
+    outline: none;
+    background: transparent;
+    color: #fff;
+    font: inherit;
+    font-size: 0.9rem;
+}
+
+.topsearch input::placeholder {
+    color: rgba(255, 255, 255, 0.7);
+}
+
+/* The native clear affordance sits awkwardly on a translucent pill and Escape
+   already clears the field. */
+.topsearch input::-webkit-search-cancel-button {
+    display: none;
+}
+
+.topsearch kbd {
+    flex: 0 0 auto;
+    font: inherit;
+    font-size: 0.72rem;
+    line-height: 1;
+    padding: 0.2rem 0.4rem;
+    border-radius: 5px;
+    background: rgba(255, 255, 255, 0.18);
+    color: rgba(255, 255, 255, 0.85);
+}
+
+.topsearch:focus-within kbd {
+    visibility: hidden;
+}
+
+/* ---- Explore / Timeline switch ---- */
+.viewseg {
+    display: flex;
+    flex: 0 0 auto;
+    gap: 0.2rem;
+    padding: 0.15rem;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.12);
+}
+
+.viewseg button {
+    border: 0;
+    background: transparent;
+    color: rgba(255, 255, 255, 0.85);
+    font: inherit;
+    font-size: 0.85rem;
+    font-weight: 600;
+    padding: 0.28rem 0.85rem;
+    border-radius: 999px;
+    cursor: pointer;
+}
+
+.viewseg button:hover {
+    color: #fff;
+    background: rgba(255, 255, 255, 0.12);
+}
+
+.viewseg button.is-on {
+    background: #fff;
+    color: var(--topbar);
+}
+
+/* On a light topbar the "on" pill would be white on white, so it takes the
+   brand colour instead. */
+.page.theme-azure .viewseg button.is-on {
+    background: rgba(255, 255, 255, 0.95);
+    color: var(--brand);
+}
+
+/* ---- search results heading ---- */
+.results-for {
+    margin: 0 0 0.9rem;
+    font-size: 1.05rem;
+    display: flex;
+    align-items: baseline;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+}
+
+.results-for strong {
+    color: var(--brand);
+}
+
+.explore mark {
+    background: var(--mark-bg);
+    color: var(--mark-fg);
+    border-radius: 3px;
+    padding: 0 0.1em;
+}
+
+/* Icons on the filter chips and card labels: the pictogram is what makes a
+   section recognisable before the label has been read. */
+.chip .bi,
+.card-sec .bi {
+    font-size: 0.85em;
+    opacity: 0.9;
+    margin-right: 0.15em;
+}
+
+/* Below this width the search pill and the view switch cannot both keep their
+   full size, so the switch sheds its labels' padding first and the brand text
+   goes last. */
+@media (max-width: 900px) {
+    .topsearch {
+        max-width: none;
+    }
+
+    .viewseg button {
+        padding: 0.28rem 0.6rem;
+    }
+}
+
+@media (max-width: 700px) {
+    .brand span {
+        display: none;
+    }
+
+    .topsearch kbd {
+        display: none;
+    }
+}

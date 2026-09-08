@@ -3,6 +3,7 @@
 @inject INavProvider Provider
 @inject PreferencesState Prefs
 @inject NavStats Stats
+@inject LibraryQueryState Query
 @implements IDisposable
 
 <PageTitle>Explore</PageTitle>
@@ -48,7 +49,7 @@
             @foreach ((string name, int count) in _sections)
             {
                 <button class="chip @(_section == name ? "is-on" : null)" @onclick="() => SetSection(name)">
-                    @name <b>@count</b>
+                    <i class="bi bi-@NavRules.IconFor(name, name)"></i> @name <b>@count</b>
                 </button>
             }
 
@@ -88,13 +89,16 @@
 
             <span class="spacer"></span>
 
-            <div class="seg">
-                <button class="@(_view == "cards" ? "is-on" : null)" @onclick='() => Set(() => _view = "cards")'>Cards</button>
-                <button class="@(_view == "timeline" ? "is-on" : null)" @onclick='() => Set(() => _view = "timeline")'>Timeline</button>
-            </div>
-
             <span class="filter-count">@Results.Count.ToString("N0") shown</span>
         </div>
+
+        @if (Query.HasQuery)
+        {
+            <p class="results-for">
+                Results for <strong>“@Query.Query”</strong>
+                <span class="filter-count">@Results.Count.ToString("N0") of @_all.Count.ToString("N0")</span>
+            </p>
+        }
 
         @if (Results.Count == 0)
         {
@@ -103,7 +107,7 @@
                 <button class="link-btn" @onclick="ResetFilters">Reset them</button>
             </p>
         }
-        else if (_view == "timeline")
+        else if (Query.View == LibraryView.Timeline)
         {
             <div class="timeline">
                 @foreach (IGrouping<string, NavLeaf> month in Results.Take(_take).GroupBy(MonthKey))
@@ -113,7 +117,7 @@
                     {
                         <a class="tl-item" href="@a.Route">
                             <span class="tl-date">@(a.Date?.ToString("dd MMM", CultureInfo.InvariantCulture) ?? "—")</span>
-                            <span class="tl-title">@a.Text</span>
+                            <span class="tl-title">@Highlight(a.Text)</span>
                             <span class="tl-sec">@SectionOf(a)</span>
                         </a>
                     }
@@ -126,8 +130,10 @@
                 @foreach (NavLeaf a in Results.Take(_take))
                 {
                     <a class="card" href="@a.Route">
-                        <span class="card-sec">@SectionOf(a)</span>
-                        <h3>@a.Text</h3>
+                        <span class="card-sec">
+                            <i class="bi bi-@NavRules.IconFor(SectionOf(a), SectionOf(a))"></i> @SectionOf(a)
+                        </span>
+                        <h3>@Highlight(a.Text)</h3>
                         <span class="card-path">@a.Path</span>
                         <span class="card-meta">
                             <span>@(a.Date?.ToString("dd MMM yyyy", CultureInfo.InvariantCulture) ?? "Undated")</span>
@@ -170,7 +176,6 @@
     private string _recency = "any";
     private string _author = string.Empty;
     private string _sort = "recent";
-    private string _view = "cards";
     private bool _favOnly;
     private int _take = PageSize;
 
@@ -181,6 +186,12 @@
         get
         {
             IEnumerable<NavLeaf> q = _all;
+
+            string[] tokens = NavOrdering.Tokenize(Query.Query);
+            if (tokens.Length > 0)
+            {
+                q = q.Where(a => NavOrdering.Matches(a, tokens));
+            }
 
             if (_section is not null)
             {
@@ -198,7 +209,7 @@
             }
 
             // "Dated only" and a recency window both require a date; the window additionally bounds it.
-            if (Prefs.DatedOnly || _view == "timeline")
+            if (Prefs.DatedOnly || Query.View == LibraryView.Timeline)
             {
                 q = q.Where(a => a.Date is not null);
             }
@@ -224,6 +235,7 @@
     protected override async Task OnInitializedAsync()
     {
         Prefs.Changed += OnPrefsChanged;
+        Query.Changed += OnQueryChanged;
 
         _all = await Provider.GetIndexAsync();
 
@@ -285,5 +297,48 @@
 
     private void OnPrefsChanged() => InvokeAsync(StateHasChanged);
 
-    public void Dispose() => Prefs.Changed -= OnPrefsChanged;
+    // A new query or view means the current page window no longer describes what is on screen.
+    private void OnQueryChanged()
+    {
+        _take = PageSize;
+        InvokeAsync(StateHasChanged);
+    }
+
+    // Wraps every matched token so readers can see why an article came back. Built as a render
+    // fragment rather than raw HTML so the article title is never interpreted as markup.
+    private RenderFragment Highlight(string text) => builder =>
+    {
+        string[] tokens = NavOrdering.Tokenize(Query.Query);
+        if (tokens.Length == 0)
+        {
+            builder.AddContent(0, text);
+            return;
+        }
+
+        int at = 0;
+        int seq = 0;
+        foreach ((int start, int length) in NavOrdering.HighlightRanges(text, tokens))
+        {
+            if (start > at)
+            {
+                builder.AddContent(seq++, text[at..start]);
+            }
+
+            builder.OpenElement(seq++, "mark");
+            builder.AddContent(seq++, text.Substring(start, length));
+            builder.CloseElement();
+            at = start + length;
+        }
+
+        if (at < text.Length)
+        {
+            builder.AddContent(seq, text[at..]);
+        }
+    };
+
+    public void Dispose()
+    {
+        Prefs.Changed -= OnPrefsChanged;
+        Query.Changed -= OnQueryChanged;
+    }
 }
