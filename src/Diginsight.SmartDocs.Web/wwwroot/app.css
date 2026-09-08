@@ -14,7 +14,7 @@
     --code-bg: #eff1f3;
     --mark-bg: #fef9c3;
     --mark-fg: #1f2328;
-    --sidebar-width: 280px;
+    --sidebar-width: 300px;
 }
 
 * {
@@ -2737,4 +2737,168 @@ body {
     /* Square top corners: while parked, rounded ones would let the scrolling grid show through. */
     border-top-left-radius: 0;
     border-top-right-radius: 0;
+}
+
+/* ============================================================
+   Sidebar hierarchy — telling four levels apart
+   ------------------------------------------------------------
+   A conference sits four levels down: section > date > track > session. Every one of those levels
+   was drawn the same way (0.85rem, weight 400, line-height 1.2), so the only cue to depth was
+   0.65rem of indent and a hairline per level - nested rules that read as noise rather than as
+   structure. Worse, rows sat closer together than the lines inside a wrapped title: 5.1px between
+   two entries against 2.7px of leading, so a three-line session title merged into its neighbour.
+
+   So: give each level its own voice, run one continuous rail per open section instead of one per
+   level, put more space between rows than inside them, cap a title at two lines, and keep the
+   section you are inside pinned to the top while its contents scroll.
+   ============================================================ */
+
+/* Sticky offsets, each the sum of what pins above it. All three are measured, not guessed: the
+   toolbar is 38px, a top-level header 40px, a nested one 27px. Headers are kept to a single line
+   precisely so these stay true - a wrapped header overlaps the level below it. */
+.dynnav {
+    --nav-stick-1: 38px;
+    --nav-stick-2: 78px;
+    --nav-stick-3: 105px;
+}
+
+/* ---- one rail, not one per level ---- */
+.nav-list .nav-list {
+    margin-left: 0;
+    border-left: none;
+    padding-left: 0.7rem;
+}
+
+.nav-top > li > details > .nav-list {
+    margin-left: 0.8rem;
+    padding-left: 0.55rem;
+    /* var(--border) is tuned for panel edges and all but vanishes as a hairline inside the tree. */
+    border-left: 1px solid color-mix(in srgb, var(--muted) 30%, transparent);
+}
+
+/* ---- each level gets its own voice ---- */
+.nav-top > li > details > summary .nav-label {
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-size: 0.71rem;
+    font-weight: 700;
+}
+
+.nav-list .nav-list > li > details > summary .nav-label {
+    font-weight: 600;
+}
+
+.nav-list .nav-list .nav-list > li > details > summary .nav-label {
+    font-weight: 500;
+    font-size: 0.82rem;
+}
+
+/* Counts matter most where a reader is choosing a section; deep inside one they are just noise. */
+.nav-list .nav-list .nav-list .nav-count {
+    opacity: 0.55;
+}
+
+/* ---- rows: more space between them than inside them ---- */
+.nav-link:not(.is-dated) {
+    align-items: flex-start;
+    padding: 0.3rem 0.5rem;
+    line-height: 1.34;
+}
+
+.nav-link:not(.is-dated) .nav-ico {
+    margin-top: 0.08rem;
+}
+
+.nav-list li + li > .nav-link:not(.is-dated) {
+    margin-top: 0.24rem;
+}
+
+/* Two lines is enough to recognise a session; the rest is available on hover and on the page. */
+.nav-link .nav-title,
+.nav-section > details > summary .nav-title {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.page[data-density="compact"] .nav-link:not(.is-dated) {
+    padding: 0.22rem 0.5rem;
+}
+
+.page[data-density="compact"] .nav-list li + li > .nav-link:not(.is-dated) {
+    margin-top: 0.06rem;
+}
+
+/* A dense tree still has to keep entries further apart than the lines inside one, so the title
+   tightens along with the spacing instead of only the spacing shrinking. */
+.page[data-density="compact"] .nav-link:not(.is-dated) .nav-title {
+    line-height: 1.24;
+}
+
+/* A pinned header has to be exactly as tall as the slot reserved for it, so section labels stay on
+   one line and a dated folder carries its date inline instead of stacked above the name. Two-line
+   headers were overlapping the level below them. */
+.nav-section > details > summary .nav-label {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.nav-section > details > summary .nav-label.is-dated {
+    flex-direction: row;
+    align-items: baseline;
+    gap: 0.4rem;
+}
+
+.nav-section > details > summary .nav-label.is-dated .nav-title {
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.nav-section > details > summary:has(.nav-label.is-dated) {
+    padding-top: 0.22rem;
+    padding-bottom: 0.22rem;
+}
+
+.nav-top > li > details > summary:has(.nav-label.is-dated) {
+    padding-top: 0.62rem;
+    padding-bottom: 0.62rem;
+}
+
+/* ---- keep the branch you are inside in view ---- */
+.nav-top > li > details > summary,
+.nav-top > li > details > .nav-list > li > details > summary,
+.nav-top > li > details > .nav-list > li > details > .nav-list > li > details > summary {
+    position: sticky;
+    z-index: 2;
+    background: var(--bg);
+}
+
+.nav-top > li > details > summary {
+    top: var(--nav-stick-1);
+}
+
+.nav-top > li > details > .nav-list > li > details > summary {
+    top: var(--nav-stick-2);
+    z-index: 1;
+}
+
+/* The track a session belongs to is the one thing a reader loses when scrolling 38 of them. */
+.nav-top > li > details > .nav-list > li > details > .nav-list > li > details > summary {
+    top: var(--nav-stick-3);
+    z-index: 0;
+}
+
+/* ---- loose pages at the root read as pages, not as headlines ---- */
+.nav-top > li > .nav-link.is-dated {
+    flex-direction: row;
+    align-items: baseline;
+    gap: 0.45rem;
+    padding: 0.42rem 0.5rem;
+}
+
+.nav-top > li > .nav-link.is-dated .nav-date {
+    color: var(--muted);
+    font-weight: 500;
 }
