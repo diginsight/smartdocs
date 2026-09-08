@@ -10,7 +10,7 @@
 {
     <button class="drawer-scrim" aria-label="Close preferences" @onclick="Close"></button>
 
-    <aside class="drawer" role="dialog" aria-label="Reading preferences" @onkeydown="OnKeyDown" tabindex="-1">
+    <aside class="drawer" role="dialog" aria-label="Reading preferences" @onkeydown="OnKeyDown" tabindex="-1" @ref="_panel">
         <div class="drawer-head">
             <i class="bi bi-sliders"></i>
             <h2>Preferences</h2>
@@ -140,6 +140,8 @@
     [Parameter] public EventCallback OnClose { get; set; }
 
     private IReadOnlyList<NavChild>? _sections;
+    private ElementReference _panel;
+    private bool _wasOpen;
 
     private string ClassicValue => ThemeState.Options.Any(o => o.Id == Theme.ThemeId && !o.Signature) ? Theme.ThemeId : string.Empty;
 
@@ -163,6 +165,21 @@
     }
 
     private void OnStateChanged() => InvokeAsync(StateHasChanged);
+
+    // Move focus into the panel as it opens. Without this the Escape handler below never fires,
+    // because focus stays on the topbar button that opened the drawer.
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (Open && !_wasOpen)
+        {
+            _wasOpen = true;
+            await _panel.FocusAsync();
+        }
+        else if (!Open)
+        {
+            _wasOpen = false;
+        }
+    }
 
     private void OnSortChanged(ChangeEventArgs e)
     {

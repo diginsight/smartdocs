@@ -1357,6 +1357,30 @@ body {
     --fs-nav: 0.855rem;
 }
 
+/* Signature — Azure (the classic SmartDocs blue, restated in the new visual language).
+   Unlike the other signature palettes the topbar is the brand colour at full saturation
+   rather than a darkened variant: the solid blue band is the point of this theme. */
+.page.theme-azure {
+    --bg: #f7f9fc;
+    --fg: #141a22;
+    --muted: #5b6675;
+    --border: #dbe2ec;
+    --sidebar: #eef2f8;
+    --hover: rgba(31, 111, 235, 0.075);
+    --brand: #1f6feb;
+    --accent-2: #38bdf8;
+    --on-brand: #ffffff;
+    --topbar: #1f6feb;
+    --selected: #1f6feb;
+    --panel: rgba(255, 255, 255, 0.9);
+    --pre-bg: #eef2f8;
+    --code-bg: #e3eaf4;
+    --mark-bg: #fde68a;
+    --mark-fg: #2b2410;
+    --glow: 0.14;
+    --elev: 0 16px 40px -24px rgba(23, 55, 110, 0.38);
+}
+
 /* Signature — Aurora (violet/cyan on deep indigo) */
 .page.theme-aurora {
     --bg: #0b0f1c;
@@ -2236,7 +2260,8 @@ body {
    landing target, not an interactive control, so the browser's default focus ring on it reads as a
    rendering fault rather than as guidance. */
 .content h1[tabindex="-1"]:focus,
-.hero h1[tabindex="-1"]:focus {
+.hero h1[tabindex="-1"]:focus,
+.drawer[tabindex="-1"]:focus {
     outline: none;
 }
 

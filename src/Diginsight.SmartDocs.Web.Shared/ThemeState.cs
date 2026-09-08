@@ -8,17 +8,18 @@ public sealed record ThemeOption(string Id, string Name, bool Dark, string Accen
 /// <summary>
 /// Shared, per-circuit theme state. The layout applies the selected theme as a CSS class
 /// (<c>theme-{id}</c>); the standalone toggle button and the About menu's theme picker all
-/// drive it through this single source of truth. The default light/dark pair is Cosmo and
-/// GitHub Dark.
+/// drive it through this single source of truth. The default light/dark pair is Azure and
+/// Aurora.
 /// </summary>
 public sealed class ThemeState
 {
-    public const string DefaultLight = "editorial";
+    public const string DefaultLight = "azure";
     public const string DefaultDark = "aurora";
 
     /// <summary>Curated light + dark themes, in menu order. Signature palettes come first.</summary>
     public static readonly IReadOnlyList<ThemeOption> Options = new[]
     {
+        new ThemeOption("azure", "Azure", false, "#1f6feb", "#f7f9fc", Signature: true),
         new ThemeOption("aurora", "Aurora", true, "#7c5cff", "#0b0f1c", Signature: true),
         new ThemeOption("editorial", "Editorial", false, "#b4530a", "#fbf9f5", Signature: true),
         new ThemeOption("forest", "Forest", true, "#4ade80", "#0d1512", Signature: true),
