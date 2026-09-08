@@ -17,8 +17,13 @@ public partial class DynNav
     private bool _scrollPending;
     private ElementReference _filterBox;
     private bool _focusFilterPending;
+    private CancellationTokenSource? _searchDebounce;
 
     private string _query = string.Empty;
+
+    // What the reader has typed and what the list is actually showing are not the same thing while
+    // a burst of typing is still in flight; the input follows _query, the results follow _applied.
+    private string _applied = string.Empty;
     private IReadOnlyList<NavLeaf>? _index;
     private bool _indexing;
 
@@ -166,6 +171,10 @@ public partial class DynNav
         Sidebar.SetCollapsed(false);
     }
 
+    // Every keystroke refilters the whole library and repaints the list — a single letter matches
+    // enough to fill it — so a burst of typing repaints once at the end rather than once per letter.
+    private const int SearchDebounceMs = 120;
+
     private async Task OnSearchInput(ChangeEventArgs e)
     {
         _query = e.Value?.ToString() ?? string.Empty;
@@ -177,10 +186,34 @@ public partial class DynNav
             _indexing = false;
         }
 
-        StateHasChanged();
+        CancellationTokenSource cts = new ();
+        CancellationTokenSource? previous = Interlocked.Exchange(ref _searchDebounce, cts);
+        if (previous is not null)
+        {
+            await previous.CancelAsync();
+            previous.Dispose();
+        }
+
+        // Clearing the box must not wait: the tree should come back the moment the text goes.
+        if (_query.Length == 0)
+        {
+            _applied = string.Empty;
+            return;
+        }
+
+        try
+        {
+            await Task.Delay(SearchDebounceMs, cts.Token);
+            _applied = _query;
+            await InvokeAsync(StateHasChanged);
+        }
+        catch (OperationCanceledException)
+        {
+            // A later keystroke owns the repaint.
+        }
     }
 
-    private void ClearSearch() => _query = string.Empty;
+    private void ClearSearch() => _query = _applied = string.Empty;
 
     private void OnPrefsChanged() => InvokeAsync(StateHasChanged);
 
@@ -197,7 +230,7 @@ public partial class DynNav
     {
         if (e.Key == "Escape" && !string.IsNullOrEmpty(_query))
         {
-            _query = string.Empty;
+            _query = _applied = string.Empty;
             _scrollPending = true;
         }
     }
@@ -279,7 +312,7 @@ public partial class DynNav
             try { await _filterBox.FocusAsync(); } catch { /* prerender */ }
         }
 
-        if (_scrollPending && _root is { Count: > 0 } && string.IsNullOrEmpty(_query) && !Sidebar.Collapsed)
+        if (_scrollPending && _root is { Count: > 0 } && string.IsNullOrEmpty(_applied) && !Sidebar.Collapsed)
         {
             _scrollPending = false;
             try { await JS.InvokeVoidAsync("appUi.scrollActiveNavIntoView"); } catch { /* prerender */ }
@@ -288,6 +321,8 @@ public partial class DynNav
 
     public void Dispose()
     {
+        _searchDebounce?.Cancel();
+        _searchDebounce?.Dispose();
         NavMgr.LocationChanged -= OnLocationChanged;
         Prefs.Changed -= OnPrefsChanged;
         if (_hub is not null)
