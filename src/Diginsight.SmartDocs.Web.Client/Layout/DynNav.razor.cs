@@ -154,7 +154,7 @@ public partial class DynNav
         _current.StartsWith(n.Prefix, StringComparison.OrdinalIgnoreCase);
 
     // Rail icon: navigate to the section's landing route if it has one; the sidebar stays collapsed
-    // (hovering the rail opens the temporary flyout for full browsing).
+    // (the rail's "Open menu" button is what brings the tree back).
     private void OnRailClick(NavChild n)
     {
         if (!string.IsNullOrEmpty(n.Route))

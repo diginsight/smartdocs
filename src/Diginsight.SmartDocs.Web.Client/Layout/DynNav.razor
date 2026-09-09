@@ -14,8 +14,8 @@
 @if (Sidebar.Collapsed)
 {
     <div class="sidebar-rail">
-        @* Reopening used to be possible only from the pin button inside the flyout, which is
-           invisible until the pointer finds the rail by accident. These two are always visible. *@
+        @* Reopening the menu has to be possible from the rail itself: the panel is put away
+           entirely when collapsed, so these two are the only way back. *@
         <div class="rail-actions">
             <button class="rail-btn rail-toggle" title="Open menu" @onclick="() => Sidebar.SetCollapsed(false)">
                 <i class="bi bi-chevron-double-right"></i>
@@ -55,18 +55,9 @@
                     @onclick="() => Sidebar.ToggleExpandAll()">
                 <i class="bi @(Sidebar.AllExpanded ? "bi-arrows-collapse" : "bi-arrows-expand")"></i>
             </button>
-            @if (Sidebar.Collapsed)
-            {
-                <button class="sidebar-tool" title="Pin menu (keep open)" @onclick="() => Sidebar.SetCollapsed(false)">
-                    <i class="bi bi-pin-angle"></i>
-                </button>
-            }
-            else
-            {
-                <button class="sidebar-tool" title="Collapse menu" @onclick="() => Sidebar.SetCollapsed(true)">
-                    <i class="bi bi-chevron-double-left"></i>
-                </button>
-            }
+            <button class="sidebar-tool" title="Collapse menu" @onclick="() => Sidebar.SetCollapsed(true)">
+                <i class="bi bi-chevron-double-left"></i>
+            </button>
         </div>
     </div>
 

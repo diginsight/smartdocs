@@ -177,7 +177,7 @@ public partial class MainLayout
     private void OnStatsChanged() => InvokeAsync(StateHasChanged);
 
     // Called from JS when the viewport crosses the responsive breakpoint: narrow → collapse the
-    // sidebar to the icon rail (still usable via the hover flyout); wide → expand it.
+    // sidebar to the icon rail (reopened from the rail's own button); wide → expand it.
     [JSInvokable]
     public Task SetSidebarCollapsed(bool collapsed)
     {

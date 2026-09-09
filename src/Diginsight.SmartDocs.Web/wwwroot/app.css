@@ -914,26 +914,11 @@ body {
     margin-bottom: 0.25rem;
 }
 
-/* collapsed rail: hovering opens the full menu as a temporary flyout (Edge vertical-tabs style);
-   the pin button inside then makes it permanently visible. */
+/* collapsed rail: the tree is put away, and stays away. Hovering used to fly the whole menu out
+   over the article, which fired whenever the pointer merely crossed the strip; the menu now
+   reopens only on a deliberate click of the rail's "Open menu" or "Search the menu" button. */
 .dynnav.is-collapsed .sidebar-panel {
     display: none;
-    position: fixed;
-    top: var(--topbar-h, 54px);
-    left: 0;
-    bottom: 0;
-    width: var(--sidebar-width);
-    max-width: 320px;
-    padding: 0.5rem 0.35rem;
-    overflow-y: auto;
-    background: var(--bg);
-    border-right: 1px solid var(--border);
-    box-shadow: 6px 0 18px rgba(0, 0, 0, 0.22);
-    z-index: 40;
-}
-
-.dynnav.is-collapsed:hover .sidebar-panel {
-    display: block;
 }
 
 /* flat search results show the article + its section path */
@@ -2914,12 +2899,10 @@ body {
    Closing the navigation — a movement, not a jump
    ------------------------------------------------------------
    Collapsing swapped the sidebar between 300px and a 3rem rail with nothing in between, so the
-   reading column jumped a quarter of the window sideways. The flyout that stands in for the tree
-   was driven by display:none -> display:block on :hover, and display cannot be animated: it
-   snapped, and with no intent delay it blinked whenever a pointer merely crossed the rail on its
-   way somewhere else. The button that reopens the menu sits inside that hidden panel, so a closed
-   sidebar offered no visible way back — the orphaned .rail-toggle rule above is what remains of
-   the button that used to provide one.
+   reading column jumped a quarter of the window sideways; the width is eased instead.
+
+   The rail itself carries an always-visible "Open menu" button, so putting the tree away no
+   longer hides the way back and the menu does not need to reappear on its own.
    ============================================================ */
 
 .sidebar {
@@ -2928,34 +2911,6 @@ body {
 
 /* Dragging writes a new width on every pointer move; easing that would make the handle elastic. */
 html.is-resizing .sidebar {
-    transition: none;
-}
-
-.dynnav.is-collapsed .sidebar-panel {
-    display: block;
-    visibility: hidden;
-    opacity: 0;
-    transform: translateX(-10px);
-    box-shadow: 14px 0 36px -26px rgba(0, 0, 0, 0.55);
-    /* Leaving starts later than arriving: clipping the corner of the panel on the way to the
-       article should not shut it, and a pointer merely passing the rail should not open it. */
-    transition: opacity 0.18s ease 0.35s, transform 0.18s ease 0.35s, visibility 0s linear 0.53s;
-}
-
-.dynnav.is-collapsed:hover .sidebar-panel,
-.dynnav.is-collapsed:focus-within .sidebar-panel {
-    visibility: visible;
-    opacity: 1;
-    transform: none;
-    transition: opacity 0.18s ease 0.2s, transform 0.18s ease 0.2s, visibility 0s linear 0.2s;
-}
-
-/* Set while the pointer is still sitting where the panel would appear, right after the menu was
-   collapsed; see the guard in app-ui.js. Keyboard focus deliberately still opens the flyout. */
-html.nav-no-flyout .dynnav.is-collapsed:hover .sidebar-panel {
-    visibility: hidden;
-    opacity: 0;
-    transform: translateX(-10px);
     transition: none;
 }
 
@@ -2995,10 +2950,7 @@ html.nav-no-flyout .dynnav.is-collapsed:hover .sidebar-panel {
 
 @media (prefers-reduced-motion: reduce) {
 
-    .sidebar,
-    .dynnav.is-collapsed .sidebar-panel,
-    .dynnav.is-collapsed:hover .sidebar-panel,
-    .dynnav.is-collapsed:focus-within .sidebar-panel {
+    .sidebar {
         transition: none;
     }
 }
