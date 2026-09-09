@@ -17,7 +17,7 @@ public sealed class ThemeState
     public const string DefaultDark = "aurora";
 
     /// <summary>The theme a reader sees before they have expressed any preference.</summary>
-    public const string Initial = DefaultDark;
+    public const string Initial = DefaultLight;
 
     /// <summary>Curated light + dark themes, in menu order. Signature palettes come first.</summary>
     public static readonly IReadOnlyList<ThemeOption> Options = new[]
