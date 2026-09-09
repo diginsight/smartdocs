@@ -110,7 +110,7 @@
                                     <i class="bi bi-pin-angle-fill"></i>
                                 </button>
                                 <button class="mini-btn @(Prefs.IsHidden(s.Text) ? "is-on" : null)"
-                                        title="@(Prefs.IsHidden(s.Text) ? "Show" : "Hide from menu")"
+                                        title="@(Prefs.IsHidden(s.Text) ? "Show" : "Hide from the menu and from Explore")"
                                         @onclick="() => Prefs.ToggleHidden(s.Text)">
                                     <i class="bi @(Prefs.IsHidden(s.Text) ? "bi-eye-slash-fill" : "bi-eye")"></i>
                                 </button>

@@ -21,7 +21,7 @@
         </p>
         <div class="hero-stats">
             <div class="hero-stat">
-                <b>@_all.Count.ToString("N0")</b>
+                <b>@_visible.Count.ToString("N0")</b>
                 <span>Articles</span>
             </div>
             <div class="hero-stat">
@@ -47,12 +47,20 @@
     {
         <div class="filterbar">
             <button class="chip @(_section is null ? "is-on" : null)" @onclick="() => SetSection(null)">
-                All <b>@_all.Count</b>
+                All <b>@_visible.Count</b>
             </button>
             @foreach ((string name, int count) in _sections)
             {
                 <button class="chip @(_section == name ? "is-on" : null)" @onclick="() => SetSection(name)">
                     <i class="bi bi-@NavRules.IconFor(name, name)"></i> @name <b>@count</b>
+                </button>
+            }
+            @if (_hiddenSections > 0)
+            {
+                <button class="chip is-muted"
+                        title="Sections you hid in preferences are left out of Explore — click to bring them back"
+                        @onclick="() => Prefs.ClearHidden()">
+                    <i class="bi bi-eye-slash"></i> @_hiddenSections hidden
                 </button>
             }
 
@@ -99,7 +107,7 @@
         {
             <p class="results-for">
                 Results for <strong>“@Query.Query”</strong>
-                <span class="filter-count">@Results.Count.ToString("N0") of @_all.Count.ToString("N0")</span>
+                <span class="filter-count">@Results.Count.ToString("N0") of @_visible.Count.ToString("N0")</span>
             </p>
         }
 
@@ -169,9 +177,11 @@
     private const int PageSize = 48;
 
     private IReadOnlyList<NavLeaf> _all = [];
+    private List<NavLeaf> _visible = [];
     private List<(string Name, int Count)> _sections = [];
     private List<string> _authors = [];
     private int _authorCount;
+    private int _hiddenSections;
     private DateTimeOffset? _latest;
     private bool _loading = true;
 
@@ -188,7 +198,7 @@
     {
         get
         {
-            IEnumerable<NavLeaf> q = _all;
+            IEnumerable<NavLeaf> q = _visible;
 
             string[] tokens = NavOrdering.Tokenize(Query.Query);
             if (tokens.Length > 0)
@@ -241,22 +251,49 @@
         Query.Changed += OnQueryChanged;
 
         _all = await Provider.GetIndexAsync();
+        Rebuild();
+        _loading = false;
+    }
 
-        _sections = _all.GroupBy(SectionOf)
-                        .Select(g => (g.Key, g.Count()))
-                        .OrderByDescending(t => t.Item2)
-                        .ToList();
+    // A section hidden in preferences is hidden here too — it leaves the chips, the results and the
+    // counts — so Explore never offers a filter the rest of the app has been told to forget. The
+    // derived lists are rebuilt on that gesture rather than filtered again on every render.
+    private void Rebuild()
+    {
+        _visible = _all.Where(a => !Prefs.IsHidden(SectionOf(a))).ToList();
 
-        _authors = _all.Select(a => a.Author)
-                       .Where(a => !string.IsNullOrWhiteSpace(a))
-                       .Select(a => a!)
-                       .Distinct(StringComparer.OrdinalIgnoreCase)
-                       .OrderBy(a => a, StringComparer.OrdinalIgnoreCase)
-                       .ToList();
+        _sections = _visible.GroupBy(SectionOf)
+                            .Select(g => (g.Key, g.Count()))
+                            .OrderByDescending(t => t.Item2)
+                            .ToList();
+
+        _hiddenSections = _all.Select(SectionOf)
+                              .Distinct(StringComparer.OrdinalIgnoreCase)
+                              .Count(Prefs.IsHidden);
+
+        _authors = _visible.Select(a => a.Author)
+                           .Where(a => !string.IsNullOrWhiteSpace(a))
+                           .Select(a => a!)
+                           .Distinct(StringComparer.OrdinalIgnoreCase)
+                           .OrderBy(a => a, StringComparer.OrdinalIgnoreCase)
+                           .ToList();
 
         _authorCount = _authors.Count;
-        _latest = _all.Max(a => a.Date);
-        _loading = false;
+        _latest = _visible.Count == 0 ? null : _visible.Max(a => a.Date);
+
+        // A filter left pointing at something that is now hidden would empty the page with no way
+        // to tell why, so it is dropped rather than kept.
+        if (_section is not null && !_sections.Any(s => s.Name == _section))
+        {
+            _section = null;
+            _take = PageSize;
+        }
+
+        if (!string.IsNullOrEmpty(_author) && !_authors.Contains(_author, StringComparer.OrdinalIgnoreCase))
+        {
+            _author = string.Empty;
+            _take = PageSize;
+        }
     }
 
     // The breadcrumb's first segment is the top-level section; a leaf sitting at the root has none.
@@ -298,7 +335,11 @@
         _favOnly = false;
     });
 
-    private void OnPrefsChanged() => InvokeAsync(StateHasChanged);
+    private void OnPrefsChanged() => InvokeAsync(() =>
+    {
+        Rebuild();
+        StateHasChanged();
+    });
 
     // A new query or view means the current page window no longer describes what is on screen.
     private void OnQueryChanged()

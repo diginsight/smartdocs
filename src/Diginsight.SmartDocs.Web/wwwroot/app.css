@@ -1786,6 +1786,18 @@ body {
     opacity: 0.9;
 }
 
+/* Not a filter but a note: sections hidden in preferences are missing from the row above, and this
+   says so without pretending to be one more thing to switch on. */
+.chip.is-muted {
+    border-style: dashed;
+    opacity: 0.7;
+    font-weight: 500;
+}
+
+.chip.is-muted:hover {
+    opacity: 1;
+}
+
 .filter-select {
     background: var(--bg);
     color: var(--fg);
