@@ -22,14 +22,14 @@
                 </span>
                 @if (Node.Date is { } sectionOn)
                 {
-                    <span class="nav-label is-dated" title="@Node.Text">
+                    <span class="nav-label is-dated">
                         <span class="nav-date">@sectionOn.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)</span>
                         <span class="nav-title">@Node.Text</span>
                     </span>
                 }
                 else
                 {
-                    <span class="nav-label" title="@Node.Text">@Node.Text</span>
+                    <span class="nav-label">@Node.Text</span>
                 }
                 @if (Prefs.ShowCounts && Node.ArticleCount is > 0)
                 {
@@ -83,7 +83,7 @@ else if (Node.Route is not null)
                     }
                     <span class="nav-date">@on.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)</span>
                 </span>
-                <span class="nav-title" title="@Node.Text">@Node.Text</span>
+                <span class="nav-title">@Node.Text</span>
             }
             else
             {
@@ -91,9 +91,8 @@ else if (Node.Route is not null)
                 {
                     <span class="nav-ico"><i class="bi bi-@Node.Icon"></i></span>
                 }
-                <span class="nav-title" title="@Node.Text">@Node.Text</span>
+                <span class="nav-title">@Node.Text</span>
             }
         </NavLink>
     </li>
 }
-

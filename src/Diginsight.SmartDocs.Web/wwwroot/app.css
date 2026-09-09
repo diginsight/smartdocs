@@ -2819,7 +2819,8 @@ body {
     margin-top: 0.24rem;
 }
 
-/* Two lines is enough to recognise a session; the rest is available on hover and on the page. */
+/* Two lines is enough to recognise a session; the full link text remains available to assistive
+   technology and on the destination page without adding a native hover tooltip to every row. */
 .nav-link .nav-title,
 .nav-section > details > summary .nav-title {
     display: -webkit-box;
