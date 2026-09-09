@@ -1,4 +1,5 @@
 using System.Text;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using Diginsight.SmartDocs.Web.Shared.Navigation;
 using Markdig;
@@ -17,6 +18,13 @@ namespace Diginsight.SmartDocs.Web.Shared.Rendering;
 /// </summary>
 public sealed class MarkdigMarkdownRenderer : IMarkdownRenderer
 {
+    /// <summary>
+    /// Stamped onto every rendered page so a cached entry produced by an older pipeline can be
+    /// rejected. Bump this by hand whenever the Markdig pipeline or relative-URL rewriting changes;
+    /// a source content hash cannot detect a code-only change.
+    /// </summary>
+    public const string RendererVersion = "1";
+
     private static readonly MarkdownPipeline Pipeline = new MarkdownPipelineBuilder()
         .UseAdvancedExtensions()
         .UseAutoIdentifiers() // stable heading ids so the on-page TOC can link to them
@@ -43,7 +51,20 @@ public sealed class MarkdigMarkdownRenderer : IMarkdownRenderer
         renderer.Render(document);
         writer.Flush();
 
-        return new RenderedPage(writer.ToString(), ExtractTitle(markdown), toc, wordCount);
+        var frontMatter = FrontMatter.Parse(markdown);
+        (string? description, IReadOnlyList<string> categories) = FrontMatter.ParsePageFields(markdown);
+
+        var metadata = new PageMetadata(
+            ExtractTitle(markdown),
+            frontMatter.Author,
+            frontMatter.Date,
+            categories,
+            description,
+            toc,
+            wordCount,
+            new Dictionary<string, JsonElement>(StringComparer.Ordinal));
+
+        return new RenderedPage(writer.ToString(), metadata);
     }
 
     private static int? ParseWordCount(string markdown)

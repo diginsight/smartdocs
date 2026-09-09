@@ -26,6 +26,8 @@ public static class FrontMatter
     private static readonly Regex DraftRx = new(@"(?m)^\s*draft\s*:\s*(true|false)\s*$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
     private static readonly Regex AuthorRx = new(@"(?m)^\s*author\s*:\s*(.+?)\s*$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
     private static readonly Regex DateRx = new(@"(?m)^\s*date\s*:\s*(.+?)\s*$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    private static readonly Regex DescriptionRx = new(@"(?m)^\s*description\s*:\s*(.+?)\s*$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    private static readonly Regex CategoriesRx = new(@"^\s*categories\s*:\s*(.*?)\s*$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
     private static readonly Regex H1Rx = new(@"(?m)^#\s+(.+?)\s*$", RegexOptions.Compiled);
 
     /// <summary>Parses frontmatter fields from a file's leading text (header + maybe some body).</summary>
@@ -48,6 +50,83 @@ public static class FrontMatter
         string? author = Clean(AuthorRx.Match(header).Groups[1].Value);
         string? date = Clean(DateRx.Match(header).Groups[1].Value);
         return new FrontMatterInfo(title, publish, draft, author, date);
+    }
+
+    /// <summary>
+    /// Description and categories from the top frontmatter only, for the rendered page metadata
+    /// projection. The bottom validation metadata block is deliberately not consulted.
+    /// </summary>
+    public static (string? Description, IReadOnlyList<string> Categories) ParsePageFields(string? leadingText)
+    {
+        if (string.IsNullOrEmpty(leadingText))
+        {
+            return (null, Array.Empty<string>());
+        }
+
+        string header = ExtractHeader(leadingText);
+        return header.Length == 0
+            ? (null, Array.Empty<string>())
+            : (Clean(DescriptionRx.Match(header).Groups[1].Value), ParseCategories(header));
+    }
+
+    /// <summary>Reads <c>categories</c> in either inline flow form or block sequence form.</summary>
+    private static IReadOnlyList<string> ParseCategories(string header)
+    {
+        string[] lines = header.Split('\n');
+
+        for (int i = 0; i < lines.Length; i++)
+        {
+            Match m = CategoriesRx.Match(lines[i]);
+            if (!m.Success)
+            {
+                continue;
+            }
+
+            string inline = m.Groups[1].Value.Trim();
+
+            if (inline.StartsWith('[') && inline.EndsWith(']'))
+            {
+                return inline[1..^1]
+                    .Split(',')
+                    .Select(Clean)
+                    .Where(static s => !string.IsNullOrEmpty(s))
+                    .Select(static s => s!)
+                    .ToArray();
+            }
+
+            if (inline.Length > 0)
+            {
+                return Clean(inline) is { } single ? new[] { single } : Array.Empty<string>();
+            }
+
+            var items = new List<string>();
+            for (int j = i + 1; j < lines.Length; j++)
+            {
+                string line = lines[j].TrimEnd('\r');
+                string trimmed = line.TrimStart();
+
+                if (trimmed.StartsWith("- ", StringComparison.Ordinal))
+                {
+                    if (Clean(trimmed[2..]) is { } item)
+                    {
+                        items.Add(item);
+                    }
+
+                    continue;
+                }
+
+                if (trimmed.Length == 0)
+                {
+                    continue;
+                }
+
+                break;
+            }
+
+            return items;
+        }
+
+        return Array.Empty<string>();
     }
 
     /// <summary>Title from frontmatter, else the first H1 heading, else null.</summary>

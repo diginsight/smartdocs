@@ -1,8 +1,10 @@
 using Diginsight.Components.Azure.Extensions;
 using Diginsight.Diagnostics;
 using Diginsight.SmartDocs.Web.Shared;
+using Diginsight.SmartDocs.Web.Shared.Sites;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 
 namespace Diginsight.SmartDocs.Web.Endpoints;
 
@@ -23,14 +25,41 @@ public static class ContentEndpoints
         return app;
     }
 
-    private static async Task<IResult> GetContentRawAsync(string key, IContentSource source, CancellationToken ct)
+    private static async Task<IResult> GetContentRawAsync(
+        HttpContext http,
+        string key,
+        IContentSource source,
+        IOptionsMonitor<SiteOptions> siteOptions,
+        CancellationToken ct)
     {
-        using var activity = Observability.ActivitySource.StartMethodActivity(logger, () => new { key });
+        ContentCacheOptions cache = siteOptions.CurrentValue.ContentCache;
+
+        using var activity = Observability.ActivitySource.StartMethodActivity(
+            logger,
+            () => new { key, cache.ConditionalRequestsEnabled, cache.MaxAgeSeconds });
 
         ContentResult? result = await source.GetAsync(key, ct);
         activity?.SetOutput(new { found = result is not null });
-        return result is null
-            ? Results.NotFound()
-            : Results.Bytes(result.Bytes, result.ContentType ?? "text/markdown; charset=utf-8");
+        if (result is null)
+        {
+            return Results.NotFound();
+        }
+
+        http.Response.Headers.CacheControl = cache.MaxAgeSeconds > 0
+            ? $"public, max-age={cache.MaxAgeSeconds}"
+            : "no-cache";
+
+        if (cache.ConditionalRequestsEnabled && !string.IsNullOrWhiteSpace(result.ETag))
+        {
+            http.Response.Headers.ETag = result.ETag;
+            string presented = http.Request.Headers.IfNoneMatch.ToString();
+            if (string.Equals(presented, result.ETag, StringComparison.Ordinal) ||
+                string.Equals(presented, "*", StringComparison.Ordinal))
+            {
+                return Results.StatusCode(StatusCodes.Status304NotModified);
+            }
+        }
+
+        return Results.Bytes(result.Bytes, result.ContentType ?? "text/markdown; charset=utf-8");
     }
 }

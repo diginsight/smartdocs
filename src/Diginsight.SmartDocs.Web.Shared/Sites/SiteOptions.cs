@@ -17,10 +17,33 @@ public sealed class SiteOptions
     /// <summary>Optional shared secret guarding the cache-invalidation endpoint.</summary>
     public string InvalidateApiKey { get; set; } = string.Empty;
 
+    /// <summary>HTTP caching behaviour of the raw content endpoint.</summary>
+    public ContentCacheOptions ContentCache { get; set; } = new();
+
     /// <summary>Publisher-level branding, applied to every space this deployment serves.</summary>
     public BrandingOptions Branding { get; set; } = new();
 
     public IList<SpaceOptions> Spaces { get; set; } = new List<SpaceOptions>();
+}
+
+/// <summary>
+/// HTTP caching applied to <c>/_content</c> responses. Both settings are deliberately separate:
+/// a conditional request still costs a round trip and a full source read, whereas a fresh
+/// <c>max-age</c> costs no request at all — so only the second turns a low content change rate
+/// into a saving. Bound through <c>IOptionsMonitor</c>, so either can be changed between
+/// measurement runs without restarting the host.
+/// </summary>
+public sealed class ContentCacheOptions
+{
+    /// <summary>Emit an <c>ETag</c> and answer a matching <c>If-None-Match</c> with <c>304</c>.</summary>
+    public bool ConditionalRequestsEnabled { get; set; } = true;
+
+    /// <summary>
+    /// <c>Cache-Control: max-age</c> in seconds. Zero emits <c>no-cache</c>, so the browser
+    /// revalidates every time. A non-zero value serves stale content until it expires — there is
+    /// no content-invalidation endpoint — so keep it small unless the content is genuinely static.
+    /// </summary>
+    public int MaxAgeSeconds { get; set; }
 }
 
 /// <summary>Publisher identity. Branding is per deployment, never per space.</summary>
