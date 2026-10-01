@@ -17,13 +17,13 @@
                 </li>
 
                 <li><span class="dropdown-subhead">Light themes</span></li>
-                @foreach (ThemeOption opt in ThemeState.Options.Where(o => !o.Dark))
+                @foreach (ThemeOption opt in Theme.Options.Where(o => !o.Dark))
                 {
                     <li>@ThemeItem(opt)</li>
                 }
 
                 <li><span class="dropdown-subhead">Dark themes</span></li>
-                @foreach (ThemeOption opt in ThemeState.Options.Where(o => o.Dark))
+                @foreach (ThemeOption opt in Theme.Options.Where(o => o.Dark))
                 {
                     <li>@ThemeItem(opt)</li>
                 }

@@ -1,0 +1,59 @@
+@* Generated space index: served at the site root when no space claims it. One card per configured
+   space — title, optional description, source repository and documentation link. *@
+@using Diginsight.SmartDocs.Web.Shared.Sites
+@inject SiteShellState Site
+
+<article class="markdown-body space-index">
+    <h1>@Site.Title</h1>
+    <p class="space-index-intro">@Site.IndexIntro</p>
+    <ul class="space-index-list">
+        @foreach (SpaceShellInfo space in Site.Spaces)
+        {
+            <li class="space-card">
+                <a class="space-card-title" href="@space.HomeRoute">
+                    @if (!string.IsNullOrWhiteSpace(space.Icon))
+                    {
+                        <span class="space-card-icon" aria-hidden="true">@space.Icon</span>
+                    }
+                    @space.Title
+                </a>
+                @if (!string.IsNullOrWhiteSpace(space.Description))
+                {
+                    <p class="space-card-desc">@space.Description</p>
+                }
+                <p class="space-card-meta">
+                    <span>repository:
+                        @if (string.IsNullOrWhiteSpace(space.RepositoryUrl))
+                        {
+                            <span>not configured</span>
+                        }
+                        else
+                        {
+                            <a href="@space.RepositoryUrl" target="_blank" rel="noopener">@RepositoryLabel(space.RepositoryUrl)</a>
+                        }
+                    </span>
+                    <span>documentation: <a href="@(space.HomeRoute)/">@(space.HomeRoute)/</a></span>
+                </p>
+            </li>
+        }
+    </ul>
+</article>
+
+@code {
+    // "owner/repo" for GitHub, "project/repo" for Azure Repos (…/project/_git/repo); the URL itself otherwise.
+    private static string RepositoryLabel(string url)
+    {
+        if (!Uri.TryCreate(url, UriKind.Absolute, out Uri? uri))
+        {
+            return url;
+        }
+
+        string[] parts = uri.AbsolutePath
+            .Split('/', StringSplitOptions.RemoveEmptyEntries)
+            .Where(static p => p != "_git")
+            .ToArray();
+        return parts.Length >= 2
+            ? $"{parts[^2]}/{parts[^1].Replace(".git", string.Empty)}"
+            : url;
+    }
+}

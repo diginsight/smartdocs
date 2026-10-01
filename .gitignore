@@ -449,3 +449,9 @@ FodyWeavers.xsd
 **/*.internal.md
 **/_internal/
 src/docs/_evidence/
+
+# Local branding assets. A publisher's logo belongs to that deployment's own content set (its
+# blob container), never to this public repository — src/docs is only the DEV content set, so a
+# mark dropped here for a local look-and-feel run must not be committed. The shell falls back to
+# the built-in icon when the asset is absent, so a fresh clone renders correctly without it.
+src/docs/_branding/

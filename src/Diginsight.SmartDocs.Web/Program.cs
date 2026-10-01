@@ -7,6 +7,7 @@ using Diginsight.SmartCache;
 using Diginsight.SmartCache.Externalization.Http;
 using Diginsight.SmartCache.Externalization.Redis;
 using Diginsight.SmartCache.Externalization.ServiceBus;
+using Diginsight.SmartDocs.Web.Caching;
 using Diginsight.SmartDocs.Web.Components;
 using Diginsight.SmartDocs.Web.ContentSources;
 using Diginsight.SmartDocs.Web.Endpoints;
@@ -16,6 +17,7 @@ using Diginsight.SmartDocs.Web.Shared.Navigation;
 using Diginsight.SmartDocs.Web.Shared.Rendering;
 using Diginsight.SmartDocs.Web.Shared.Services;
 using Diginsight.SmartDocs.Web.Shared.Sites;
+using Diginsight.SmartDocs.Web.Sites;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 
@@ -74,7 +76,14 @@ public class Program
             services.Configure<SiteOptions>(configuration.GetSection("Site"));
             SiteOptions siteOptions = configuration.GetSection("Site").Get<SiteOptions>()
                 ?? throw new InvalidOperationException("Missing 'Site' configuration section.");
-            services.AddScoped(_ => new SiteShellState(siteOptions));
+
+            // Populated after the container is built (see BrandingAssetResolver), so the scoped
+            // factory below — which only ever runs once a request is being served — reads the
+            // resolved value and the prerendered header already carries the mark.
+            var brandingAssets = new BrandingAssets();
+            services.AddSingleton(brandingAssets);
+            services.AddScoped(_ => new SiteShellState(siteOptions, brandingAssets.LogoUrl));
+            services.AddScoped(_ => new ThemeState(ThemeCatalog.Resolve(siteOptions.Themes)));
             var spaceRegistry = new SpaceRegistry(siteOptions.Spaces);
             services.AddSingleton(spaceRegistry);
             logger.LogInformation(
@@ -141,48 +150,65 @@ public class Program
                 });
             }
 
-            // One cached reader + one lister per space, all singletons. Content sources stay singletons
-            // because the navigation builders capture them; the space is therefore chosen by an explicit
-            // argument, never by a scoped factory reading the current request — that would be a captive
-            // dependency on the server and would have no counterpart at all in the browser.
+            // One physical source per space, joined into a single path namespace by the mounted
+            // source (each prefixed space under its route-base segment), with one SmartCache
+            // decorator in front of the whole namespace. Every cache key, nav level, metrics cell and
+            // invalidation rule is a content path, and a mounted path is unique across spaces — so
+            // caching the joined namespace, rather than each space separately, is what keeps two
+            // spaces' "index.md" from sharing an entry.
+            // How stale an answer may be when no invalidation call arrived. Bound eagerly, like the
+            // site options above, because the content sources are built here rather than resolved.
+            var freshness = new ContentFreshnessOptions();
+            configuration.GetSection("ContentFreshness").Bind(freshness);
+            services.AddSingleton(freshness);
+
             services.AddSingleton(sp => new SpaceContentRegistry(
                 spaceRegistry.All.Select(space =>
                 {
                     IContentSource physical = CreatePhysicalContentSource(sp, space);
-                    var lister = (IContentLister)physical;
-                    var cached = new CachedContentSource(
-                        physical,
-                        lister,
-                        sp.GetRequiredService<ISmartCache>(),
-                        sp.GetRequiredService<ILogger<CachedContentSource>>());
-                    return new SpaceContentAccess(space, cached, cached);
+                    return new SpaceContentAccess(space, physical, (IContentLister)physical);
                 })));
-
-            // Default space: the one mounted at the site root, else the first configured. Every
-            // single-space consumer (page loader, nav builder, raw content endpoint) resolves through
-            // these two registrations, so a one-space site behaves exactly as it did before spaces existed.
-            SpaceOptions defaultSpace = spaceRegistry.All.FirstOrDefault(static s => s.IsRootMounted)
-                ?? spaceRegistry.All[0];
-            services.AddSingleton<IContentSource>(sp =>
-                sp.GetRequiredService<SpaceContentRegistry>().Get(defaultSpace.Id).Source);
-            services.AddSingleton<IContentLister>(sp =>
-                sp.GetRequiredService<SpaceContentRegistry>().Get(defaultSpace.Id).Lister);
+            services.AddSingleton(sp => new SpaceMountedContentSource(
+                spaceRegistry,
+                sp.GetRequiredService<SpaceContentRegistry>(),
+                sp.GetRequiredService<ILogger<SpaceMountedContentSource>>()));
+            services.AddSingleton(sp =>
+            {
+                SpaceMountedContentSource mounted = sp.GetRequiredService<SpaceMountedContentSource>();
+                return new CachedContentSource(
+                    mounted,
+                    mounted,
+                    sp.GetRequiredService<ISmartCache>(),
+                    freshness,
+                    sp.GetRequiredService<ILogger<CachedContentSource>>());
+            });
+            services.AddSingleton<IContentSource>(sp => sp.GetRequiredService<CachedContentSource>());
+            services.AddSingleton<IContentLister>(sp => sp.GetRequiredService<CachedContentSource>());
 
             services.AddScoped<IMarkdownRenderer, MarkdigMarkdownRenderer>();
             services.AddScoped<PageLoader>();
             services.AddScoped<TocState>();
-            services.AddScoped<ThemeState>();
             services.AddScoped<SidebarState>();
             services.AddScoped<NavStats>();
             services.AddScoped<ArticleState>();
             // Dynamic, spec-compliant menu built on demand from the live content hierarchy.
             services.AddMemoryCache();
             services.AddSingleton<FolderMetricsIndex>();
-            services.AddSingleton<DynamicNavBuilder>();
+            // The inner builder gets a lazy handle on the decorator that wraps it, so the whole-tree
+            // walk behind GetIndexAsync reads each level through the cache instead of re-listing the
+            // tree. Lazy breaks the cycle: it is never forced in the constructor, only on first walk.
+            services.AddSingleton<DynamicNavBuilder>(sp => new DynamicNavBuilder(
+                sp.GetRequiredService<IContentLister>(),
+                sp.GetRequiredService<FolderMetricsIndex>(),
+                sp.GetRequiredService<IParallelService>(),
+                new Lazy<INavBuilder>(() => sp.GetRequiredService<CachedDynamicNavBuilder>()),
+                sp.GetRequiredService<ILogger<DynamicNavBuilder>>(),
+                spaceRegistry));
             services.AddSingleton<CachedDynamicNavBuilder>(sp => new CachedDynamicNavBuilder(
                 sp.GetRequiredService<DynamicNavBuilder>(),
                 sp.GetRequiredService<ISmartCache>(),
                 sp.GetRequiredService<IParallelService>(),
+                freshness,
                 sp.GetRequiredService<ILogger<CachedDynamicNavBuilder>>()));
             services.AddSingleton<INavBuilder>(sp => sp.GetRequiredService<CachedDynamicNavBuilder>());
             services.AddScoped<INavProvider, ServerNavProvider>();
@@ -225,6 +251,10 @@ public class Program
         // Drain results must reach the hub before any content write can happen.
         app.Services.GetRequiredService<NavChangePublisher>().Wire();
 
+        // Locate the publisher's mark before the first request, so the prerendered header already
+        // carries it. One read of one asset; a space that cannot answer is skipped with a warning.
+        BrandingAssetResolver.Resolve(app.Services, logger);
+
         // Build the navigation metrics projection in the background: seed from the previous run so
         // the counter never starts from nothing, then discover + fold the tree one root branch at a
         // time so the footer total climbs as a labelled lower bound instead of jumping.
@@ -244,6 +274,11 @@ public class Program
                 }
 
                 // A restart is just a global invalidation over a warm seed — same drain, no special path.
+                // The per-root loop publishes progress but does NOT flush the level cache: that flush is
+                // global (an empty-path rule is on every branch), so one per root section meant R+2 whole-tree
+                // wipes, each one discarding levels the very next root's discovery had to rebuild. The counts
+                // reach the client over SignalR regardless; the levels only need rebuilding once, at the end,
+                // when the aggregates have settled.
                 var reachable = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                 foreach (var root in await cachedNav.GetChildrenAsync(string.Empty))
                 {
@@ -254,7 +289,6 @@ public class Program
 
                     reachable.UnionWith(await metrics.DiscoverAsync(root.Prefix));
                     await metrics.DrainAsync();
-                    cachedNav.InvalidateLevels();
                     await publisher.PublishCountsReadyAsync();
                 }
 
@@ -266,8 +300,9 @@ public class Program
                 await metrics.DrainAsync();
                 cachedNav.InvalidateLevels();
 
-                // Flattened search index + every level warm, then the authoritative final push.
-                await cachedNav.GetIndexAsync();
+                // Every level warm, then the authoritative final push. The flattened search index is
+                // deliberately NOT built here: its only consumer is the menu filter, which runs when a
+                // visitor types, and building it walks every article.
                 await cachedNav.WarmAllLevelsAsync();
                 await publisher.PublishCountsReadyAsync();
 

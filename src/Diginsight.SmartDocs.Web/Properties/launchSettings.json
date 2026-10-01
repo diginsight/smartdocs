@@ -44,6 +44,17 @@
         "AppsettingsEnvironmentName": "devlearn"
       }
     },
+    "https - devec4": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "launchBrowser": true,
+      "applicationUrl": "https://localhost:7280;http://localhost:5280",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "AppsettingsEnvironmentName": "devec4",
+        "ExternalConfigurationFolder": "..\\..\\..\\smartdocs.internal"
+      }
+    },
     "https - Testmc": {
       "commandName": "Project",
       "dotnetRunMessages": true,

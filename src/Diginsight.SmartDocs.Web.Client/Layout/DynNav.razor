@@ -7,6 +7,7 @@
 @inject NavStats Stats
 @inject IJSRuntime JS
 @inject IServiceProvider Services
+@inject Diginsight.SmartDocs.Web.Shared.Sites.SiteShellState Site
 @implements IDisposable
 
 <div class="dynnav @(Sidebar.Collapsed ? "is-collapsed" : null)" @onkeydown="OnKeyDown">
@@ -63,7 +64,7 @@
     {
         <p class="nav-loading"><em>Loading menu…</em></p>
     }
-    else if (!string.IsNullOrWhiteSpace(_query))
+    else if (!string.IsNullOrWhiteSpace(_applied))
     {
         @if (_index is null)
         {
@@ -71,10 +72,10 @@
         }
         else
         {
-            var matches = Filter(_index, _query);
+            var matches = Filter(_index, _applied);
             @if (matches.Count == 0)
             {
-                <p class="nav-loading"><em>No matches for “@_query”.</em></p>
+                <p class="nav-loading"><em>No matches for “@_applied”.</em></p>
             }
             else
             {
@@ -83,10 +84,10 @@
                     {
                         <li>
                             <NavLink class="nav-link" href="@m.Route" Match="NavLinkMatch.All">
-                                <span class="nav-search-text">@Highlight(m.Text, _query)</span>
+                                <span class="nav-search-text">@Highlight(m.Text, _applied)</span>
                                 @if (!string.IsNullOrEmpty(m.Path))
                                 {
-                                    <span class="nav-search-path">@Highlight(m.Path, _query)</span>
+                                    <span class="nav-search-path">@Highlight(m.Path, _applied)</span>
                                 }
                             </NavLink>
                         </li>
@@ -104,7 +105,9 @@
         <ul class="nav-list nav-top" role="tree">
             @foreach (NavChild node in _root)
             {
-                <DynNavNode Node="node" CurrentRoute="@_current" />
+                @* Keyed so re-rooting the tree on a space switch creates fresh nodes instead of
+                   reusing a node instance that holds another folder's loaded children. *@
+                <DynNavNode @key="node.Prefix ?? node.Route ?? node.Text" Node="node" CurrentRoute="@_current" />
             }
         </ul>
     }

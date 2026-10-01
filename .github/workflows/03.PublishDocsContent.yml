@@ -267,19 +267,52 @@ jobs:
           PYTHONWARNINGS: ignore
           INVALIDATE_KEY: ${{ secrets.SMARTDOCS_INVALIDATE_KEY }}
         run: |
-          # Best effort: content is already published and the host rebuilds its tree on its own
-          # schedule, so a failure here delays freshness rather than breaking the site.
+          # The content is uploaded by now, and this call is what makes it visible promptly: the host
+          # watches nothing and rescans on no schedule. Site:ContentFreshness caps how long a lost
+          # call stays invisible, but that cap is a safety net rather than a plan, so a failure here
+          # is reported instead of swallowed - a green run that published nothing anyone can see is
+          # the outcome worth preventing.
+          #
+          # Note the limit of a single request: it reaches one instance. Where the site runs on more
+          # than one, cross-instance eviction is what Diginsight:SmartCache:ServiceBus provides, and
+          # without it the other instances fall back to the freshness window above.
           $rg = az webapp list --query "[?name=='$env:WEBAPP_NAME'].resourceGroup | [0]" -o tsv
-          if (-not $rg) { Write-Host "Target host not resolved; skipping invalidation"; exit 0 }
+          if (-not $rg) {
+            Write-Error "Could not resolve the resource group for the target App Service; the navigation cache was not invalidated."
+            exit 1
+          }
           $hostName = az webapp show --name $env:WEBAPP_NAME --resource-group $rg --query defaultHostName -o tsv
+          if (-not $hostName) {
+            Write-Error "Could not resolve the host name for the target App Service; the navigation cache was not invalidated."
+            exit 1
+          }
 
           $headers = @{}
           if ($env:INVALIDATE_KEY) { $headers["X-Invalidate-Key"] = $env:INVALIDATE_KEY }
-          try {
-            Invoke-WebRequest -Uri "https://$hostName/_nav/invalidate" -Method Post `
-              -Headers $headers -TimeoutSec 60 -UseBasicParsing | Out-Null
-            Write-Host "Navigation cache invalidated"
+
+          # A cold start or a transient gateway error can lose a single request, which is exactly the
+          # failure this step has to survive.
+          $delays = @(5, 15, 30, 60)
+          for ($attempt = 0; $attempt -le $delays.Count; $attempt++) {
+            try {
+              $response = Invoke-WebRequest -Uri "https://$hostName/_nav/invalidate" -Method Post `
+                -Headers $headers -TimeoutSec 60 -UseBasicParsing
+              # The endpoint answers with the navigation version it has just bumped. Reading that back
+              # separates "the site dropped its cache" from "something on the way returned 200".
+              # A body that is not JSON at all throws here and is caught below, which is the
+              # right outcome: it means something other than the endpoint answered.
+              $version = ($response.Content | ConvertFrom-Json).version
+              if ($null -ne $version) {
+                Write-Host "Navigation cache invalidated (version $version)"
+                exit 0
+              }
+              Write-Host "Attempt $($attempt + 1): answered 200 but carried no version; not the invalidation endpoint."
+            }
+            catch {
+              Write-Host "Attempt $($attempt + 1) failed: $($_.Exception.Message)"
+            }
+            if ($attempt -lt $delays.Count) { Start-Sleep -Seconds $delays[$attempt] }
           }
-          catch {
-            Write-Host "Invalidation call failed: $($_.Exception.Message)"
-          }
+
+          Write-Error "The navigation cache was not invalidated after $($delays.Count + 1) attempts. The content is published and the site will pick it up within its configured freshness window; re-running this step makes it immediate."
+          exit 1

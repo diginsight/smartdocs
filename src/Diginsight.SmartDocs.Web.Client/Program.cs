@@ -1,3 +1,4 @@
+using System.Net.Http.Json;
 using Diginsight.SmartDocs.Web.Client;
 using Diginsight.SmartDocs.Web.Shared;
 using Diginsight.SmartDocs.Web.Shared.Navigation;
@@ -20,8 +21,26 @@ builder.Services.AddScoped<ThemeState>();
 builder.Services.AddScoped<SidebarState>();
 builder.Services.AddScoped<NavStats>();
 builder.Services.AddScoped<ArticleState>();
-builder.Services.AddScoped<SiteShellState>();
+// Singleton so the instance filled below, before the first render, is the one every component sees.
+builder.Services.AddSingleton<SiteShellState>();
 builder.Services.AddScoped<INavProvider, HttpNavProvider>();
 builder.Services.AddScoped<NavHubClient>();
 
-await builder.Build().RunAsync();
+WebAssemblyHost host = builder.Build();
+
+// The space list decides what a route renders (a space's page or the generated index) and how the
+// menus are scoped, so it has to be known before hydration re-renders the prerendered page.
+// MainLayout still fetches it if this load fails.
+try
+{
+    using var siteHttp = new HttpClient { BaseAddress = new Uri(builder.HostEnvironment.BaseAddress) };
+    if (await siteHttp.GetFromJsonAsync<SiteShellOptions>("_site") is { } site)
+    {
+        host.Services.GetRequiredService<SiteShellState>().Apply(site);
+    }
+}
+catch (Exception ex) when (ex is HttpRequestException or System.Text.Json.JsonException)
+{
+}
+
+await host.RunAsync();

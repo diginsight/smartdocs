@@ -85,6 +85,9 @@ public partial class MainLayout
                 Site.Apply(site);
             }
         }
+
+        // The picker lists what this deployment offers, which only the site payload knows.
+        Theme.SetCatalog(Site.Themes);
     }
 
     private void OnSiteChanged() => InvokeAsync(StateHasChanged);
@@ -123,10 +126,12 @@ public partial class MainLayout
     {
         if (firstRender)
         {
+            // Reader choice wins; the deployment's branding theme only supplies the first load.
             string? saved = await JS.InvokeAsync<string?>("localStorage.getItem", "lh-theme");
-            Theme.SetTheme(saved);
+            Theme.SetTheme(string.IsNullOrWhiteSpace(saved) ? Site.Branding.DefaultTheme : saved);
             await JS.InvokeVoidAsync("appUi.initResizer");
             await JS.InvokeVoidAsync("appUi.initTocResizer");
+            await JS.InvokeVoidAsync("appUi.initHeaderMetrics");
             _selfRef = DotNetObjectReference.Create(this);
             await JS.InvokeVoidAsync("appUi.initResponsive", _selfRef);
         }

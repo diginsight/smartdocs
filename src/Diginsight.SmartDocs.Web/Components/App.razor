@@ -1,3 +1,7 @@
+@using Diginsight.SmartDocs.Web.Shared
+@using Diginsight.SmartDocs.Web.Shared.Sites
+@using Microsoft.Extensions.Options
+@inject IOptions<SiteOptions> Site
 <!DOCTYPE html>
 <html lang="en">
 
@@ -7,6 +11,10 @@
     <base href="/" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
     <link rel="stylesheet" href="app.css" />
+    @* This deployment's palettes, written out by the host rather than shipped in app.css. Emitted
+       during prerender and after app.css, so the selected theme is painted on the first frame —
+       applying it from the client would show the default palette until hydration. *@
+    <style>@((MarkupString)ThemeCatalog.ToCss(ThemeCatalog.Resolve(Site.Value.Themes)))</style>
     <HeadOutlet @rendermode="InteractiveWebAssembly" />
 </head>
 

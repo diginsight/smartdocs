@@ -21,7 +21,7 @@ public partial class AboutMenu
         builder.AddAttribute(5, "class", "theme-swatch");
         builder.AddAttribute(6, "style", $"--sw-bg:{opt.Bg};--sw-accent:{opt.Accent}");
         builder.CloseElement();
-        builder.AddContent(7, opt.Name);
+        builder.AddContent(7, opt.DisplayName);
         builder.CloseElement();
     };
 }

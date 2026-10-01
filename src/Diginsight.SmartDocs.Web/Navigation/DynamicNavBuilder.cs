@@ -1,6 +1,7 @@
 using Diginsight.Components;
 using Diginsight.Diagnostics;
 using Diginsight.SmartDocs.Web.Shared.Navigation;
+using Diginsight.SmartDocs.Web.Shared.Sites;
 using Microsoft.Extensions.Logging;
 
 namespace Diginsight.SmartDocs.Web.Navigation;
@@ -17,11 +18,25 @@ namespace Diginsight.SmartDocs.Web.Navigation;
 /// <see cref="Coverage.None"/> rather than a misleading zero.
 /// </para>
 /// </summary>
+/// <param name="levelSource">
+/// The decorated builder, used by the whole-tree walk behind <see cref="GetIndexAsync"/> so each
+/// level it visits comes from (and populates) the level cache. Recursing through this class's own
+/// <see cref="GetChildrenAsync"/> would silently opt the walk out of the decorator wrapping it, and
+/// re-list the entire tree on every index build. <see cref="Lazy{T}"/> because the decorator holds
+/// this instance: the cycle is only legal because it is resolved on first use, never in the constructor.
+/// </param>
+/// <param name="spaces">
+/// The configured spaces. At the site root, a folder that is a space's mount point is labelled with
+/// the space title, ordered by configuration position, and always kept as a section — its name is a
+/// route base chosen by configuration, not an authored folder the naming rules were written for.
+/// </param>
 public sealed class DynamicNavBuilder(
     IContentLister lister,
     FolderMetricsIndex metrics,
     IParallelService parallelService,
-    ILogger<DynamicNavBuilder> logger) : INavBuilder
+    Lazy<INavBuilder> levelSource,
+    ILogger<DynamicNavBuilder> logger,
+    SpaceRegistry? spaces = null) : INavBuilder
 {
     public async Task<IReadOnlyList<NavChild>> GetChildrenAsync(string prefix, CancellationToken ct = default)
     {
@@ -40,10 +55,15 @@ public sealed class DynamicNavBuilder(
         return leaves;
     }
 
-    /// <summary>Flattens the tree into navigable leaves (menu search / prev-next). Counting is the index's job.</summary>
+    /// <summary>
+    /// Flattens the tree into navigable leaves (menu search / prev-next). Counting is the index's job.
+    /// Recursion goes through <c>levelSource</c>, not <see cref="GetChildrenAsync"/>: every level the
+    /// walk touches is one the menu will ask for anyway, so taking them from the cache turns a second
+    /// full listing of the tree into cache hits and leaves the level cache warm behind it.
+    /// </summary>
     private async Task WalkAsync(string prefix, string path, List<NavLeaf> leaves, CancellationToken ct)
     {
-        foreach (NavChild n in await GetChildrenAsync(prefix, ct))
+        foreach (NavChild n in await levelSource.Value.GetChildrenAsync(prefix, ct))
         {
             if (n.IsSection && n.Prefix is not null)
             {
@@ -91,6 +111,11 @@ public sealed class DynamicNavBuilder(
     /// <summary>Per-entry scoring extracted out of <see cref="BuildLevelAsync"/> so siblings can be scored concurrently.</summary>
     private async Task<(SortTuple Key, NavChild Node)?> ScoreEntryAsync(string prefix, ChildEntry entry, CancellationToken ct)
     {
+        if (prefix.Length == 0 && entry.IsFolder && spaces?.MountedAt(entry.Name) is { } mounted)
+        {
+            return ScoreMount(mounted, entry);
+        }
+
         if (NavRules.IsExcludedName(entry.Name) || IsTempRoot(prefix, entry.Name))
         {
             return null;
@@ -98,13 +123,19 @@ public sealed class DynamicNavBuilder(
 
         if (entry.IsFolder)
         {
-            FolderMeta meta = await ReadFolderMetaAsync(entry.Path, ct);
+            // One listing per folder, shared by the metadata lookup and the classification below.
+            // Both used to list it independently, and the metadata read used to be a blind probe for
+            // a file that exists in a handful of folders out of hundreds — so the overwhelmingly
+            // common answer was a not-found round trip. The listing already carries that answer.
+            IReadOnlyList<ChildEntry> kids = await lister.ListChildrenAsync(entry.Path, ct) ?? [];
+
+            FolderMeta meta = await ReadFolderMetaAsync(kids, ct);
             if (meta.Hidden)
             {
                 return null; // metadata.yml opted the folder out of navigation
             }
 
-            NavChild? folderNode = await ClassifyFolderAsync(entry, meta, ct);
+            NavChild? folderNode = await ClassifyFolderAsync(entry, kids, meta, ct);
             if (folderNode is null)
             {
                 return null;
@@ -135,12 +166,24 @@ public sealed class DynamicNavBuilder(
         return null;
     }
 
+    /// <summary>A space's mount point at the site root: always a section, labelled and ordered by configuration.</summary>
+    private (SortTuple Key, NavChild Node) ScoreMount(SpaceOptions space, ChildEntry entry)
+    {
+        string label = string.IsNullOrWhiteSpace(space.Title) ? NavRules.Label(entry.Name) : space.Title;
+        (int? articleCount, DateTimeOffset? latestUtc, Coverage coverage) = FolderAggregate(entry.Path, FolderMeta.None);
+        var node = new NavChild(label, Route(entry.Path), entry.Path, "journal-bookmark", true, true,
+            ArticleCount: articleCount, LatestArticleUtc: latestUtc, CountCoverage: coverage);
+
+        // Group 0 with a negative weight: mounts come first, in configuration order, ahead of a
+        // root-mounted space's own numbered sections.
+        return (new SortTuple(0, spaces!.IndexOf(space) - 10_000, entry.Name.ToLowerInvariant()), node);
+    }
+
     /// <summary>Decides whether a folder is a section, a collapsed single link, or nothing.</summary>
-    private async Task<NavChild?> ClassifyFolderAsync(ChildEntry folder, FolderMeta meta, CancellationToken ct)
+    /// <param name="kids">The folder's already-materialised children, listed once by the caller.</param>
+    private async Task<NavChild?> ClassifyFolderAsync(ChildEntry folder, IReadOnlyList<ChildEntry> kids, FolderMeta meta, CancellationToken ct)
     {
         using var activity = Observability.ActivitySource.StartMethodActivity(logger, () => new { folder });
-
-        IReadOnlyList<ChildEntry> kids = await lister.ListChildrenAsync(folder.Path, ct) ?? [];
 
         var subFolders = kids.Where(k => k.IsFolder && !NavRules.IsExcludedName(k.Name) && !NavRules.IsAssetFolder(k.Name)).ToList();
         var articles = kids.Where(k => !k.IsFolder && NavRules.IsMarkdown(k.Name)
@@ -201,15 +244,17 @@ public sealed class DynamicNavBuilder(
             : (null, null, Coverage.None);
     }
 
-    /// <summary>Reads a folder's optional <c>metadata.yml</c> overrides (absent file → no overrides).</summary>
-    private async Task<FolderMeta> ReadFolderMetaAsync(string folderPath, CancellationToken ct)
+    /// <summary>
+    /// Reads a folder's optional <c>metadata.yml</c> overrides from its already-listed children.
+    /// Absent file → no overrides, and no read at all: the listing is authoritative about what the
+    /// folder contains, so asking the store for a file it did not mention can only answer "no".
+    /// </summary>
+    private async Task<FolderMeta> ReadFolderMetaAsync(IReadOnlyList<ChildEntry> kids, CancellationToken ct)
     {
-        using var activity = Observability.ActivitySource.StartMethodActivity(logger, () => new { folderPath });
+        ChildEntry? entry = kids.FirstOrDefault(
+            k => !k.IsFolder && string.Equals(k.Name, "metadata.yml", StringComparison.OrdinalIgnoreCase));
 
-        string dir = (folderPath ?? string.Empty).Replace('\\', '/').Trim('/');
-        string key = dir.Length == 0 ? "metadata.yml" : $"{dir}/metadata.yml";
-        string? text = await lister.ReadHeadAsync(key, ct);
-        return FolderMeta.Parse(text);
+        return entry is null ? FolderMeta.None : FolderMeta.Parse(await lister.ReadHeadAsync(entry.Path, ct));
     }
 
     // Root-level folders that are project/infrastructure, not site content (only relevant when the

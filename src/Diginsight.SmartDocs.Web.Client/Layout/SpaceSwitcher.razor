@@ -1,0 +1,42 @@
+@* Space switcher: shown only when the site publishes more than one space. Lists the generated
+   index (when the site root is unclaimed) and every space; the current one is marked. *@
+@using Diginsight.SmartDocs.Web.Shared.Sites
+@inject SiteShellState Site
+@inject NavigationManager Navigation
+@implements IDisposable
+
+@if (Site.IsMultiSpace)
+{
+    <div class="topmenu space-switcher">
+        <div class="topmenu-item">
+            <button class="topmenu-btn space-switcher-btn" type="button" title="Switch documentation space"
+                    aria-haspopup="true">
+                <i class="bi bi-collection"></i>
+                <span class="space-switcher-label">@(_current?.Title ?? "All documentation")</span>
+                <span class="caret">▾</span>
+            </button>
+            <div class="topmenu-dropdown">
+                <ul class="dropdown-list">
+                    @if (Site.ServesIndexAtRoot)
+                    {
+                        <li>
+                            <a class="dropdown-link space-switcher-item @(_current is null ? "active" : null)" href="/">
+                                <i class="bi bi-grid space-switcher-icon"></i>All documentation
+                            </a>
+                        </li>
+                        <li class="dropdown-sep"><hr /></li>
+                    }
+                    <li><span class="dropdown-subhead">Spaces</span></li>
+                    @foreach (SpaceShellInfo space in Site.Spaces)
+                    {
+                        <li>
+                            <a class="dropdown-link space-switcher-item @(IsCurrent(space) ? "active" : null)" href="@space.HomeRoute">
+                                <span class="space-switcher-icon">@space.Icon</span>@space.Title
+                            </a>
+                        </li>
+                    }
+                </ul>
+            </div>
+        </div>
+    </div>
+}

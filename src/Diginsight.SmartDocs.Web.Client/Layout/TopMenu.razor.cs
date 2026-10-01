@@ -23,25 +23,41 @@ public partial class TopMenu : IDisposable
     // Prefix of the section whose dropdown is pinned open by a CLICK (hover opens independently via CSS).
     private string? _openKey;
 
+    // Nav prefix of the space the reader is in; the band shows that space's top level only.
+    private string _scope = string.Empty;
+
     protected override void OnInitialized() => Navigation.LocationChanged += OnLocationChanged;
 
     protected override async Task OnInitializedAsync()
     {
-        IReadOnlyList<NavChild> root = await NavProvider.GetChildrenAsync(string.Empty);
+        _scope = SpaceScope.PrefixFor(Site, Navigation.ToBaseRelativePath(Navigation.Uri));
+        await LoadAsync(_scope);
+    }
 
-        // The top bar shows the Home link (empty route) plus top-level sections; other root links
+    private async Task LoadAsync(string scope)
+    {
+        IReadOnlyList<NavChild> root = await SpaceScope.LoadRootAsync(NavProvider, Site, scope);
+        if (!string.Equals(scope, _scope, StringComparison.OrdinalIgnoreCase))
+        {
+            return; // a later navigation already re-rooted the band
+        }
+
+        // The top bar shows the Home link plus top-level sections; other root links
         // (e.g. Getting Started, Documentation Index) stay in the sidebar only.
-        _root = root.Where(c => c.IsSection || string.IsNullOrEmpty(c.Route)).ToList();
+        _root = root.Where(c => c.IsSection || SpaceScope.IsHome(c, scope)).ToList();
 
         // Render the top-level buttons NOW; then fill each dropdown as its children arrive. Without
         // this the whole menu stays blank until ALL sections' children have loaded, so a slow level
         // build (e.g. during the startup warm-up) makes the menu look broken.
         StateHasChanged();
 
-        foreach (NavChild section in DisplayNodes().Where(c => c.IsSection && c.Prefix is not null))
+        foreach (NavChild section in DisplayNodes().Where(c => c.IsSection && c.Prefix is not null).ToList())
         {
-            _children[section.Prefix!] = await NavProvider.GetChildrenAsync(section.Prefix!);
-            StateHasChanged();
+            if (!_children.ContainsKey(section.Prefix!))
+            {
+                _children[section.Prefix!] = await NavProvider.GetChildrenAsync(section.Prefix!);
+                StateHasChanged();
+            }
         }
     }
 
@@ -62,15 +78,25 @@ public partial class TopMenu : IDisposable
 
     private bool IsOpen(NavChild node) => node.Prefix is not null && _openKey == node.Prefix;
 
-    // Close the pinned dropdown after a navigation (e.g. selecting a dropdown link).
+    // Close the pinned dropdown after a navigation (e.g. selecting a dropdown link), and re-root the
+    // band when the navigation crossed into another space.
     private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
     {
-        if (_openKey is null)
+        string scope = SpaceScope.PrefixFor(Site, Navigation.ToBaseRelativePath(e.Location));
+        bool rescoped = !string.Equals(scope, _scope, StringComparison.OrdinalIgnoreCase);
+        if (_openKey is null && !rescoped)
         {
             return;
         }
 
         _openKey = null;
+        if (rescoped)
+        {
+            _scope = scope;
+            InvokeAsync(() => LoadAsync(scope));
+            return;
+        }
+
         InvokeAsync(StateHasChanged);
     }
 

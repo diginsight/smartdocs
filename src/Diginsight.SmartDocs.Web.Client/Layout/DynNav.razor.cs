@@ -15,9 +15,18 @@ public partial class DynNav
 
     private IReadOnlyList<NavChild>? _root;
     private string _current = string.Empty;
+
+    // Nav prefix of the space the reader is in (its route-base segment), or empty at the site root.
+    // The tree shows only that space; moving to another space re-roots it.
+    private string _scope = string.Empty;
     private bool _scrollPending;
+    private CancellationTokenSource? _searchDebounce;
 
     private string _query = string.Empty;
+
+    // What the reader has typed and what the list is actually showing are not the same thing while
+    // a burst of typing is still in flight; the input follows _query, the results follow _applied.
+    private string _applied = string.Empty;
     private IReadOnlyList<NavLeaf>? _index;
     private bool _indexing;
 
@@ -29,8 +38,9 @@ public partial class DynNav
     protected override async Task OnInitializedAsync()
     {
         _current = CurrentRoute();
+        _scope = SpaceScope.PrefixFor(Site, _current);
         NavMgr.LocationChanged += OnLocationChanged;
-        _root = await Provider.GetChildrenAsync(string.Empty);
+        _root = await SpaceScope.LoadRootAsync(Provider, Site, _scope);
         PublishRootStats();
         _scrollPending = true;
 
@@ -112,7 +122,7 @@ public partial class DynNav
             }
 
             (Provider as HttpNavProvider)?.ApplyAggregates(deltas);
-            _root = await Provider.GetChildrenAsync(string.Empty);
+            _root = await SpaceScope.LoadRootAsync(Provider, Site, _scope);
             PublishRootStats();
 
             Sidebar.RequestCountsRefresh();
@@ -129,7 +139,7 @@ public partial class DynNav
             {
                 Stats.SetTotal(total);
             }
-            _root = await Provider.RefreshChildrenAsync(string.Empty);
+            _root = await SpaceScope.LoadRootAsync(Provider, Site, _scope, refresh: true);
             PublishRootStats();
             Sidebar.RequestCountsRefresh();
             StateHasChanged();
@@ -149,6 +159,10 @@ public partial class DynNav
         }
     }
 
+    // Every keystroke refilters the whole library and repaints the list — a single letter matches
+    // enough to fill it — so a burst of typing repaints once at the end rather than once per letter.
+    private const int SearchDebounceMs = 120;
+
     private async Task OnSearchInput(ChangeEventArgs e)
     {
         _query = e.Value?.ToString() ?? string.Empty;
@@ -160,23 +174,49 @@ public partial class DynNav
             _indexing = false;
         }
 
-        StateHasChanged();
+        CancellationTokenSource cts = new ();
+        CancellationTokenSource? previous = Interlocked.Exchange(ref _searchDebounce, cts);
+        if (previous is not null)
+        {
+            await previous.CancelAsync();
+            previous.Dispose();
+        }
+
+        // Clearing the box must not wait: the tree should come back the moment the text goes.
+        if (_query.Length == 0)
+        {
+            _applied = string.Empty;
+            return;
+        }
+
+        try
+        {
+            await Task.Delay(SearchDebounceMs, cts.Token);
+            _applied = _query;
+            await InvokeAsync(StateHasChanged);
+        }
+        catch (OperationCanceledException)
+        {
+            // A later keystroke owns the repaint.
+        }
     }
 
-    private void ClearSearch() => _query = string.Empty;
+    private void ClearSearch() => _query = _applied = string.Empty;
 
     // Esc exits search mode and drops back to the tree, revealing/scrolling the active article.
     private void OnKeyDown(KeyboardEventArgs e)
     {
         if (e.Key == "Escape" && !string.IsNullOrEmpty(_query))
         {
-            _query = string.Empty;
+            _query = _applied = string.Empty;
             _scrollPending = true;
         }
     }
 
-    private static List<NavLeaf> Filter(IReadOnlyList<NavLeaf> index, string query) =>
-        index.Where(l => l.Text.Contains(query, OIC) || l.Path.Contains(query, OIC))
+    // Menu search stays inside the current space, like the tree it replaces.
+    private List<NavLeaf> Filter(IReadOnlyList<NavLeaf> index, string query) =>
+        index.Where(l => SpaceScope.InScope(Site, _scope, l.Route)
+                         && (l.Text.Contains(query, OIC) || l.Path.Contains(query, OIC)))
              .Take(MaxResults)
              .ToList();
 
@@ -218,6 +258,26 @@ public partial class DynNav
     {
         _current = CurrentRoute();
         _scrollPending = true;
+
+        string scope = SpaceScope.PrefixFor(Site, _current);
+        if (!string.Equals(scope, _scope, OIC))
+        {
+            _scope = scope;
+            _ = InvokeAsync(async () =>
+            {
+                IReadOnlyList<NavChild> root = await SpaceScope.LoadRootAsync(Provider, Site, scope);
+                if (!string.Equals(scope, _scope, OIC))
+                {
+                    return; // a later navigation already re-rooted the tree
+                }
+
+                _root = root;
+                PublishRootStats();
+                _scrollPending = true;
+                StateHasChanged();
+            });
+        }
+
         InvokeAsync(StateHasChanged);
     }
 
@@ -235,7 +295,7 @@ public partial class DynNav
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (_scrollPending && _root is { Count: > 0 } && string.IsNullOrEmpty(_query) && !Sidebar.Collapsed)
+        if (_scrollPending && _root is { Count: > 0 } && string.IsNullOrEmpty(_applied) && !Sidebar.Collapsed)
         {
             _scrollPending = false;
             try { await JS.InvokeVoidAsync("appUi.scrollActiveNavIntoView"); } catch { /* prerender */ }
@@ -244,6 +304,8 @@ public partial class DynNav
 
     public void Dispose()
     {
+        _searchDebounce?.Cancel();
+        _searchDebounce?.Dispose();
         NavMgr.LocationChanged -= OnLocationChanged;
         if (_hub is not null)
         {

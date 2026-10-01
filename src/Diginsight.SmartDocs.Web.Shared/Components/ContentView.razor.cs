@@ -16,6 +16,9 @@ public partial class ContentView
     private NavLeaf? _next;
     private IReadOnlyList<NavChild>? _sectionChildren;
 
+    // True at the site root when no space claims it: the root then shows the generated space index.
+    private bool _isSpaceIndex;
+
     protected override async Task OnParametersSetAsync()
     {
         _loading = true;
@@ -23,6 +26,16 @@ public partial class ContentView
         _trail = Array.Empty<Crumb>();
         _sectionChildren = null;
         Toc.SetEntries(Array.Empty<TocEntry>());
+
+        _isSpaceIndex = Norm(Path).Length == 0 && Site.ServesIndexAtRoot;
+        if (_isSpaceIndex)
+        {
+            _page = null;
+            _loading = false;
+            Article.Clear();
+            return;
+        }
+
         _page = await Loader.LoadAsync(Path);
         _loading = false;
         Toc.SetEntries(_page?.Toc ?? Array.Empty<TocEntry>());
@@ -92,6 +105,14 @@ public partial class ContentView
                 return; // navigated away while the index was loading
             }
 
+            // Prev/next never crosses into another space: the reader stays in the documentation set
+            // the switcher says they are in.
+            string space = SpaceSegment(forPath);
+            if (space.Length > 0)
+            {
+                index = index.Where(l => SpaceSegment(l.Route) == space).ToList();
+            }
+
             string cur = Norm(forPath);
             int idx = -1;
             for (int i = 0; i < index.Count; i++)
@@ -148,10 +169,22 @@ public partial class ContentView
     private static string Norm(string? route) =>
         (route ?? string.Empty).Replace('\\', '/').Trim('/').ToLowerInvariant();
 
+    // Route-base segment of the prefixed space owning a route, or empty for the root space.
+    private string SpaceSegment(string? route) =>
+        Site.ResolveSpace(route) is { IsRootMounted: false } space ? space.Segment.ToLowerInvariant() : string.Empty;
+
     /// <summary>Derive a human-readable title from the current path for section landing pages.</summary>
     private string SectionTitle()
     {
         string path = (Path ?? string.Empty).Replace('\\', '/').Trim('/');
+
+        // A space's own landing, when its content has no index page: the space title.
+        if (Site.ResolveSpace(path) is { IsRootMounted: false } space &&
+            string.Equals(space.Segment, path, StringComparison.OrdinalIgnoreCase))
+        {
+            return space.Title;
+        }
+
         string lastSeg = path.Contains('/') ? path[(path.LastIndexOf('/') + 1)..] : path;
         // Strip numeric prefix (e.g. "02.01-azure" → "azure") and title-case
         int dash = lastSeg.IndexOf('-');

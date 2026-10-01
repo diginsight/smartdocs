@@ -33,6 +33,35 @@ public sealed class SpaceRegistry
     public SpaceOptions? ById(string id) =>
         All.FirstOrDefault(s => string.Equals(s.Id, id, StringComparison.OrdinalIgnoreCase));
 
+    /// <summary>Spaces mounted under a prefix, in configuration order.</summary>
+    public IEnumerable<SpaceOptions> Prefixed => All.Where(static s => !s.IsRootMounted);
+
+    /// <summary>The root-mounted space, if any.</summary>
+    public SpaceOptions? Root => root;
+
+    /// <summary>The prefixed space whose route base is exactly <paramref name="segment"/>, or null.</summary>
+    public SpaceOptions? MountedAt(string? segment)
+    {
+        string s = (segment ?? string.Empty).Trim('/');
+        return s.Length == 0
+            ? null
+            : prefixed.FirstOrDefault(p => string.Equals(p.NormalizedRouteBase.Trim('/'), s, StringComparison.OrdinalIgnoreCase));
+    }
+
+    /// <summary>Configuration position of a space, used to order the mounts at the site root.</summary>
+    public int IndexOf(SpaceOptions space)
+    {
+        for (int i = 0; i < All.Count; i++)
+        {
+            if (ReferenceEquals(All[i], space))
+            {
+                return i;
+            }
+        }
+
+        return All.Count;
+    }
+
     /// <summary>
     /// Splits an incoming path into the owning space and the content key beneath it. Longest route
     /// base wins, so <c>/diginsight.tools/x</c> is matched before a root-mounted space's catch-all.

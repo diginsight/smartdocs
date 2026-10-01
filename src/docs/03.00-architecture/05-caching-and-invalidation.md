@@ -89,9 +89,13 @@ Neither is required, and both are wired only when their configuration is present
 
 Two mechanisms exist, for two different situations.
 
-**Locally**, the `Development` overlay declares `WatchForChanges: true` on the filesystem space. ^[environment-11]
+The application **watches nothing and rescans on no schedule**. `WatchForChanges: true` is declared on the filesystem spaces ^[environment-11] and is bound by `SpaceOptions`, but no code reads it — a file edited under a running host keeps serving its previous contents, and so does a file that has been deleted.
 
-**When deployed**, content arrives in a blob container that the application does not watch. The publish workflow therefore tells the site explicitly: after uploading content and removing the blobs that no longer have a local counterpart ^[devops-25], it issues `POST /_nav/invalidate` against the site, carrying `X-Invalidate-Key` when a key is configured ^[devops-26]. That call is best-effort — it is given a sixty-second timeout, and its failure does not fail the workflow run. ^[devops-26]
+**When deployed**, content arrives in a blob container. The publish workflow tells the site explicitly: after uploading content and removing the blobs that no longer have a local counterpart ^[devops-25], it issues `POST /_nav/invalidate`, carrying `X-Invalidate-Key` when a key is configured ^[devops-26]. It retries that call, and reads the navigation version back out of the response to confirm the site acted on it rather than something on the way answering `200`; when every attempt fails the step fails, because a green run that published nothing anyone can see is the outcome worth preventing.
+
+**`ContentFreshness` bounds what a lost notification can cost.** The call above is a single HTTP request and can still be lost — to a cold start, or to reaching only one instance of a site that runs several. Each cached answer therefore carries a freshness tolerance, applied when it is read: five minutes for an article and for one level of the menu, and thirty seconds for a path that was *not* found, since a stale miss hides an article that has just been published while a stale hit merely shows slightly old text. The flattened search index is deliberately left out of this: rebuilding it walks every article, and expiring it on a timer would hand that wait to whichever reader arrived first.
+
+**Invalidating warms what it drops.** Because the index is expensive, dropping it moves the cost onto a reader rather than removing it. The endpoint therefore starts a background rebuild of the index and of every level before returning, so the pipeline is not kept waiting and the next reader finds the cache already warm.
 
 The endpoint compares the supplied key against `Site:InvalidateApiKey` with `CryptographicOperations.FixedTimeEquals` and returns `401` on mismatch. ^[code-15,security-05]
 
@@ -105,7 +109,7 @@ Diginsight.SmartCache provides the caching primitives; `AddSmartCache(...).AddHt
 
 ## 🧭 Design decisions
 
-**SmartCache is declared disabled in the public settings.** `Diginsight:SmartCache:Enabled` is `false`, alongside an absolute expiration of 31 days, a maximum age of 7 days and a sliding expiration of 7 days. ^[configuration-09,data-13] Whether either deployed environment turns it on is decided by the private overlay.
+**`Diginsight:SmartCache:Enabled` does nothing.** The key is declared as `false` in the public settings ^[configuration-09,data-13], but `SmartCacheCoreOptions` exposes no `Enabled` property — it has `Mode`, which resolves to `InMemory` — so the value is read by nobody and the cache is active regardless. The expirations beside it *are* bound: 31 days absolute, seven days sliding, seven days maximum age. Those are the outer limits; `ContentFreshness` is what governs freshness in practice, because it overrides the maximum age per operation.
 
 **Persist the metrics snapshot outside the application folder.** The snapshot path comes from `Site:MetricsSnapshotPath` when that is non-empty, and otherwise sits beside the application binaries. ^[code-37] The pipeline sets that value as an App Service application setting on both deployments. ^[devops-18]
 

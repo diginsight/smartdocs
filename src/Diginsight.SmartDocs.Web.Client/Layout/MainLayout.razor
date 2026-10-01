@@ -12,12 +12,23 @@
 
 <div class="page theme-@Theme.ThemeId">
     <header class="topbar">
-        <a class="brand" href=""><i class="bi @BrandIconClass"></i> <span>@Site.Title</span></a>
-        <TopMenu Placement="TopMenu.Group.Left" />
-        <TopMenu Placement="TopMenu.Group.Right" />
+        <a class="brand" href="">
+            @if (Site.HasLogo)
+            {
+                <img class="brand-logo" src="@Site.LogoUrl" alt="" />
+            }
+            else
+            {
+                <i class="bi @BrandIconClass"></i>
+            }
+            <span>@Site.Title</span>
+        </a>
+        <SpaceSwitcher />
+        <div class="topbar-spacer"></div>
         <AboutMenu />
-        <button class="icon-btn" title="Search" @onclick="() => _searchOpen = true">
+        <button class="topbar-search" type="button" title="Search" @onclick="() => _searchOpen = true">
             <i class="bi bi-search"></i>
+            <span class="topbar-search-label">Search</span>
         </button>
         <button class="icon-btn" title="Notifications" @onclick="() => _notifyOpen = !_notifyOpen">
             <i class="bi bi-bell"></i>
@@ -26,6 +37,11 @@
             @(Theme.Dark ? "☀️" : "🌙")
         </button>
     </header>
+
+    <nav class="tabbar">
+        <TopMenu Placement="TopMenu.Group.Left" />
+        <TopMenu Placement="TopMenu.Group.Right" />
+    </nav>
 
     <SearchOverlay Open="_searchOpen" OnClose="() => _searchOpen = false" />
     <NotificationPanel Open="_notifyOpen" OnClose="() => _notifyOpen = false" />
