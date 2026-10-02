@@ -29,14 +29,15 @@ Waves 1, 2, and 3 are implemented, validated, and deployed, all on 2026-10-02:
 - **Wave 3 — render once, cache one way.** A page renders once on the server, the prerendered state carries what the browser already shows, and one key type and one path-set rule address every cached kind. (✅ done)
 - **`M2` — the scale harness.** A generator for a synthetic tree of any fan-out, an overlay that serves it outside the debug profile, and a measurement script. Across a ten-fold step in corpus size the first page is byte-identical and memory is flat at 20 s, while the background crawl keeps growing with the corpus. (✅ done)
 - **`C33` — Always On.** Turned on for both SmartDocs apps. The docs site's first request when idle went from `504` after 110.7 s to 422 ms. (✅ done)
-- **`M1` — the deployed baseline, completed.** Steady state after waves 1 to 3 is 3.4–4.7 CPU-seconds per 15 minutes at 0.076–0.096 s average. Under load, instrumentation turned out to cost about 90% of the CPU of every request. (✅ done)
+- **`M1` — the deployed baseline, completed.** Steady state after waves 1 to 3 is 3.4–4.7 CPU-seconds per 15 minutes at 0.076–0.096 s average. (✅ done)
+- **`PL-1` — what instrumentation costs.** 82–89% of a request's CPU, on the profile a deployed instance runs: about a third writing the log records, about twice that in the activity machinery around them. Measured on a controlled host after an attempt on the deployed instance was withdrawn — a startup walk still holding the core made its per-request figures meaningless. (✅ done)
 - **`C34` — the folder-record validator.** `/_nav/folder` was the one response the browser re-reads that carried no entity tag; `C29` added the endpoint after `C20` tagged the rest. (✅ done)
 - **Wave 0 — stop paying for instrumentation on the hot path.** `C1`, `C2`, and `C9`, returned to the plan by `M1`'s measurement. Now the highest-value work open. (🟡 todo)
 - **Wave 4 — any size.** Persisted per-folder records, change-driven freshness, paged levels, server-side search, targeted pushes, and a narrowed body preload. (🟡 todo)
 
 ## 💡 Conclusion
 
-The cheapest wins were accidental costs rather than design faults, and the two largest were found only by measuring the instance that actually serves readers: a crawler trap that took the core, and instrumentation that takes nine-tenths of every request. Neither appeared in any local run. What remains is wave 0, which removes the second of those while keeping the diagnostics, and wave 4, the only lever that removes the costs growing with the corpus.
+The cheapest wins were accidental costs rather than design faults, and the two largest were found outside navigation: a crawler trap that took the deployed core, and instrumentation that takes 82–89% of a request. The second needed three configurations and a controlled host to measure — a two-way switch on a shared instance gave a figure ten times too large and attributed it to the wrong half. What remains is wave 0, which removes that cost while keeping the diagnostics, and wave 4, the only lever that removes the costs growing with the corpus.
 
 ## 📚 References
 

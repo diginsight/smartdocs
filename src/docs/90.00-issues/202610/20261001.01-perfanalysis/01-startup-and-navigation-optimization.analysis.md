@@ -10,9 +10,9 @@ publish: false
 # Startup and navigation at any scale: run review, caching model, and target design
 
 **Date:** 2026-10-01
-**Revised:** 2026-10-02, version 1.6 — `PL-1` was measured on the deployed instance and resolved against the premise it was parked on: instrumentation takes about 90% of the CPU of every request, so `C1` and `C2` return as wave 0 and the strategy gains a rank above all five of its cost classes. The same revision turned Always On on for both apps (`C33`), confirmed waves 2 and 3 deployed, and added `C34`, the validator `C29` had left off `/_nav/folder`. Version 1.5 closed waves 2 and 3 — `C29`, `C4`, `C22`, `C11`, `C12`, `C21`, `C10`, and `C23`, each with its own implementation record and visible-browser validation sequence — and added `M2`, the scale harness, with two points measured across a ten-fold step in corpus size. Version 1.4 confirmed `C32`'s effect over matched platform-metric windows, and moved navigation warm-up after listening into one foreground-gated queue (`C4`). Version 1.3 measured the deployed Learning Hub, read-only: a crawler trap, not navigation, took almost all of its CPU (`N20`), and `C32` ended it. Version 1.2, earlier the same day, recorded wave 1 as implemented and validated against the previous build. Version 1.1, of 2026-10-01, parked the instrumentation finding until a deployed instance is measured, generalized folder metadata from counts to one complete record per folder, added a cache-sizing finding, and re-ranked the strategy by what a runtime environment pays for
+**Revised:** 2026-10-02, version 1.6 — `PL-1` was resolved against the premise it was parked on: on the profile a deployed instance runs, instrumentation takes 82–89% of the CPU of a request, about a third of it writing log records and about twice that in the activity machinery. `C1`, `C2`, and `C9` return as wave 0 and the strategy gains a rank above all five of its cost classes. A first attempt at this measurement, on the deployed instance itself, was **withdrawn**: it could not separate the request path from a startup walk still consuming a whole core, and the page records the withdrawal beside the measurement that replaced it. The same revision turned Always On on for both apps (`C33`), confirmed waves 2 and 3 deployed, and added `C34`, the validator `C29` had left off `/_nav/folder`. Version 1.5 closed waves 2 and 3 — `C29`, `C4`, `C22`, `C11`, `C12`, `C21`, `C10`, and `C23`, each with its own implementation record and visible-browser validation sequence — and added `M2`, the scale harness, with two points measured across a ten-fold step in corpus size. Version 1.4 confirmed `C32`'s effect over matched platform-metric windows, and moved navigation warm-up after listening into one foreground-gated queue (`C4`). Version 1.3 measured the deployed Learning Hub, read-only: a crawler trap, not navigation, took almost all of its CPU (`N20`), and `C32` ended it. Version 1.2, earlier the same day, recorded wave 1 as implemented and validated against the previous build. Version 1.1, of 2026-10-01, parked the instrumentation finding until a deployed instance is measured, generalized folder metadata from counts to one complete record per folder, added a cache-sizing finding, and re-ranked the strategy by what a runtime environment pays for
 **Author:** Dario Airoldi
-**Status:** Waves 1, 2, and 3 are implemented, validated, and deployed, and `C32`, `C33`, and `C34` with them, all on 2026-10-02 — see [🔧 Wave 1 implementation record](#-wave-1-implementation-record) and the per-change records from [🚦 C4](#-c4-implementation-record) to [🧩 C23](#-c23-implementation-record). `M1` and `M2` are measured; `M1` settled `PL-1`, which opened [wave 0](#wave-0--stop-paying-for-instrumentation-on-the-hot-path) — now the highest-value work still open, ahead of wave 4 (`C24`–`C28`, `C16`). See [⚡ What instrumentation costs a deployed instance](#-what-instrumentation-costs-a-deployed-instance)
+**Status:** Waves 1, 2, and 3 are implemented, validated, and deployed, and `C32`, `C33`, and `C34` with them, all on 2026-10-02 — see [🔧 Wave 1 implementation record](#-wave-1-implementation-record) and the per-change records from [🚦 C4](#-c4-implementation-record) to [🧩 C23](#-c23-implementation-record). `M1` and `M2` are measured; `PL-1` is resolved, which opened [wave 0](#wave-0--stop-paying-for-instrumentation-on-the-hot-path) — now the highest-value work still open, ahead of wave 4 (`C24`–`C28`, `C16`). See [⚡ What instrumentation costs](#-what-instrumentation-costs)
 **Component:** `Diginsight.SmartDocs.Web` (host, navigation, caching), `Diginsight.SmartDocs.Web.Client` (menus, hydration), `Diginsight.SmartDocs.Web.Shared` (page loading, rendering)
 **Framework:** .NET 10 / ASP.NET Core / Blazor Web App (server prerender + global interactive WebAssembly), Diginsight.SmartCache 3.8.0.2, Diginsight.Core 3.8.0.2
 **Builds on:** [`20260925.02-startup-optimization`](../../202609/20260925.02-startup-optimization/overview.md) — the analysis of 2026-09-29 this page reviews and extends
@@ -78,8 +78,9 @@ publish: false
 - [🖨️ C21 and C10 implementation record](#-c21-and-c10-implementation-record)
 - [🧩 C23 implementation record](#-c23-implementation-record)
 - [🧊 Parked items](#-parked-items)
-- [⚡ What instrumentation costs a deployed instance](#-what-instrumentation-costs-a-deployed-instance)
-  - [How it was measured](#how-it-was-measured-1)
+- [⚡ What instrumentation costs](#-what-instrumentation-costs)
+  - [Why the deployed measurement was withdrawn](#why-the-deployed-measurement-was-withdrawn)
+  - [How it was measured instead](#how-it-was-measured-instead)
   - [What it costs](#what-it-costs)
   - [What it means](#what-it-means)
 - [🧪 Verification](#-verification)
@@ -99,7 +100,7 @@ The five findings below are stated as they were measured, on commit `71171ed` of
 - **The cache is mostly full of text nothing reads.** Every front-matter read caches the first 8 KB of the file as text, though navigation uses a few hundred characters of it. For the Learning Hub's content that's an estimated 8.84 million of the 10 million units SmartCache holds by default, which leaves every listing, every level, and every cached article to share the rest — room for about a hundred average articles at most. This is runtime behavior, independent of logging and instrumentation.
 - **Rendered documents aren't cached at any layer.** SmartCache holds Markdown bytes. Every prerender runs Markdig, every browser navigation downloads Markdown again and renders it in WebAssembly, and no response carries a validator — so a repeat view of an unchanged page costs a full round trip and a full render. Images bypass every cache: a 144 KB image is sent in full on every view.
 - **Folder metadata has no record of its own, and the client sees only part of it.** A folder's authored metadata — its `metadata.yml` — is cached as raw text and parsed at every level build, and every key the parser doesn't know is dropped. Its derived metadata — the article count, newest date, and coverage — lives outside SmartCache, in a private dictionary saved to a JSON snapshot. Both are copied into the parent's cached level, so any count change flushes every level, and the browser sees only what a level carries: never a folder's description, and never the newest article's author, although two contracts already have a field for it.
-- **The instrumentation question was parked, and has since been answered.** In the debug profile, SmartCache's own activities and log records dominated the trace. A deployed instance logs at `Warning` and samples traces at 10%, and instrumentation at the debug level is enabled on purpose, for debugging, so whether a deployed instance paid anything for it was parked as [`PL-1-runtime-instrumentation-cost`](#pl-1-runtime-instrumentation-cost--what-instrumentation-costs-in-a-deployed-instance) until one was measured. One was, on 2026-10-02: it pays about 90% of the CPU of every request, which makes it the largest remaining cost on the deployed instance.
+- **The instrumentation question was parked, and has since been answered.** In the debug profile, SmartCache's own activities and log records dominated the trace. A deployed instance logs at `Warning` and samples traces at 10%, and instrumentation at the debug level is enabled on purpose, for debugging, so whether a deployed instance paid anything for it was parked as [`PL-1-runtime-instrumentation-cost`](#pl-1-runtime-instrumentation-cost--what-instrumentation-costs-in-a-deployed-instance) until one was measured. Measured on that profile on 2026-10-02, it pays 82–89% of the CPU of a request — about a third writing the records, and about twice that in the activity machinery around them.
 - **An unlimited document set overturns three of the earlier conclusions.** One manifest per space, preloading every article body, and a whole-tree index for search and prev/next all grow with the corpus — and so does a cache warmed with every header. The target keeps the earlier principles — load instead of crawl, approximate first, foreground first, render once — and adds one: **no request, startup step, or change may cost work proportional to the size of the corpus.** Three records carry everything a reader sees — a folder record holding all of a folder's metadata, a level, and a rendered page — each cached in SmartCache, versioned for the browser, and updated by change events instead of by crawling.
 
 The following table compares the primary run with the target. The target column is an estimate; it holds at any corpus size by construction, not by measurement.
@@ -123,7 +124,7 @@ The following table compares the primary run with the target. The target column 
 
 **A deployed instance pays for something else first.** `M1` measured the deployed Learning Hub on 2026-10-02 from its platform metrics, its web-server log, and requests from outside. For at least three days it had spent 77–88% of its single core, at about 2 s per response, on one crawler requesting routes that don't exist: 5,852 of the 5,854 paths it asked for in three hours. The application answers an unknown route with status 200 and a full page of relative links, and the crawler resolves those links against the page's own URL, so every answer breeds new unknown routes ([`N20`](#n20-crawler-trap--unknown-routes-answer-200-and-breed-more)). Wave 1 doesn't touch that cost. `C32` ends it — a 404 before prerendering, rooted links, and a `robots.txt`. Deployed the same day, it cut the Learning Hub's CPU from 160–228 to 4 CPU-seconds per five minutes, and [📏 Deployed baseline](#-deployed-baseline) re-ranks waves 2–4 around it.
 
-**And then it pays for instrumentation.** With the trap gone and waves 1 to 3 deployed, the same instance was put under a steady load with the `Diginsight.*` activity sources listened to — its base configuration — and again with them gated off. The cost per request was **0.248 s against 0.019–0.025 s**: about 90% of the CPU of every request is instrumentation, on a deployed instance logging at `Warning` and sampling 10% of traces. This page had parked that question as [`PL-1`](#pl-1-runtime-instrumentation-cost--what-instrumentation-costs-in-a-deployed-instance) on the premise that it was a debug-profile cost, and left instrumentation off its ranking of what a runtime environment pays for. The premise was wrong. `C1-gate-hot-activities` and `C2-trim-hot-path-activities` return as [wave 0](#wave-0--stop-paying-for-instrumentation-on-the-hot-path), ahead of everything else still open, and [⚡ What instrumentation costs a deployed instance](#-what-instrumentation-costs-a-deployed-instance) records the measurement.
+**And then it pays for instrumentation.** With the trap gone and waves 1 to 3 deployed, the cost that remained was measured by comparing three configurations of the same host under load: as deployed, with log records suppressed, and with the activity sources gated off. On the profile a deployed instance runs — `Warning` by default, `Information` for the application's own category, log4net on — **82–89% of the CPU of a request is instrumentation**: about a third of it writing the log records, and about twice that in the activity machinery around them, which is paid before any log level is checked. This page had parked that question as [`PL-1`](#pl-1-runtime-instrumentation-cost--what-instrumentation-costs-in-a-deployed-instance) on the premise that it was a debug-profile cost, and left instrumentation off its ranking of what a runtime environment pays for. The premise was wrong. `C1-gate-hot-activities` and `C2-trim-hot-path-activities` return as [wave 0](#wave-0--stop-paying-for-instrumentation-on-the-hot-path), ahead of everything else still open. The first attempt at this measurement, taken on the deployed instance, was withdrawn: it could not separate the request path from a startup walk that was still consuming a whole core, and [⚡ What instrumentation costs](#-what-instrumentation-costs) records both the withdrawal and the measurement that replaced it.
 
 ## 🔁 Review of the 2026-09-29 analysis
 
@@ -615,7 +616,7 @@ The runs measured a debug profile; a deployed instance runs a different one. The
 4. **Work repeated on every change.** Level flushes for count changes, and whole-site invalidations for a publish.
 5. **Work at startup that grows with the corpus.** The crawl, the refold of an unchanged snapshot, and the rebuild of every level.
 
-**This list was written without instrumentation on it, and that was wrong.** It said instrumentation was a debug-profile cost "until [`PL-1`](#pl-1-runtime-instrumentation-cost--what-instrumentation-costs-in-a-deployed-instance) shows otherwise". On 2026-10-02 `PL-1` showed otherwise: on the deployed instance, on its base settings, instrumentation takes about 90% of the CPU of every request — 0.248 s against 0.019–0.025 s with the `Diginsight.*` sources gated off. See [⚡ What instrumentation costs a deployed instance](#-what-instrumentation-costs-a-deployed-instance). It now ranks above all five, because it is paid on every instrumented call on every request, whatever the corpus holds and whatever the request does.
+**This list was written without instrumentation on it, and that was wrong.** It said instrumentation was a debug-profile cost "until [`PL-1`](#pl-1-runtime-instrumentation-cost--what-instrumentation-costs-in-a-deployed-instance) shows otherwise". On 2026-10-02 `PL-1` showed otherwise: on the profile a deployed instance runs, instrumentation takes 82–89% of the CPU of a request — about a third of it writing log records and about twice that in the activity machinery around them. See [⚡ What instrumentation costs](#-what-instrumentation-costs). It now ranks above all five, because it is paid on every instrumented call on every request, whatever the corpus holds and whatever the request does.
 
 ### The levers, ranked
 
@@ -623,7 +624,7 @@ The table ranks eight levers by their effect on a runtime environment. *Holds at
 
 | Rank | Lever | What it removes in a runtime environment | Holds at any size | Effort | Changes |
 |---|---|---|---|---|---|
-| 0 | Stop paying for instrumentation on the hot path | about 90% of the CPU of every request, measured on the deployed instance: the emitter resolving its options at every activity start and stop, and SmartCache's two nested activities and per-lookup records | yes — it's per call, not per document | hours each, plus two library changes | `C1`, `C2`, with `C3`/`SIG-1` and `SIG-2` upstream |
+| 0 | Stop paying for instrumentation on the hot path | 82–89% of the CPU of a request, measured on the profile a deployed instance runs: about a third writing log records, and about twice that in the activity machinery around them — the emitter resolving its options at every activity start and stop, and SmartCache's two nested activities and per-lookup records | yes — it's per call, not per document | hours each, plus two library changes | `C1`, `C2`, `C9`, with `C3`/`SIG-1` and `SIG-2` upstream |
 | 1 | Stop accidental work | the whole-tree walk triggered by the first page and by every unknown file; the 228–394 KB index downloaded on every session's first page; image folders crawled and shown as sections; the refold of an unchanged snapshot | yes | hours each | `C17`, `C7`, `C18`, `C19` |
 | 2 | Make every repeat free | full re-downloads of unchanged pages, levels, and images; uncompressed JSON; two round trips per blob | yes | a day | `C20`, `C34` |
 | 3 | Fit the cache to its purpose | origin re-reads caused by a cap filled with header text; a redundant registration | yes | hours | `C31`, `C30` |
@@ -651,7 +652,7 @@ The local runs measured a debug profile. One deployed baseline ranks the waves b
 
 | # | Id | Change | Addresses | Effort | Risk | Status |
 |---|---|---|---|---|---|---|
-| 0 | `M1-deployed-baseline` | On one deployed instance, before and after wave 1, record: time to listening and to the first page after a restart; p50 and p95 of `/_page` and `/_nav/children`, warm and after the five-minute tolerance lapses; bytes per navigation, images included; SmartCache's total size and evictions by reason; how long counts stay stale after a publish; and CPU and activities per request with the `Diginsight.SmartCache` and `Diginsight.Components` sources listened to and gated off. Measured read-only on 2026-10-02, then completed the same day on the instance itself — see [📏 Deployed baseline](#-deployed-baseline) and [⚡ What instrumentation costs a deployed instance](#-what-instrumentation-costs-a-deployed-instance). SmartCache's size and evictions, and counts after a publish, stay unmeasured: neither is readable from outside | `PL-1`, `N19` | hours | none | ✅ done in part |
+| 0 | `M1-deployed-baseline` | On one deployed instance, before and after wave 1, record: time to listening and to the first page after a restart; p50 and p95 of `/_page` and `/_nav/children`, warm and after the five-minute tolerance lapses; bytes per navigation, images included; SmartCache's total size and evictions by reason; how long counts stay stale after a publish; and CPU and activities per request with the `Diginsight.SmartCache` and `Diginsight.Components` sources listened to and gated off. Measured read-only on 2026-10-02, then completed the same day on the instance itself — see [📏 Deployed baseline](#-deployed-baseline). The instrumentation half could not be measured there and moved to a controlled host, see [⚡ What instrumentation costs](#-what-instrumentation-costs). SmartCache's size and evictions, and counts after a publish, stay unmeasured: neither is readable from outside | `PL-1`, `N19` | hours | none | ✅ done in part |
 | 0a | `M2-scale-baseline` | A generator for a synthetic tree of any fan-out, an overlay that serves it outside the debug profile, and a measurement script for time to listening, first page, first-page bytes, warm p50 and p95, and working set — so wave 4 is judged by a comparison across sizes. Harness built and two points measured on 2026-10-02 — see [📐 Scale baseline](#-scale-baseline) | `N17` | hours | none | ✅ done |
 
 ### Wave 0 — stop paying for instrumentation on the hot path
@@ -734,7 +735,7 @@ The table says where each remaining change of the earlier analysis went.
 
 | Id | Where it went |
 |---|---|
-| `C1-gate-hot-activities`, `C2-trim-hot-path-activities`, `C9-local-log-defaults` | **Returned to the active sequence as wave 0** on 2026-10-02, when `PL-1`'s measurement showed instrumentation taking about 90% of the CPU of every request on the deployed instance. They were parked on the premise that this was a debug-profile cost; the premise was tested and failed. (🟡 todo) |
+| `C1-gate-hot-activities`, `C2-trim-hot-path-activities`, `C9-local-log-defaults` | **Returned to the active sequence as wave 0** on 2026-10-02, when `PL-1`'s measurement showed instrumentation taking 82–89% of the CPU of a request on the profile a deployed instance runs. They were parked on the premise that this was a debug-profile cost; the premise was tested and failed. `C9` is no longer only a local-defaults convenience: about a third of the cost is the records themselves. (🟡 todo) |
 | `C3-fix-options-cache-upstream` | Stays upstream, tracked as `SIG-1` on the earlier work item's signals page. `PL-1`'s measurement confirms its production rationale, which that record had argued from configuration alone. (🟡 todo) |
 | `C5-overlay-counts` | Superseded by `C29-folder-records`, which takes every piece of folder metadata out of levels, not only counts. |
 | `C8-exclusions-any-depth` | Folded into `C18`. |
@@ -820,7 +821,7 @@ Deploys had failed since 2026-10-01 on a restore error unrelated to this work: t
 
 Two conclusions followed at the time. Wave 1 does what it set out to do on the deployed instance — the icon, the validators, and compression behave as in the local run — but the instance's cost was never in its scope: the crawler trap takes the core whatever navigation does. And every startup measure on the plan is dominated by that contention, so the startup figures `M1` asks for can only be read once the trap is gone.
 
-A third followed once the trap was gone and the figures could be read: **the cost that remained wasn't navigation either.** At 46 requests per 15 minutes the instance was spending about 4 CPU-seconds, which looks settled — until the same instance is put under a steady load and the cost per request turns out to be nine-tenths instrumentation. [⚡ What instrumentation costs a deployed instance](#-what-instrumentation-costs-a-deployed-instance) records that measurement; it is the reason this page now has a wave 0.
+A third followed once the trap was gone and the figures could be read, though not from this instance: **the cost that remained wasn't navigation either.** At 46 requests per 15 minutes the instance spends about 4 CPU-seconds, which looks settled — and at that rate it is. Under load, most of what a request costs turns out to be instrumentation. The attempt to establish that *here* failed, because a startup walk still holding the core made the per-request figure meaningless; [⚡ What instrumentation costs](#-what-instrumentation-costs) records the withdrawal and the controlled measurement that replaced it. It is the reason this page now has a wave 0.
 
 ### `C32-end-the-crawler-trap` — what changed
 
@@ -847,11 +848,12 @@ The owner decided that GPTBot may crawl the Learning Hub's public content, with 
 
 The parts that act on the instance were left for the owner at first: the time to listening after a deliberate restart, CPU with the instrumentation sources gated off — which is what settles `PL-1` — SmartCache's size and evictions, and how long counts stay stale after a publish.
 
-**Three of the four were done later the same day**, once `C33` had freed the instance and the owner authorized acting on it:
+**Two of the four were done later the same day**, once `C33` had freed the instance and the owner authorized acting on it:
 
 - **The restart.** With Always On on, the platform recycles with an overlap: a deliberate restart of the Learning Hub never exposed a cold start, and the first request after it answered in 1.9 s. The figure `M1` wanted — a visitor waiting for a full start — no longer exists on these apps, which is what `C33` was for. The docs site, which this page had recorded answering `504` after 110.7 s when idle, answered in 422 ms.
 - **Steady state after waves 1 to 3.** 3.4–4.7 CPU-seconds per 15 minutes at 46–47 requests, with an average response time of 0.076–0.096 s. Before `C32` the same instance spent 160–228 CPU-seconds per *five* minutes at about 2 s per response.
-- **The instrumentation comparison.** Done, and it settles `PL-1` against the premise the item was parked on — see [⚡ What instrumentation costs a deployed instance](#-what-instrumentation-costs-a-deployed-instance).
+
+**The instrumentation comparison was attempted here and withdrawn.** The idle windows it added showed the instance burning 45–51 CPU-seconds per minute while serving three requests per minute, so no per-request figure taken on it means anything; it was re-done on a controlled local host instead. See [⚡ What instrumentation costs](#-what-instrumentation-costs).
 
 Two remain unmeasured, and neither is readable from outside: **SmartCache's total size and evictions by reason**, which need either a diagnostic endpoint or a profiler on the instance, and **how long counts stay stale after a publish**, which needs a publish against the deployed content set. (🟡 todo)
 
@@ -971,7 +973,7 @@ These items are in this work item's domain and deliberately left out of the acti
 
 ### `PL-1-runtime-instrumentation-cost` — what instrumentation costs in a deployed instance
 
-- **State** — resolved on 2026-10-02. The sections below record why it was parked and what it waited for; [⚡ What instrumentation costs a deployed instance](#-what-instrumentation-costs-a-deployed-instance) records what the measurement found.
+- **State** — resolved on 2026-10-02. The sections below record why it was parked and what it waited for; [⚡ What instrumentation costs](#-what-instrumentation-costs) records what the measurement found, and why the first attempt at it was withdrawn.
 - **Absorbs** finding `N16-smartcache-overhead` of this page's first version, the production share of [`N1-activity-options-rebind`](../../202609/20260925.02-startup-optimization/overview.md#n1-activity-options-rebind--every-instrumented-call-re-binds-its-logging-options), and the changes that answer them: `C1-gate-hot-activities`, `C2-trim-hot-path-activities`, `C3-fix-options-cache-upstream`, and `C9-local-log-defaults`.
 - **Why it was parked.** Every measurement of instrumentation up to that point was local: this page's runs used the debug profile, and the earlier analysis's runs a Development host whose emitter listened to `Diginsight.*` unless a run gated it off. Instrumentation at that level is enabled on purpose, for debugging, and a deployed instance doesn't run the debug profile. What it cost there was an open question, not a finding.
 - **What's known about deployed instances.** Neither deployed overlay sets a `Diginsight:Activities`, `Logging`, or `OpenTelemetry` section, and the build workflow sets only the environment name, the snapshot path, and the invalidation key. A deployed instance therefore runs the base settings: logs at `Warning`, the activity sources `Diginsight.*` listened to, and traces sampled at 10%, which is the default Diginsight.Components applies outside Development. Settings added on an App Service by hand aren't covered by this reading.
@@ -981,36 +983,62 @@ These items are in this work item's domain and deliberately left out of the acti
   2. OpenTelemetry tracing, which listens to `Diginsight.*` and samples 10% of traces: what an unsampled lookup costs, and the export volume when a monitoring connection string is configured;
   3. the per-lookup `Debug` records, which a `Warning` level should reduce to one level check each.
 - **How it's resolved.** As part of `M1-deployed-baseline`: on one deployed instance, compare CPU and activities per request with the `Diginsight.SmartCache` and `Diginsight.Components` sources listened to and gated off. A difference within measurement noise closes the item. A larger one returns `C1` and `C2` to wave 1, restores the relevance of `SIG-2` on [this work item's signals page](02-signals.md), and confirms the production rationale of `SIG-1` on the [earlier work item's signals page](../../202609/20260925.02-startup-optimization/01-signals.md).
-- **Disposition** → **unparked on 2026-10-02.** The measurement was taken and the difference is an order of magnitude, not noise. See [⚡ What instrumentation costs a deployed instance](#-what-instrumentation-costs-a-deployed-instance). `C1` and `C2` return to the active sequence as `W0`, `SIG-2` regains its relevance, and `SIG-1`'s production rationale is confirmed.
+- **Disposition** → **unparked on 2026-10-02.** The measurement was taken — on a controlled host, after one attempt on the deployed instance was withdrawn — and the difference is 82–89% of a request, not noise. See [⚡ What instrumentation costs](#-what-instrumentation-costs). `C1`, `C2`, and `C9` return to the active sequence as wave 0, `SIG-2` regains its relevance, and `SIG-1`'s production rationale is confirmed. The item's own closing rule asked for CPU per request with the sources listened to and gated off; it did not say that the comparison must also hold the background work still, which is what made the first attempt unusable.
 
-## ⚡ What instrumentation costs a deployed instance
+## ⚡ What instrumentation costs
 
-`PL-1` asked what a deployed instance pays for instrumentation, and parked the question until one was measured. It was measured on 2026-10-02 on the deployed Learning Hub, running waves 1 to 3 and `C32`, with Always On on.
+`PL-1` asked what a deployed instance pays for instrumentation, and parked the question until one was measured. It was attempted on the deployed Learning Hub on 2026-10-02 and **that attempt failed**; the question was then answered on a controlled local host the same day. Both are recorded, because the failure is the more useful half: it shows what a measurement on a shared App Service plan cannot establish.
 
-### How it was measured
+### Why the deployed measurement was withdrawn
 
-Four load runs of four minutes each, at an offered rate of four requests per second over a fixed mix — `/_nav/children`, `/_nav/folder`, `/_page`, and a prerendered article page. Between runs, one app setting was added or removed: `Diginsight__Activities__ActivitySources__Diginsight.*`, absent by default and therefore `true` from the base settings. Changing it restarts the app, so every run was preceded by the same 80-second warm. CPU came from the platform's per-minute `CpuTime`, divided by the per-minute request count over the same window. The setting was removed at the end; the instance is back on its base configuration.
+The first attempt applied four minutes of load to the deployed Learning Hub with the `Diginsight.*` activity sources listened to and gated off, read the platform's per-minute `CpuTime` for each window, and divided by the request count. It produced 0.248 s of CPU per request against 0.019–0.025 s, and this page reported that as "about 90% of the CPU of every request".
 
-The load generator is `scripts\Smartdocs.Deployed.Load.ps1`, which reports the UTC window it covered so metrics can be read for exactly that window.
+**That figure was wrong, and the method could not have produced a right one.** A later run added an idle window — two minutes with no load — before each load window. The idle windows burned **45–51 CPU-seconds per minute while serving three requests per minute**. The startup walk was still running long after the app answered, and it runs longer when instrumented, so the CPU in each load window was mostly background work that dividing by request count charged to the request path. The configuration with instrumentation on was penalized twice: once for its own cost, and once for a walk that hadn't finished.
+
+Two further confounds, either of which alone would be disqualifying: the B1 plan carries five apps, three of them now Always On, so the core available to this one varies with its neighbours — during one probe the home page took 16.6 s; and the load client is closed-loop, so a slower instance offers less load, which changes the test rather than measuring it.
+
+What the deployed runs do establish is narrower and still worth having: **the startup walk is far more expensive instrumented than not**, enough to still be consuming a whole core minutes after the app starts answering. That is a cost on the same hot paths wave 0 addresses, and it compounds with `C24`, whose crawl it is.
+
+### How it was measured instead
+
+On a local host, where the process is the only tenant and its own CPU can be read directly. `scripts\Smartdocs.Local.CpuCost.ps1` starts the host, waits until its CPU has gone quiet — so the warm-up is genuinely finished, not merely old — measures an idle window, then issues 400 requests over a fixed mix of `/_nav/children`, `/_nav/folder`, `/_page`, and a prerendered page. The reported cost is **marginal**: the load window's CPU minus the idle rate extrapolated over the same wall time, divided by the requests. Idle CPU measured 0.000–0.003 of a core in every run, so the subtraction is small and the figure is the request's own.
+
+`appsettings.cpucost.json` gives the host the profile a deployed instance runs — `Warning` by default, `Information` for the application's own category, log4net on — rather than the debug profile. Three configurations, run back to back so that machine load is shared:
+
+- **as deployed** — the activity sources listened to, records written at those levels;
+- **logs off** — the same sources listened to, every level set to `None`, so activities are still created, listened to, and sampled, but no record is written;
+- **activities off** — `Diginsight.*` and `Diginsight.SmartDocs.Web` gated off, levels left as deployed.
+
+The middle configuration is the one the first attempt lacked. Gating a source off suppresses the activity *and* every record it emits *and* its OpenTelemetry span, so a two-way comparison cannot say which of the three is being paid for.
 
 ### What it costs
 
-| Run | `Diginsight.*` | Requests in 4 min | p50 | p95 | CPU per request |
-|---|---|---|---|---|---|
-| A′ | listened to | 580 | 203.6 ms | 1,050.1 ms | 0.248 s |
-| B | gated off | 900 | 50.7 ms | 150.1 ms | 0.025 s |
-| B′ | gated off | 871 | 54.0 ms | 225.5 ms | 0.019 s |
+One matched set, the three runs taken consecutively:
 
-The client is closed-loop — it waits for each response before pacing the next — so a slower instance completes fewer requests in the same wall time. The throughput column is therefore a second reading of the same effect, not an independent one.
+| Configuration | CPU per request | p50 | p95 | Wall for 400 requests |
+|---|---|---|---|---|
+| As deployed | 136.6 ms | 25.9 ms | 173.6 ms | 23.2 s |
+| Logs off, activities on | 92.9 ms | 18.5 ms | 118.5 ms | 16.1 s |
+| Activity sources gated off | 14.6 ms | 8.9 ms | 19.7 ms | 4.2 s |
 
-An earlier run with the sources listened to, taken 16 minutes after a restart rather than 80 seconds, was worse still: 155 requests, a p50 of 871.3 ms, and about 0.86 s of CPU per request. It isn't in the table because its warm-up was still competing; it's recorded because it shows the cost compounds with whatever else the host is doing.
+Which decomposes as:
+
+| Component | Share of the as-deployed request |
+|---|---|
+| Writing the log records | 32% |
+| The activity machinery itself — creation, the per-activity options rebind, the OpenTelemetry listener | 57% |
+| **Total instrumentation** | **89%** |
+| The work the request actually does | 11% |
+
+Across three sets the total ranged from 82% to 89%, the log-writing share from 23% to 32%, and the activity share from 57% to 59%. Absolute figures moved between sets — 136.6, 169.6, and 114.2 ms for the as-deployed configuration — because the machine was shared; the shares held.
 
 ### What it means
 
-- **Instrumentation costs about 90% of the CPU per request.** 0.248 s against 0.019–0.025 s, a factor of ten, reproduced twice in each configuration. This is a deployed instance on its base settings — logging at `Warning`, traces sampled at 10% — not the debug profile, so `PL-1`'s own closing rule applies: the difference is not noise.
-- **`N1-activity-options-rebind` holds in production.** The earlier analysis inferred its production share from configuration; it's now measured. The emitter resolving its options at every activity start and stop is paid on every instrumented call, before any log level is checked.
-- **The strategy's ranking was wrong on this point, and says so.** [What a runtime environment pays for](#what-a-runtime-environment-pays-for) excluded instrumentation as a debug-profile cost "until `PL-1` shows otherwise". It has.
-- **Gating the whole source off is a mitigation, not the fix.** It removes the diagnostics along with the cost, and the owner enables them on purpose. `C1-gate-hot-activities` and `C2-trim-hot-path-activities` keep the diagnostics and remove the hot-path cost; `SIG-1` and `SIG-2` are the library-side halves. The deployed instance was returned to its base configuration rather than left gated, because that choice belongs to the owner — one app setting, `Diginsight__Activities__ActivitySources__Diginsight.*=false`, applies it at any time.
+- **Instrumentation dominates the cost of a request, and logging is a third of it.** Not a tenth, and not all of it: the records are a real cost, and the activity machinery around them is roughly twice as large. A measurement that gates the source off, as the first attempt did, cannot tell the two apart, and this page previously presented the combined figure as though it were the activity machinery alone.
+- **`N1-activity-options-rebind` is the larger half, and is paid before any level check.** 57 points of the 89 are activities that are created, listened to, and sampled whatever the log level says — which is why lowering the level alone recovers only a third.
+- **The strategy's ranking was wrong to exclude instrumentation, and the correction stands** on this evidence rather than on the withdrawn one. [What a runtime environment pays for](#what-a-runtime-environment-pays-for) said instrumentation was a debug-profile cost "until `PL-1` shows otherwise"; measured on the profile a deployed instance runs, it is 82–89% of a request.
+- **Wave 0 needs both halves.** `C1-gate-hot-activities` and `C2-trim-hot-path-activities` address the 57; the 32 needs the records themselves to be fewer or cheaper, which is `C9-local-log-defaults` plus the per-lookup records of `SIG-2`. Gating the whole source off removes all 89 and the diagnostics with them, which is why it is a mitigation rather than the fix, and why the deployed instance was returned to its base configuration rather than left gated.
+- **This is a local figure, on a developer machine with many cores.** The shares should carry to a deployed instance; the milliseconds will not. Confirming the shares there needs an instance that isn't sharing a core, or a profiler on the instance itself — neither of which this work item has. (🟡 todo)
 
 ## 🧪 Verification
 
@@ -1036,7 +1064,10 @@ The following checks were run for this page and its revision:
 - The scale harness was built and two points measured against waves 1 to 3, over generated trees of 1,000 and 10,000 articles with the root level held constant. (✅ done — see [📐 Scale baseline](#-scale-baseline))
 - The criterion's own tree, 10,000 sections and 100,000 articles, hasn't been run, so no memory ceiling is established. (🟡 todo)
 - `M1` was measured in part on 2026-10-02 on the deployed Learning Hub and docs site, without acting on them: three days of platform metrics, three hours of web-server log, and requests from outside before and after wave 1 was deployed. (✅ done)
-- `M1` was then completed on the instance itself, with the owner's authorization: Always On turned on, a deliberate restart, steady-state CPU and response time after waves 1 to 3, and four load runs comparing instrumentation listened to and gated off. (✅ done — see [⚡ What instrumentation costs a deployed instance](#-what-instrumentation-costs-a-deployed-instance))
+- `M1` was then completed on the instance itself, with the owner's authorization: Always On turned on, a deliberate restart, and steady-state CPU and response time after waves 1 to 3. (✅ done)
+- The instrumentation comparison was attempted on the deployed instance and **withdrawn**: its idle windows showed 45–51 CPU-seconds per minute at three requests per minute, so CPU divided by request count measured the startup walk rather than the request. (✅ done — withdrawn and recorded, not carried as a figure)
+- The instrumentation comparison was then run on a controlled local host, on the profile a deployed instance uses, in three configurations — as deployed, log levels at `None`, and the activity sources gated off — with the idle rate subtracted and the result reproduced across three matched sets. (✅ done — see [⚡ What instrumentation costs](#-what-instrumentation-costs))
+- The shares were not confirmed on a deployed instance: doing so needs an instance that isn't sharing a core with four other apps, or a profiler on the instance. (🟡 todo)
 - SmartCache's total size and evictions by reason, and how long counts stay stale after a publish, stay unmeasured: neither is readable from outside the instance. (🟡 todo)
 - The deployed instance was returned to its base configuration after the instrumentation runs; no `Diginsight` app setting remains on it. (✅ done)
 - `C34`'s entity tag and `304` on `/_nav/folder` were verified on a local Release build before and after the change: `200` with no `ETag` before, `200` with a strong tag and `Cache-Control: no-cache` after, and `304` with an empty body on a conditional request. (✅ done)
@@ -1077,26 +1108,29 @@ The scale baseline needs the two harness scripts and nothing else. Each point is
 
 Discard the first measurement after a build: it carries the host's cold start, and in this page's runs it reported a time to listening more than twice the warm figure. Measure on a port no other instance holds, and take the working set twice — shortly after the first page, and again once the background walk has had time to run — because the two answer different questions.
 
-The instrumentation comparison needs a deployed instance, two app-setting changes, and the platform's per-minute metrics. Each phase must be preceded by the same warm, because changing an app setting restarts the app and a run taken closer to a restart measures the warm-up as well:
+The instrumentation comparison needs a host whose CPU can be attributed to it alone, three configurations rather than two, and an idle window beside each load window. `scripts\Smartdocs.Local.CpuCost.ps1` does all three: it waits for the warm-up to go quiet, measures the idle rate, issues a fixed number of requests, and subtracts the idle rate extrapolated over the load's wall time before dividing by the requests.
 
 ```powershell
-# Phase with the sources listened to — the base configuration, nothing set
-az webapp config appsettings delete --name <app> --resource-group <rg> `
-  --setting-names 'Diginsight__Activities__ActivitySources__Diginsight.*'
-# ... wait ~45 s for the restart, warm for ~35 s, then:
-.\scripts\Smartdocs.Deployed.Load.ps1 -BaseUrl 'https://<host>' -DurationMinutes 4 -RequestsPerSecond 4 -Label 'listened to'
+# As deployed: the activity sources listened to, records at the deployed levels
+.\scripts\Smartdocs.Local.CpuCost.ps1 -EnvironmentName cpucost -Label 'as deployed' `
+  -ArticleRoute '03.00-architecture/05-caching-and-invalidation' -Requests 400
 
-# Phase with the sources gated off
-az webapp config appsettings set --name <app> --resource-group <rg> `
-  --settings 'Diginsight__Activities__ActivitySources__Diginsight.*=false'
-# ... same wait and warm, then the same load run
+# Logs off: the sources still listened to and sampled, no record written
+.\scripts\Smartdocs.Local.CpuCost.ps1 -EnvironmentName cpucost -Label 'logs off' `
+  -ArticleRoute '03.00-architecture/05-caching-and-invalidation' -Requests 400 `
+  -EnvironmentOverrides @('Logging__LogLevel__Default=None','Logging__LogLevel__Diginsight=None',
+                          'Logging__LogLevel__Diginsight.*=None','Logging__LogLevel__Diginsight.SmartDocs.Web=None')
 
-# CPU and requests per minute for the windows the load runs reported
-az monitor metrics list --resource <resource-id> --metric CpuTime Requests `
-  --interval PT1M --start-time <startUtc> --end-time <endUtc> --aggregation Total
+# Activity sources gated off, records left at the deployed levels
+.\scripts\Smartdocs.Local.CpuCost.ps1 -EnvironmentName cpucost -Label 'activities off' `
+  -ArticleRoute '03.00-architecture/05-caching-and-invalidation' -Requests 400 `
+  -EnvironmentOverrides @('Diginsight__Activities__ActivitySources__Diginsight.*=false',
+                          'Diginsight__Activities__ActivitySources__Diginsight.SmartDocs.Web=false')
 ```
 
-Divide each window's `CpuTime` by its `Requests` to get CPU per request, and use the request counts rather than the client's clock to locate the window: the platform's counters lag the client by a minute or two. Remove the setting when done, so the instance is left on the configuration it was found in.
+Run the three consecutively and compare within the set, never across sets: absolute figures moved by a third between sets on a shared developer machine, while the shares held. The middle configuration is not optional — without it the comparison cannot say whether the cost is the records or the machinery that emits them.
+
+Do **not** take this comparison from App Service platform metrics. `CpuTime` divided by `Requests` charges the window's background work to the request path, and on a plan carrying several apps the core available to one of them varies minute to minute. Both failures are recorded in [⚡ What instrumentation costs](#-what-instrumentation-costs).
 
 ### Acceptance criteria for the target
 
@@ -1110,7 +1144,7 @@ The target is done when these hold:
 - No reader waits for a revalidation: at any time after start, the p95 of `/_page` and `/_nav/children` stays within 20% of the cached figure. (🟡 todo — `C22` serves stale and revalidates in the background and `C4` keeps the warm-up off the request path; on the deployed instance under load the p95 is dominated by instrumentation, so this can only be judged after wave 0)
 - After any publish, the counts on screen are exact on every instance within one coalescing window plus the event latency. (🟡 todo — exact on one instance since wave 1, and `C23` gives a folder key an invalidation callback that refolds wherever the broadcast lands; no multi-instance deployment has been measured, and the coalescing window needs `C28`)
 - A generated tree ten times larger — about 10,000 sections and 100,000 articles — leaves startup time, first-page reads, and server memory unchanged within 10%. (🟡 todo — a controlled ten-fold step holds first-page bytes identical and memory within 0.2% at 20 s, but memory diverges 5.8% once the background crawl runs on; see [📐 Scale baseline](#-scale-baseline). The criterion's own tree hasn't been run, and the divergence needs `C24`)
-- A request costs the deployed instance no more CPU with its diagnostics available than with them gated off. (🟡 todo — added on 2026-10-02, when the difference was measured at 0.248 s against 0.019–0.025 s. It is what wave 0 is for)
+- A request costs no more CPU with its diagnostics available than with them gated off. (🟡 todo — added on 2026-10-02, when the difference was measured at 82–89% of a request on the profile a deployed instance runs. It is what wave 0 is for)
 
 ## 💡 Conclusion
 
@@ -1120,7 +1154,7 @@ The four questions have short answers, and a fifth answer the page didn't set ou
 - **The cheapest wins are new.** A static icon, prev/next from the level, validators on every response, a cache that stores parsed records instead of raw text, and the asset-folder rule each take hours — and all of them landed in wave 1.
 - **Caching should be one model.** SmartCache in the host for every derived value — rendered pages and complete folder records included — and HTTP validators in the browser, carrying the same versions.
 - **At any size, the folder is the unit.** One record and one level per folder, read when shown, rewritten when changed, never loaded all at once — and the record carries all of the folder's metadata, so anything a publisher adds to `metadata.yml` reaches the reader.
-- **The largest cost was never navigation.** Twice over. The deployed instance's core went to a crawler trap, which `C32` ended; what remained of its CPU per request is about nine-tenths instrumentation, which wave 0 is for. Both were invisible in every local run, and both were found by measuring the instance that actually serves readers.
+- **The largest cost was never navigation.** Twice over. The deployed instance's core went to a crawler trap, which `C32` ended; what remains of a request's CPU is 82–89% instrumentation, about a third of it the log records and twice that the activity machinery, which wave 0 is for. Neither appeared in a local run of the application's own code, and the second needed a controlled host to measure after the deployed instance proved unable to separate it from its own startup walk.
 
 Next steps:
 
@@ -1132,7 +1166,9 @@ Next steps:
 - Deploy waves 2 and 3. (✅ done — commit `7408cfc` reached both apps at 16:24 UTC on 2026-10-02, and the live `/_nav/children` returns the folder-reference shape `C29` introduced)
 - Build the scale harness and measure waves 1 to 3 across a ten-fold step in corpus size (`M2`). (✅ done — 2026-10-02, [📐 Scale baseline](#-scale-baseline))
 - Turn Always On on, per deployed app (`C33`). (✅ done — 2026-10-02, both SmartDocs apps; the docs site's first request when idle went from `504` after 110.7 s to 422 ms)
-- Complete `M1` on the instance — a deliberate restart, steady-state CPU and response time, and the instrumentation comparison that settles `PL-1`. (✅ done — 2026-10-02, [⚡ What instrumentation costs a deployed instance](#-what-instrumentation-costs-a-deployed-instance))
+- Complete `M1` on the instance — a deliberate restart and steady-state CPU and response time. (✅ done — 2026-10-02)
+- Settle `PL-1` by comparing a request's CPU with instrumentation on and off. (✅ done — 2026-10-02 on a controlled host, after the deployed attempt was withdrawn: [⚡ What instrumentation costs](#-what-instrumentation-costs))
+- Confirm the instrumentation shares on a deployed instance that isn't sharing a core, or with a profiler on the instance. (📌 next steps)
 - Give `/_nav/folder` the validator `C20` gave the other endpoints (`C34`). (✅ done — 2026-10-02, verified locally before and after)
 - Implement wave 0 — `C1`, `C2`, and `C9` — and re-run the instrumentation comparison to confirm the cost is gone with the diagnostics kept. It is now the highest-value work open. (📌 next steps)
 - Read SmartCache's size and evictions, and how long counts stay stale after a publish, which need a diagnostic endpoint and a publish rather than an outside probe. (📌 next steps)
@@ -1140,7 +1176,7 @@ Next steps:
 
 ## 🎓 Lessons learned
 
-**A measurement inherits its profile — and a parked question inherits its premise.** The debug profile instruments every call, which is why its trace can't rank costs for a deployed instance; every figure on this page names the profile it came from. But the page then parked instrumentation on the *assumption* that a deployed instance, logging at `Warning` and sampling 10% of traces, wouldn't pay for it. That assumption held the item for two revisions and kept instrumentation off the ranking of what a runtime environment pays for. One four-minute load run on the deployed instance refuted it: nine-tenths of the CPU of every request. A parked item should name the measurement that settles it — this one did — and the measurement should be taken as soon as the instance allows, because until it is, the park is a guess wearing a disposition.
+**A measurement inherits its profile — and a parked question inherits its premise.** The debug profile instruments every call, which is why its trace can't rank costs for a deployed instance; every figure on this page names the profile it came from. But the page then parked instrumentation on the *assumption* that a deployed instance, logging at `Warning` and sampling 10% of traces, wouldn't pay for it. That assumption held the item for two revisions and kept instrumentation off the ranking of what a runtime environment pays for. Running the application on that profile and measuring it refuted the assumption: 82–89% of a request. A parked item should name the measurement that settles it — this one did — and the measurement should be taken as soon as something can run that profile, because until it is, the park is a guess wearing a disposition.
 
 **Split what changes often from what changes rarely.** Counts change with every publish below a folder; a level changes only when its own children do. Storing the count inside the level made every publish a flush. A folder record beside the level keeps each change as small as what it touched — and gives the client all of the folder's metadata instead of the fields a level happened to carry.
 
@@ -1150,7 +1186,9 @@ Next steps:
 
 **Cache the answer, not the raw material.** Caching a file's first 8 KB to read five fields filled most of the cache with text nothing reads. A cache that stores parsed records holds an order of magnitude more of what navigation needs in the same space.
 
-**Idle traffic hides a per-request cost.** After `C32` the deployed instance sat at about 4 CPU-seconds per 15 minutes, which reads as settled — and it is, for 46 requests. The cost that matters is per request, and at 46 requests in 15 minutes there aren't enough of them for it to show. Four minutes of steady load made the same instance spend 0.248 s of CPU on each one. A low total is not a low unit cost; it can just be a low count.
+**A per-request cost cannot be read off a host that is busy with something else.** After `C32` the deployed instance sat at about 4 CPU-seconds per 15 minutes, which reads as settled, and at 46 requests it is. Putting it under load and dividing the window's CPU by its request count looked like the way to find the cost per request — and it gave a figure ten times too large, because the startup walk was still holding the core: the idle windows burned 45–51 CPU-seconds per minute while serving three requests. Two rules came out of it. Measure an idle window beside every load window and subtract it, or the background work is charged to the request path. And measure where the process is the only tenant: on a shared B1 with five apps, the same probe that read 85 ms one minute read 16.6 s the next.
+
+**A two-way switch cannot decompose a three-way cost.** Gating an activity source off stops the activity, the log records it emits, and its OpenTelemetry span, all at once. Calling the resulting difference "instrumentation" was accurate; attributing it to the activity machinery was not. Adding a middle configuration — levels at `None`, sources still listened to — split it: about a third of a request is writing the records and about twice that is the machinery around them. The question "which of the things I turned off was it?" has to be designed into the experiment, because no amount of repetition of a two-way comparison will answer it.
 
 **Hold one dimension still, or the measurement answers a different question.** The first scale pair grew the corpus ten-fold and the root level from four areas to ten at the same time, and attributed 39% more first-page bytes to the corpus. Growing only what lies below an identical root level put the difference at zero: the bytes belonged to the level on screen, which is bounded by the menu, not by the corpus. A comparison across sizes is only evidence when one size is the only thing that changed.
 
@@ -1177,7 +1215,9 @@ Waves 2 and 3, also on 2026-10-02, were swept with the same questions. They adde
 
 `M2` was swept last. It added no record: a generator, an overlay, and a measurement script are apparatus for this work item's own acceptance criterion, they reference no path outside this workspace beyond the tree they write beside it, and they carry no storage identity. The confound its first pair hit — growing the corpus and the root level together — changed this page's own method, so it is a lesson here rather than a signal elsewhere.
 
-`C33`, the completion of `M1`, and `C34`, all on 2026-10-02, were swept together. They changed the standing of two existing records rather than adding one. `SIG-2` — SmartCache's two nested activities and per-lookup `Debug` records on every lookup — had its relevance lowered to `low` on the grounds that its cost was a debug-profile concern pending `PL-1`; `PL-1` now measures that concern at about 90% of the CPU of every request on a deployed instance, so its relevance is raised. `SIG-1` — the options rebind per activity — had argued its production rationale from configuration; that rationale is now measured, and the record says so. Nothing new belongs elsewhere: `C34` is a validator this work item's own `C20` established and its own `C29` omitted, and wave 0 is this work item's to implement. Two decisions were made with the owner and written here rather than to another file: Always On on for both SmartDocs apps and for neither of the three unrelated apps sharing their plan, and the deployed instance returned to its base configuration rather than left with instrumentation gated off, because gating the whole source off trades diagnostics for CPU and that trade is the owner's. One governing-artifact note, not a shortfall: the measurement acted on a deployed instance, which this repository's validation rules don't cover — they bind a visible browser and a local build — so the run recorded its window, its commands, and its restoration instead.
+`C33`, the completion of `M1`, and `C34`, all on 2026-10-02, were swept together. They changed the standing of two existing records rather than adding one. `SIG-2` — SmartCache's two nested activities and per-lookup `Debug` records on every lookup — had its relevance lowered to `low` on the grounds that its cost was a debug-profile concern pending `PL-1`; `PL-1` now measures instrumentation at 82–89% of a request on the profile a deployed instance runs, so its relevance is raised. `SIG-1` of the earlier work item — the options rebind per activity — had argued its production rationale from configuration; the three-way comparison now shows that suppressing the records recovers only about a third of the cost, which is direct evidence for the mechanism that record describes, and it says so. Nothing new belongs elsewhere: `C34` is a validator this work item's own `C20` established and its own `C29` omitted, and wave 0 is this work item's to implement. Two decisions were made with the owner and written here rather than to another file: Always On on for both SmartDocs apps and for neither of the three unrelated apps sharing their plan, and the deployed instance returned to its base configuration rather than left with instrumentation gated off, because gating the whole source off trades diagnostics for CPU and that trade is the owner's.
+
+One framing landed wrong and was corrected in the same session, and it is recorded here as a lesson rather than a signal because it changed this page's own method. This page first reported instrumentation at "about 90% of the CPU of every request" on the authority of a two-way comparison taken from App Service platform metrics. The owner questioned the figure — logging is enabled in deployed environments, and a tenfold difference attributed to it looked implausible. Re-measuring with an idle window showed the instance burning 45–51 CPU-seconds per minute while serving three requests, so the figure had charged a startup walk to the request path; and adding a third configuration showed that about a third of the real cost is the log records, which the two-way comparison had silently folded into the activity machinery. The conclusion — that wave 0 outranks what remains — survived; the number and its attribution did not. No governing artifact fell short: the validation rules bind a visible browser and a local build, and the measurement acted on a deployed instance, so the run recorded its window, its commands, and its restoration instead.
 
 ## 📚 References
 
