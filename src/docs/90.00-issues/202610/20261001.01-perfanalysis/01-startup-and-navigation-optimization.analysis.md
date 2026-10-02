@@ -82,6 +82,7 @@ publish: false
   - [Why the deployed measurement was withdrawn](#why-the-deployed-measurement-was-withdrawn)
   - [How it was measured instead](#how-it-was-measured-instead)
   - [What it costs](#what-it-costs)
+  - [Whose instrumentation it is](#whose-instrumentation-it-is)
   - [What it means](#what-it-means)
 - [🧪 Verification](#-verification)
 - [💡 Conclusion](#-conclusion)
@@ -624,7 +625,7 @@ The table ranks eight levers by their effect on a runtime environment. *Holds at
 
 | Rank | Lever | What it removes in a runtime environment | Holds at any size | Effort | Changes |
 |---|---|---|---|---|---|
-| 0 | Stop paying for instrumentation on the hot path | 82–89% of the CPU of a request, measured on the profile a deployed instance runs: about a third writing log records, and about twice that in the activity machinery around them — the emitter resolving its options at every activity start and stop, and SmartCache's two nested activities and per-lookup records | yes — it's per call, not per document | hours each, plus two library changes | `C1`, `C2`, `C9`, with `C3`/`SIG-1` and `SIG-2` upstream |
+| 0 | Stop paying for instrumentation on the hot path | 82–89% of the CPU of a request, measured on the profile a deployed instance runs. About 59 points are the application's own — 43 its activities and 16 its `Information` records — and change in this repository; the remaining 29 belong to the library sources and to `SIG-1` and `SIG-2` | yes — it's per call, not per document | hours each for the 59 points; the rest upstream | `C2`, `C9`, `C1`, with `C3`/`SIG-1` and `SIG-2` upstream |
 | 1 | Stop accidental work | the whole-tree walk triggered by the first page and by every unknown file; the 228–394 KB index downloaded on every session's first page; image folders crawled and shown as sections; the refold of an unchanged snapshot | yes | hours each | `C17`, `C7`, `C18`, `C19` |
 | 2 | Make every repeat free | full re-downloads of unchanged pages, levels, and images; uncompressed JSON; two round trips per blob | yes | a day | `C20`, `C34` |
 | 3 | Fit the cache to its purpose | origin re-reads caused by a cap filled with header text; a redundant registration | yes | hours | `C31`, `C30` |
@@ -657,15 +658,15 @@ The local runs measured a debug profile. One deployed baseline ranks the waves b
 
 ### Wave 0 — stop paying for instrumentation on the hot path
 
-`PL-1`'s measurement put this wave ahead of everything still open: on the deployed instance it is the largest cost per request, it doesn't depend on the corpus, and it is hours of work here plus two library changes already recorded as signals. It was added on 2026-10-02 and isn't started.
+`PL-1`'s measurement put this wave ahead of everything still open: on the profile a deployed instance runs it is the largest cost per request, it doesn't depend on the corpus, and **about two-thirds of it is the application's own instrumentation**, changeable here without waiting for a library release. It was added on 2026-10-02 and isn't started.
 
 | # | Id | Change | Addresses | Effort | Risk | Status |
 |---|---|---|---|---|---|---|
-| 0b | `C1-gate-hot-activities` | Gate the activities started on the hot path — per-lookup cache activities, per-file reads — behind a check that costs nothing when the source isn't listened to, so the diagnostics stay available without being paid for on every call | `PL-1`, `N1` | hours | low | 🟡 todo |
-| 0c | `C2-trim-hot-path-activities` | Remove the activities whose only consumer is a developer reading a local trace, and keep one per request rather than one per lookup | `PL-1`, `N1` | hours | low | 🟡 todo |
-| 0d | `C9-local-log-defaults` | Keep the debug profile's levels for local runs and leave deployed instances on `Warning`, so a measurement can't be taken against the wrong profile by accident | `PL-1` | hours | low | 🟡 todo |
+| 0b | `C2-trim-hot-path-activities` | Keep one activity per request rather than one per lookup and per file read, so the application starts the activities a reader's trace needs and not the ones only a local debugging session reads. Measured at 43% of a request | `PL-1`, `N1` | hours | low | 🟡 todo |
+| 0c | `C9-local-log-defaults` | Lower the application's own category from `Information` to `Warning` on deployed instances and keep the richer levels for local runs. Measured at 16% of a request | `PL-1` | hours | low | 🟡 todo |
+| 0d | `C1-gate-hot-activities` | Gate what the application starts on the hot path behind a check that costs nothing when nobody is listening. It can't reach the library sources' 29% selectively: a wildcard `false` vetoes a more specific `true`, so gating them means enumerating them | `PL-1`, `N1` | hours | low | 🟡 todo |
 
-The two library halves stay upstream: `C3-fix-options-cache-upstream` is `SIG-1` on the [earlier work item's signals page](../../202609/20260925.02-startup-optimization/01-signals.md), and SmartCache's per-lookup activities and records are `SIG-2` on [this work item's signals page](02-signals.md). Until they land, this wave can only mitigate what SmartDocs itself starts.
+The library halves stay upstream: `C3-fix-options-cache-upstream` is `SIG-1` on the [earlier work item's signals page](../../202609/20260925.02-startup-optimization/01-signals.md), and SmartCache's per-lookup activities and records are `SIG-2` on [this work item's signals page](02-signals.md). They carry the remaining 29%; the rest doesn't wait on them.
 
 ### Wave 1 — remove accidental work
 
@@ -1032,12 +1033,36 @@ Which decomposes as:
 
 Across three sets the total ranged from 82% to 89%, the log-writing share from 23% to 32%, and the activity share from 57% to 59%. Absolute figures moved between sets — 136.6, 169.6, and 114.2 ms for the as-deployed configuration — because the machine was shared; the shares held.
 
+### Whose instrumentation it is
+
+The figures above say how much instrumentation costs, not who would have to change to remove it. A second set gates the sources one at a time, which answers that:
+
+| Configuration | CPU per request |
+|---|---|
+| As deployed — every source listened to | 123.0 ms |
+| `Diginsight.SmartDocs.Web` gated off, the library sources still listened to | 49.8 ms |
+| Every `Diginsight.*` source gated off | 14.0 ms |
+| As deployed, but the application's own category lowered from `Information` to `Warning` | 103.1 ms |
+
+Which attributes a request as follows:
+
+| Component | Per request | Share | Where the change lives |
+|---|---|---|---|
+| The application's own activities — the machinery, not the records | ~53 ms | 43% | `C2-trim-hot-path-activities`, in this repository |
+| The application's own `Information` records | ~20 ms | 16% | `C9-local-log-defaults`, in this repository |
+| The Diginsight library sources — SmartCache and Components, at `Warning` | ~36 ms | 29% | `SIG-2` and `SIG-1` upstream; `C1` can only gate them wholesale |
+| The work the request actually does | ~14 ms | 11% | — |
+
+**About 59% of a request is the application's own instrumentation**, and that half is addressable here without waiting for a library release. The analysis had assumed the opposite — that wave 0 "can only mitigate what SmartDocs itself starts" and would therefore be small until `SIG-1` and `SIG-2` land. What SmartDocs itself starts is the larger part.
+
+One configuration constraint came out of the same runs, and it limits `C1`. **A wildcard `false` vetoes a more specific `true`**: with `Diginsight.*` set to `false` and `Diginsight.SmartDocs.Web` set explicitly to `true`, the application's own source stayed silent and the request cost 13.9 ms — the same as gating everything. The reverse works, so a specific source can be switched off while the wildcard stays on. An operator who wants the library sources quiet but the application's own diagnostics live therefore cannot express it with the wildcard, and must enumerate the sources to gate instead.
+
 ### What it means
 
 - **Instrumentation dominates the cost of a request, and logging is a third of it.** Not a tenth, and not all of it: the records are a real cost, and the activity machinery around them is roughly twice as large. A measurement that gates the source off, as the first attempt did, cannot tell the two apart, and this page previously presented the combined figure as though it were the activity machinery alone.
 - **`N1-activity-options-rebind` is the larger half, and is paid before any level check.** 57 points of the 89 are activities that are created, listened to, and sampled whatever the log level says — which is why lowering the level alone recovers only a third.
 - **The strategy's ranking was wrong to exclude instrumentation, and the correction stands** on this evidence rather than on the withdrawn one. [What a runtime environment pays for](#what-a-runtime-environment-pays-for) said instrumentation was a debug-profile cost "until `PL-1` shows otherwise"; measured on the profile a deployed instance runs, it is 82–89% of a request.
-- **Wave 0 needs both halves.** `C1-gate-hot-activities` and `C2-trim-hot-path-activities` address the 57; the 32 needs the records themselves to be fewer or cheaper, which is `C9-local-log-defaults` plus the per-lookup records of `SIG-2`. Gating the whole source off removes all 89 and the diagnostics with them, which is why it is a mitigation rather than the fix, and why the deployed instance was returned to its base configuration rather than left gated.
+- **Wave 0 needs both halves, and most of it is ours.** `C2-trim-hot-path-activities` addresses the 43 points the application's own activities cost and `C9-local-log-defaults` the 16 its `Information` records cost — 59 points, in this repository, without a library release. `C1-gate-hot-activities` and the upstream `SIG-1` and `SIG-2` share the remaining 29. Gating the whole source off removes all 89 and the diagnostics with them, which is why it is a mitigation rather than the fix, and why the deployed instance was returned to its base configuration rather than left gated.
 - **This is a local figure, on a developer machine with many cores.** The shares should carry to a deployed instance; the milliseconds will not. Confirming the shares there needs an instance that isn't sharing a core, or a profiler on the instance itself — neither of which this work item has. (🟡 todo)
 
 ## 🧪 Verification
@@ -1067,6 +1092,8 @@ The following checks were run for this page and its revision:
 - `M1` was then completed on the instance itself, with the owner's authorization: Always On turned on, a deliberate restart, and steady-state CPU and response time after waves 1 to 3. (✅ done)
 - The instrumentation comparison was attempted on the deployed instance and **withdrawn**: its idle windows showed 45–51 CPU-seconds per minute at three requests per minute, so CPU divided by request count measured the startup walk rather than the request. (✅ done — withdrawn and recorded, not carried as a figure)
 - The instrumentation comparison was then run on a controlled local host, on the profile a deployed instance uses, in three configurations — as deployed, log levels at `None`, and the activity sources gated off — with the idle rate subtracted and the result reproduced across three matched sets. (✅ done — see [⚡ What instrumentation costs](#-what-instrumentation-costs))
+- The cost was attributed between the application's own source and the Diginsight library sources by gating each in turn, and the application's own `Information` records isolated by lowering that one category to `Warning`. (✅ done — 59 of the 89 points are the application's own)
+- A wildcard `false` was found to veto a more specific `true` in `Diginsight:Activities:ActivitySources`, so the library sources can't be gated while the application's own stays live without enumerating them. (✅ done — established by measurement, not from the library's source)
 - The shares were not confirmed on a deployed instance: doing so needs an instance that isn't sharing a core with four other apps, or a profiler on the instance. (🟡 todo)
 - SmartCache's total size and evictions by reason, and how long counts stay stale after a publish, stay unmeasured: neither is readable from outside the instance. (🟡 todo)
 - The deployed instance was returned to its base configuration after the instrumentation runs; no `Diginsight` app setting remains on it. (✅ done)
