@@ -79,10 +79,12 @@ public partial class MainLayout
 
         if (!Site.IsConfigured)
         {
-            SiteShellOptions? site = await Http.GetFromJsonAsync<SiteShellOptions>("_site");
+            SiteShellOptions? site = Bootstrap.Site
+                ?? await Http.GetFromJsonAsync<SiteShellOptions>("_site");
             if (site is not null)
             {
                 Site.Apply(site);
+                Bootstrap.Site = site;
             }
         }
 

@@ -17,7 +17,17 @@ namespace Diginsight.SmartDocs.Web.Shared.Navigation;
 /// <param name="TopbarAlign">Top-bar side for the folder: <c>left</c> or <c>right</c> (null = default: right for folders).</param>
 /// <param name="ArticleCount">Seed count of articles under the folder (recursive); overridden by the computed nav value.</param>
 /// <param name="LatestArticleUtc">Seed timestamp of the newest article under the folder; overridden by the computed nav value.</param>
-public sealed record FolderMeta(string? Label, string? Short, string? Icon, double? Order, bool Hidden, bool TopbarHidden, string? TopbarAlign, int? ArticleCount = null, DateTimeOffset? LatestArticleUtc = null)
+public sealed record FolderMeta(
+    string? Label,
+    string? Short,
+    string? Icon,
+    double? Order,
+    bool Hidden,
+    bool TopbarHidden,
+    string? TopbarAlign,
+    int? ArticleCount = null,
+    DateTimeOffset? LatestArticleUtc = null,
+    IReadOnlyDictionary<string, string>? Values = null)
 {
     /// <summary>No overrides — every field falls back to the code defaults.</summary>
     public static readonly FolderMeta None = new(null, null, null, null, false, false, null);
@@ -41,11 +51,13 @@ public sealed record FolderMeta(string? Label, string? Short, string? Icon, doub
         string? topbarAlign = null;
         int? articleCount = null;
         DateTimeOffset? latestArticle = null;
+        var values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
         foreach (Match m in KeyRx.Matches(yaml))
         {
             string key = m.Groups["k"].Value.ToLowerInvariant();
             string value = Unquote(m.Groups["v"].Value);
+            values[key] = value;
 
             switch (key)
             {
@@ -90,7 +102,17 @@ public sealed record FolderMeta(string? Label, string? Short, string? Icon, doub
             }
         }
 
-        return new FolderMeta(label, shortLabel, icon, order, hidden, topbarHidden, topbarAlign, articleCount, latestArticle);
+        return new FolderMeta(
+            label,
+            shortLabel,
+            icon,
+            order,
+            hidden,
+            topbarHidden,
+            topbarAlign,
+            articleCount,
+            latestArticle,
+            values);
     }
 
     private static string Unquote(string v)

@@ -1,5 +1,7 @@
 using System.Net;
+using System.Net.Http.Json;
 using Diginsight.SmartDocs.Web.Shared;
+using Diginsight.SmartDocs.Web.Shared.Rendering;
 
 namespace Diginsight.SmartDocs.Web.Client;
 
@@ -7,10 +9,40 @@ namespace Diginsight.SmartDocs.Web.Client;
 /// Client-side content source: fetches raw Markdown from the server's <c>/_content/{key}</c>
 /// endpoint. Storage credentials never reach the browser — the server owns them.
 /// </summary>
-public sealed class HttpContentSource(HttpClient http) : IContentSource, IContentPathResolver
+public sealed class HttpContentSource(HttpClient http) :
+    IContentSource,
+    IContentPathResolver,
+    IRenderedPageResolver
 {
     /// <summary>Matches <c>ContentEndpoints.ContentKeyHeader</c>, which the client cannot reference.</summary>
     private const string ContentKeyHeader = "X-Content-Key";
+
+    public async Task<RenderedPageResolution> ResolveRenderedAsync(
+        string? routePath,
+        CancellationToken cancellationToken = default)
+    {
+        string path = (routePath ?? string.Empty).Replace('\\', '/').Trim('/');
+        using HttpResponseMessage response = await http.GetAsync(
+            path.Length == 0 ? "_page" : $"_page/{path}",
+            cancellationToken);
+
+        if (response.StatusCode == HttpStatusCode.NoContent)
+        {
+            return RenderedPageResolution.Nothing;
+        }
+
+        if (response.StatusCode == HttpStatusCode.NotFound)
+        {
+            return RenderedPageResolution.Unhandled;
+        }
+
+        response.EnsureSuccessStatusCode();
+        RenderedPage? page = await response.Content.ReadFromJsonAsync<RenderedPage>(
+            cancellationToken: cancellationToken);
+        return page is null
+            ? throw new InvalidOperationException($"Rendered page response for '{path}' had no body.")
+            : RenderedPageResolution.Found(page);
+    }
 
     /// <summary>
     /// Asks the server to walk the candidate file names where the files actually are. Probing them

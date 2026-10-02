@@ -4,6 +4,7 @@ using Diginsight.SmartCache;
 using Diginsight.SmartDocs.Web.Caching;
 using Diginsight.SmartDocs.Web.Shared.Navigation;
 using Microsoft.Extensions.Logging;
+using Diginsight.Runtime;
 
 namespace Diginsight.SmartDocs.Web.Navigation;
 
@@ -16,18 +17,12 @@ namespace Diginsight.SmartDocs.Web.Navigation;
 public sealed class CachedDynamicNavBuilder(
     INavBuilder inner,
     ISmartCache smartCache,
+    BackgroundRevalidationCache revalidation,
     IParallelService parallelService,
     ContentFreshnessOptions freshness,
     ILogger<CachedDynamicNavBuilder> logger) : INavBuilder
 {
     private static long _version = 1;
-
-    private int _warming;
-
-    // Set by every warm request and drained by the running warm. Without it a request that lands
-    // while a warm is in flight is lost - and that is the damaging case, because the warm in flight
-    // is repopulating entries the newer invalidation has already dropped.
-    private int _warmRequested;
 
     /// <summary>Current nav version; bumps on <see cref="Invalidate()"/>.</summary>
     public static long Version => Interlocked.Read(ref _version);
@@ -55,12 +50,22 @@ public sealed class CachedDynamicNavBuilder(
     /// version so clients (which hold only a single version number, not per-path state) refetch.
     /// An empty <paramref name="path"/> invalidates everything.
     /// </summary>
-    public void Invalidate(string path)
+    public void Invalidate(string path) => Invalidate([path]);
+
+    public void Invalidate(IEnumerable<string> paths)
     {
-        using var activity = Observability.ActivitySource.StartMethodActivity(logger, () => new { path });
+        string[] normalized = paths
+            .Select(ContentPathCacheKey.Normalize)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        using var activity = Observability.ActivitySource.StartMethodActivity(
+            logger,
+            () => new { paths = normalized });
 
         Interlocked.Increment(ref _version);
-        smartCache.Invalidate(new ContentPathInvalidationRule(ContentPathCacheKey.Normalize(path)));
+        var rule = new ContentPathInvalidationRule(normalized);
+        revalidation.Invalidate(rule);
+        smartCache.Invalidate(rule);
     }
 
     public async Task<IReadOnlyList<NavChild>> GetChildrenAsync(string prefix, CancellationToken ct = default)
@@ -82,62 +87,19 @@ public sealed class CachedDynamicNavBuilder(
         var key = new ContentPathCacheKey("nav-level", prefix);
 
         string levelPrefix = prefix;
-        NavChildrenEnvelope envelope = await smartCache.GetAsync(
+        NavChildrenEnvelope envelope = await revalidation.GetAsync(
             key,
-            async innerCt => new NavChildrenEnvelope((await inner.GetChildrenAsync(levelPrefix, innerCt)).ToArray()),
-            options,
-            callerType: typeof(CachedDynamicNavBuilder),
-            cancellationToken: ct);
+            freshness.NavLevel,
+            innerCt => smartCache.GetAsync(
+                key,
+                async cacheCt => new NavChildrenEnvelope((await inner.GetChildrenAsync(levelPrefix, cacheCt)).ToArray()),
+                options,
+                callerType: typeof(CachedDynamicNavBuilder),
+                cancellationToken: innerCt),
+            ct);
 
         activity?.SetOutput(new { count = envelope.Items.Count() });
         return envelope.Items;
-    }
-
-    /// <summary>
-    /// Rebuilds the index and every level away from the request path, after an invalidation has just
-    /// dropped them. Without this, making the publish-time invalidation reliable would simply move
-    /// the cost onto a reader: the index walks every article — around 14 seconds on a 1,100-article
-    /// site — and whoever arrived first would wait for it. Returns immediately; concurrent requests
-    /// collapse onto the warm already in flight, which then runs one more pass so that entries it
-    /// had populated before the newer invalidation dropped them are rebuilt too.
-    /// </summary>
-    public void WarmInBackground()
-    {
-        // Record the request before claiming the slot, so a warm already running picks it up.
-        Interlocked.Exchange(ref _warmRequested, 1);
-
-        if (Interlocked.Exchange(ref _warming, 1) == 1)
-        {
-            return;
-        }
-
-        _ = Task.Run(async () =>
-        {
-            do
-            {
-                while (Interlocked.Exchange(ref _warmRequested, 0) == 1)
-                {
-                    try
-                    {
-                        await GetIndexAsync();
-                        await WarmAllLevelsAsync();
-                    }
-                    catch (Exception ex)
-                    {
-                        // Warming is an optimisation: a failure here costs the next reader time, not
-                        // correctness, so it must never take the invalidation down with it.
-                        logger.LogWarning(ex, "Nav warm-up after invalidation failed");
-                    }
-                }
-
-                Interlocked.Exchange(ref _warming, 0);
-
-                // A request that arrived between draining the flag and releasing the slot would
-                // otherwise be lost, so reclaim the slot and drain again. If another caller claimed
-                // it first, that caller runs the warm instead.
-            }
-            while (Volatile.Read(ref _warmRequested) == 1 && Interlocked.Exchange(ref _warming, 1) == 0);
-        });
     }
 
     /// <summary>Flattened article index (menu search / prev-next), cached at the root path.</summary>
@@ -171,19 +133,34 @@ public sealed class CachedDynamicNavBuilder(
     /// Pre-warms every nav level through the cache by recursively calling <see cref="GetChildrenAsync"/>
     /// for every section prefix at each depth. Call after startup so expand-all is instant.
     /// </summary>
-    public Task WarmAllLevelsAsync(CancellationToken ct = default)
-        => WarmLevelAsync(string.Empty, int.MaxValue, ct);
+    public Task WarmAllLevelsAsync(
+        CancellationToken ct = default,
+        Func<CancellationToken, Task>? beforeLevel = null)
+        => WarmLevelAsync(string.Empty, int.MaxValue, ct, beforeLevel);
 
     /// <summary>
     /// Pre-warms nav levels starting at <paramref name="prefix"/> down to <paramref name="depth"/> additional levels.
     /// Use to ensure N+2 levels ahead of a selected node are cache-hot.
     /// </summary>
-    public Task WarmLevelsAsync(string prefix, int depth, CancellationToken ct = default)
-        => depth <= 0 ? Task.CompletedTask : WarmLevelAsync(prefix, depth, ct);
+    public Task WarmLevelsAsync(
+        string prefix,
+        int depth,
+        CancellationToken ct = default,
+        Func<CancellationToken, Task>? beforeLevel = null)
+        => depth <= 0 ? Task.CompletedTask : WarmLevelAsync(prefix, depth, ct, beforeLevel);
 
-    private async Task WarmLevelAsync(string prefix, int remainingDepth, CancellationToken ct)
+    private async Task WarmLevelAsync(
+        string prefix,
+        int remainingDepth,
+        CancellationToken ct,
+        Func<CancellationToken, Task>? beforeLevel)
     {
         if (remainingDepth <= 0) return;
+
+        if (beforeLevel is not null)
+        {
+            await beforeLevel(ct);
+        }
 
         var children = await GetChildrenAsync(prefix, ct);
 
@@ -192,12 +169,27 @@ public sealed class CachedDynamicNavBuilder(
         var sections = children.Where(c => c.IsSection && c.Prefix is not null).ToList();
         var parallelOptions = new ParallelOptions { MaxDegreeOfParallelism = parallelService.MediumConcurrency, CancellationToken = ct };
         await parallelService.ForEachAsync(sections, parallelOptions,
-            child => WarmLevelAsync(child.Prefix!, remainingDepth - 1, ct));
+            child => WarmLevelAsync(child.Prefix!, remainingDepth - 1, ct, beforeLevel));
     }
 
     /// <summary>Serializable envelope so a built level round-trips through SmartCache (incl. Redis).</summary>
-    private sealed record NavChildrenEnvelope(NavChild[] Items);
+    private sealed record NavChildrenEnvelope(NavChild[] Items) : ISizeableHeuristically
+    {
+        public HeuristicSizeResult GetSizeHeuristically(HeuristicSizeGetter innerGet) =>
+            new(128L + Items.Sum(static item => 128L + 2L * (
+                item.Text.Length +
+                (item.Route?.Length ?? 0) +
+                (item.Prefix?.Length ?? 0) +
+                (item.Icon?.Length ?? 0) +
+                (item.Short?.Length ?? 0) +
+                (item.Author?.Length ?? 0))));
+    }
 
     /// <summary>Serializable envelope so the flattened index round-trips through SmartCache.</summary>
-    private sealed record NavIndexEnvelope(NavLeaf[] Items);
+    private sealed record NavIndexEnvelope(NavLeaf[] Items) : ISizeableHeuristically
+    {
+        public HeuristicSizeResult GetSizeHeuristically(HeuristicSizeGetter innerGet) =>
+            new(128L + Items.Sum(static item => 96L + 2L * (
+                item.Text.Length + item.Route.Length + item.Path.Length + (item.Author?.Length ?? 0))));
+    }
 }

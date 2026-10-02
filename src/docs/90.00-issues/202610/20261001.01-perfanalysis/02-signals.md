@@ -21,7 +21,7 @@ The table lists the six records in priority order. `SIG-5` earns this page on re
 
 | Order | Id | Kind | Relevance | Actionability | Target | Existing landing | State |
 |---|---|---|---|---|---|---|---|
-| 1 | `SIG-5` | `upstream-feedback` | high | ready | `diginsight/smartdocs` | partial: `SIG-2` of `20260925.02-startup-optimization` covers one of the seven statements | `pending` |
+| 1 | `SIG-5` | `upstream-feedback` | high | ready | `diginsight/smartdocs` | partial: `SIG-2` of `20260925.02-startup-optimization` covers one of the eight statements | `pending` |
 | 2 | `SIG-1` | `divergent-commitment` | medium | ready | `diginsight/telemetry` | none found | `pending` |
 | 3 | `SIG-2` | `divergent-commitment` | low | bounded | `diginsight/smartcache` | none found | `pending` |
 | 4 | `SIG-4` | `divergent-commitment` | low | bounded | `diginsight/smartcache` | none found | `pending` |

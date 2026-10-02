@@ -8,10 +8,22 @@ namespace Diginsight.SmartDocs.Web.Shared.Services;
 /// renders it. Runs unchanged on the server (prerender) and in the WASM client (navigation);
 /// only the injected <see cref="IContentSource"/> differs per platform.
 /// </summary>
-public sealed class PageLoader(IContentSource source, IMarkdownRenderer renderer)
+public sealed class PageLoader(
+    IContentSource source,
+    IMarkdownRenderer? renderer = null,
+    IRenderedPageResolver? renderedResolver = null)
 {
     public async Task<RenderedPage?> LoadAsync(string? routePath, CancellationToken ct = default)
     {
+        if (renderedResolver is not null)
+        {
+            RenderedPageResolution rendered = await renderedResolver.ResolveRenderedAsync(routePath, ct);
+            if (rendered.Handled)
+            {
+                return rendered.Page;
+            }
+        }
+
         // Over HTTP each miss below is a wasted round trip, so a source that can walk the
         // candidates where the files are answers the whole route in one call instead. Only a
         // resolver that cannot answer at all falls through to probing.
@@ -38,6 +50,11 @@ public sealed class PageLoader(IContentSource source, IMarkdownRenderer renderer
 
     private RenderedPage Render(string key, ContentResult result)
     {
+        if (renderer is null)
+        {
+            throw new InvalidOperationException("No Markdown renderer is registered for the raw-content fallback.");
+        }
+
         string markdown = Encoding.UTF8.GetString(result.Bytes);
         string contentDir = key.Contains('/') ? key[..key.LastIndexOf('/')] : string.Empty;
         return renderer.Render(markdown, contentDir);

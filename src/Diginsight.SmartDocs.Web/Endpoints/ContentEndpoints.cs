@@ -1,11 +1,14 @@
 using Diginsight.Components.Azure.Extensions;
 using Diginsight.Diagnostics;
 using Diginsight.SmartDocs.Web.Caching;
+using Diginsight.SmartDocs.Web.Rendering;
 using Diginsight.SmartDocs.Web.Shared;
 using Diginsight.SmartDocs.Web.Shared.Navigation;
+using Diginsight.SmartDocs.Web.Shared.Rendering;
 using Diginsight.SmartDocs.Web.Shared.Services;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using System.Text.Json;
 
 namespace Diginsight.SmartDocs.Web.Endpoints;
 
@@ -26,8 +29,8 @@ public static class ContentEndpoints
     public static IEndpointRouteBuilder MapContentEndpoints(this IEndpointRouteBuilder app)
     {
         app.MapGet("/_content/{**key}", GetContentRawAsync);
-        app.MapGet("/_page", (IContentSource source, HttpContext http, CancellationToken ct) =>
-            ResolvePageAsync(null, source, http, ct));
+        app.MapGet("/_page", (RenderedPageProvider pages, HttpContext http, CancellationToken ct) =>
+            ResolvePageAsync(null, pages, http, ct));
         app.MapGet("/_page/{**path}", ResolvePageAsync);
         return app;
     }
@@ -67,38 +70,24 @@ public static class ContentEndpoints
     /// <see cref="PageLoader.Candidates"/> itself, so the two paths cannot drift apart.
     /// </summary>
     private static async Task<IResult> ResolvePageAsync(
-        string? path, IContentSource source, HttpContext http, CancellationToken ct)
+        string? path, RenderedPageProvider pages, HttpContext http, CancellationToken ct)
     {
         using var activity = Observability.ActivitySource.StartMethodActivity(logger, () => new { path });
 
-        foreach (string key in PageLoader.Candidates(path))
+        RenderedPageResolution resolution = await pages.ResolveRenderedAsync(path, ct);
+        if (resolution.Page is not { } page)
         {
-            ContentResult? result = await source.GetAsync(key, ct);
-            if (result is null)
-            {
-                continue;
-            }
-
-            activity?.SetOutput(new { key });
-            // The renderer resolves links and images relative to the file the Markdown came from,
-            // which the client can no longer infer once the probing happens here.
-            http.Response.Headers[ContentKeyHeader] = key;
-
-            // The tag covers the resolved key as well as the bytes: a 304 hands the browser back its
-            // stored response, key header included, so the key must be part of what was validated.
-            string etag = HttpValidators.Tag(key, result.ETag);
-            if (HttpValidators.IsNotModified(http, etag, HttpValidators.Revalidate))
-            {
-                return Results.StatusCode(StatusCodes.Status304NotModified);
-            }
-
-            return Results.Bytes(result.Bytes, result.ContentType ?? "text/markdown; charset=utf-8");
+            activity?.SetOutput(new { found = false });
+            return Results.NoContent();
         }
 
-        activity?.SetOutput(new { key = (string?)null });
-        // Not 404: the client has to tell "no page backs this route" (normal for a section folder)
-        // apart from "this server has no such endpoint", which is what a 404 here would mean to a
-        // client newer than the server it is talking to.
-        return Results.NoContent();
+        byte[] body = JsonSerializer.SerializeToUtf8Bytes(page);
+        activity?.SetOutput(new { found = true });
+        if (HttpValidators.IsNotModified(http, HttpValidators.Tag(body), HttpValidators.Revalidate))
+        {
+            return Results.StatusCode(StatusCodes.Status304NotModified);
+        }
+
+        return Results.Bytes(body, "application/json; charset=utf-8");
     }
 }

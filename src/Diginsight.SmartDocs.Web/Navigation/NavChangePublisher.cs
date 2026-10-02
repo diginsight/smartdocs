@@ -18,6 +18,7 @@ namespace Diginsight.SmartDocs.Web.Navigation;
 public sealed class NavChangePublisher(
     FolderMetricsIndex metrics,
     CachedDynamicNavBuilder nav,
+    FolderRecordProvider folders,
     IHubContext<NavHub> hub,
     ILogger<NavChangePublisher> logger)
 {
@@ -45,10 +46,6 @@ public sealed class NavChangePublisher(
     /// </summary>
     public void PublishChangeAsync(string path)
     {
-        // Drop the cached levels first: the fold reads a level to recount it, so it must not consume
-        // one that was cached before this change.
-        nav.InvalidateLevels();
-
         string normalized = (path ?? string.Empty).Replace('\\', '/').Trim('/');
         if (normalized.Length == 0)
         {
@@ -120,32 +117,26 @@ public sealed class NavChangePublisher(
 
         try
         {
-            // The counts live on the folder nodes inside each parent's cached level, so those levels
-            // must rebuild before anyone reads them again.
-            nav.InvalidateLevels();
+            var changedPrefixes = new HashSet<string>(prefixes, StringComparer.OrdinalIgnoreCase);
+            if (metrics.TryGet(string.Empty) is not null)
+            {
+                changedPrefixes.Add(string.Empty);
+            }
 
-            NavAggregateDelta[] deltas = prefixes
-                .Select(p => (Prefix: p, Metrics: metrics.TryGet(p)))
-                .Where(x => x.Metrics is not null)
-                .Select(x => new NavAggregateDelta(
-                    x.Prefix, x.Metrics!.Value.Count, x.Metrics.Value.Latest, null, x.Metrics.Value.Coverage))
-                .ToArray();
+            foreach (string prefix in changedPrefixes)
+            {
+                folders.Invalidate(prefix);
+            }
 
-            if (deltas.Length == 0)
+            FolderRecord[] records = await Task.WhenAll(
+                changedPrefixes.Select(prefix => folders.GetAsync(prefix)));
+            if (records.Length == 0)
             {
                 return;
             }
 
-            // Always carry the site root, even when it did not change in this pass: it is the one
-            // value every client displays, and a drain that publishes a folder without it would
-            // leave the footer showing a total that disagrees with the section it just updated.
-            if (!deltas.Any(d => d.Prefix.Length == 0) && metrics.TryGet(string.Empty) is { } site)
-            {
-                deltas = [.. deltas, new NavAggregateDelta(string.Empty, site.Count, site.Latest, null, site.Coverage)];
-            }
-
-            await hub.Clients.All.SendAsync(NavHubContract.MetadataChanged, deltas);
-            logger.LogDebug("Pushed {Count} nav metadata deltas", deltas.Length);
+            await hub.Clients.All.SendAsync(NavHubContract.MetadataChanged, records);
+            logger.LogDebug("Pushed {Count} folder records", records.Length);
         }
         catch (Exception ex)
         {
@@ -160,10 +151,10 @@ public sealed class NavChangePublisher(
 
         try
         {
-            NavAggregateDelta[] deltas = await BuildRootDeltasAsync();
-            if (deltas.Length > 0)
+            FolderRecord[] records = await BuildRootRecordsAsync();
+            if (records.Length > 0)
             {
-                await hub.Clients.All.SendAsync(NavHubContract.CountsReady, deltas);
+                await hub.Clients.All.SendAsync(NavHubContract.CountsReady, records);
             }
         }
         catch (Exception ex)
@@ -182,10 +173,10 @@ public sealed class NavChangePublisher(
 
         try
         {
-            NavAggregateDelta[] deltas = await BuildRootDeltasAsync();
-            if (deltas.Length > 0)
+            FolderRecord[] records = await BuildRootRecordsAsync();
+            if (records.Length > 0)
             {
-                await caller.SendAsync(NavHubContract.CountsReady, deltas);
+                await caller.SendAsync(NavHubContract.CountsReady, records);
             }
         }
         catch (Exception ex)
@@ -194,22 +185,24 @@ public sealed class NavChangePublisher(
         }
     }
 
-    private async Task<NavAggregateDelta[]> BuildRootDeltasAsync()
+    private async Task<FolderRecord[]> BuildRootRecordsAsync()
     {
         IReadOnlyList<NavChild> roots = await nav.GetChildrenAsync(string.Empty);
-        var deltas = roots
-            .Where(c => c.IsSection && c.Prefix is not null && c.ArticleCount is not null)
-            .Select(c => new NavAggregateDelta(c.Prefix!, c.ArticleCount!.Value, c.LatestArticleUtc, null, c.CountCoverage))
+        var prefixes = roots
+            .Where(static child => child.IsSection && child.Prefix is not null)
+            .Select(static child => child.Prefix!)
             .ToList();
-
-        // The site total is the root cell itself, not the sum of the root sections: the root level
-        // also holds standalone articles that belong to no section.
-        if (metrics.TryGet(string.Empty) is { } site)
+        if (metrics.TryGet(string.Empty) is not null)
         {
-            deltas.Insert(0, new NavAggregateDelta(string.Empty, site.Count, site.Latest, null, site.Coverage));
+            prefixes.Insert(0, string.Empty);
         }
 
-        return deltas.ToArray();
+        foreach (string prefix in prefixes)
+        {
+            folders.Invalidate(prefix);
+        }
+
+        return await Task.WhenAll(prefixes.Select(prefix => folders.GetAsync(prefix)));
     }
 
     // A change to "a/b/article.md" is a change to folder "a/b"; a change to a folder is itself.

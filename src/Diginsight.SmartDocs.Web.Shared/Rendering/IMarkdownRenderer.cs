@@ -14,5 +14,21 @@ public interface IMarkdownRenderer
 /// <summary>The HTML body, title, table of contents, and word count produced from a Markdown document.</summary>
 public sealed record RenderedPage(string Html, string Title, IReadOnlyList<TocEntry> Toc, int WordCount);
 
+public interface IRenderedPageResolver
+{
+    Task<RenderedPageResolution> ResolveRenderedAsync(
+        string? routePath,
+        CancellationToken cancellationToken = default);
+}
+
+public sealed record RenderedPageResolution(bool Handled, RenderedPage? Page)
+{
+    public static RenderedPageResolution Unhandled { get; } = new(false, null);
+
+    public static RenderedPageResolution Nothing { get; } = new(true, null);
+
+    public static RenderedPageResolution Found(RenderedPage page) => new(true, page);
+}
+
 /// <summary>A single heading in the on-page table of contents.</summary>
 public sealed record TocEntry(int Level, string Text, string Id);

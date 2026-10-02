@@ -6,6 +6,9 @@ namespace Diginsight.SmartDocs.Web.Client.Layout;
 
 public partial class TopMenu : IDisposable
 {
+    [PersistentState] public string? PersistedScope { get; set; }
+    [PersistentState] public NavChild[]? PersistedRoot { get; set; }
+
     public enum Group { Left, Right }
 
     [Parameter] public Group Placement { get; set; } = Group.Left;
@@ -19,6 +22,7 @@ public partial class TopMenu : IDisposable
 
     // Immediate children of each displayed section, cached in-memory for the dropdown.
     private readonly Dictionary<string, IReadOnlyList<NavChild>> _children = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, Task> _loading = new(StringComparer.OrdinalIgnoreCase);
 
     // Prefix of the section whose dropdown is pinned open by a CLICK (hover opens independently via CSS).
     private string? _openKey;
@@ -36,7 +40,20 @@ public partial class TopMenu : IDisposable
 
     private async Task LoadAsync(string scope)
     {
-        IReadOnlyList<NavChild> root = await SpaceScope.LoadRootAsync(NavProvider, Site, scope);
+        IReadOnlyList<NavChild> root;
+        if (string.Equals(PersistedScope, scope, StringComparison.OrdinalIgnoreCase) &&
+            PersistedRoot is not null)
+        {
+            root = PersistedRoot;
+        }
+        else if (Bootstrap.TryGetLevel(scope, out IReadOnlyList<NavChild> bootstrapped))
+        {
+            root = bootstrapped;
+        }
+        else
+        {
+            root = await SpaceScope.LoadRootAsync(NavProvider, Site, scope);
+        }
         if (!string.Equals(scope, _scope, StringComparison.OrdinalIgnoreCase))
         {
             return; // a later navigation already re-rooted the band
@@ -45,20 +62,11 @@ public partial class TopMenu : IDisposable
         // The top bar shows the Home link plus top-level sections; other root links
         // (e.g. Getting Started, Documentation Index) stay in the sidebar only.
         _root = root.Where(c => c.IsSection || SpaceScope.IsHome(c, scope)).ToList();
+        PersistedScope = scope;
+        PersistedRoot = _root.ToArray();
+        Bootstrap.SetLevel(scope, root);
 
-        // Render the top-level buttons NOW; then fill each dropdown as its children arrive. Without
-        // this the whole menu stays blank until ALL sections' children have loaded, so a slow level
-        // build (e.g. during the startup warm-up) makes the menu look broken.
         StateHasChanged();
-
-        foreach (NavChild section in DisplayNodes().Where(c => c.IsSection && c.Prefix is not null).ToList())
-        {
-            if (!_children.ContainsKey(section.Prefix!))
-            {
-                _children[section.Prefix!] = await NavProvider.GetChildrenAsync(section.Prefix!);
-                StateHasChanged();
-            }
-        }
     }
 
     // Click toggles a pinned-open dropdown (lazy-loading its children if the prefetch has not landed).
@@ -70,9 +78,39 @@ public partial class TopMenu : IDisposable
         }
 
         _openKey = _openKey == node.Prefix ? null : node.Prefix;
-        if (_openKey is not null && !_children.ContainsKey(node.Prefix))
+        if (_openKey is not null)
         {
-            _children[node.Prefix] = await NavProvider.GetChildrenAsync(node.Prefix);
+            await LoadChildrenAsync(node);
+        }
+    }
+
+    private Task LoadChildrenAsync(NavChild node)
+    {
+        if (node.Prefix is not { } prefix || _children.ContainsKey(prefix))
+        {
+            return Task.CompletedTask;
+        }
+
+        if (_loading.TryGetValue(prefix, out Task? pending))
+        {
+            return pending;
+        }
+
+        Task load = LoadCoreAsync(prefix);
+        _loading[prefix] = load;
+        return load;
+    }
+
+    private async Task LoadCoreAsync(string prefix)
+    {
+        try
+        {
+            _children[prefix] = await NavProvider.GetChildrenAsync(prefix);
+            await InvokeAsync(StateHasChanged);
+        }
+        finally
+        {
+            _loading.Remove(prefix);
         }
     }
 

@@ -10,9 +10,9 @@ publish: false
 # Startup and navigation at any scale: run review, caching model, and target design
 
 **Date:** 2026-10-01
-**Revised:** 2026-10-02, version 1.3 — `M1` measured the deployed Learning Hub, read-only: a crawler trap, not navigation, takes almost all of its CPU (`N20`), and `C32` ends it. Version 1.2, earlier the same day, recorded wave 1 as implemented and validated against the previous build. Version 1.1, of 2026-10-01, parked the instrumentation finding until a deployed instance is measured, generalized folder metadata from counts to one complete record per folder, added a cache-sizing finding, and re-ranked the strategy by what a runtime environment pays for
+**Revised:** 2026-10-02, version 1.4 — platform metrics confirmed `C32`'s effect over matched windows, and `C4` moved navigation warm-up after listening into one foreground-gated queue. Version 1.3 measured the deployed Learning Hub, read-only: a crawler trap, not navigation, took almost all of its CPU (`N20`), and `C32` ended it. Version 1.2, earlier the same day, recorded wave 1 as implemented and validated against the previous build. Version 1.1, of 2026-10-01, parked the instrumentation finding until a deployed instance is measured, generalized folder metadata from counts to one complete record per folder, added a cache-sizing finding, and re-ranked the strategy by what a runtime environment pays for
 **Author:** Dario Airoldi
-**Status:** Wave 1 and `C32` deployed on 2026-10-02 — see [🔧 Wave 1 implementation record](#-wave-1-implementation-record) and [📏 Deployed baseline](#-deployed-baseline), where `M1` is measured in part; waves 2–4 open. The analysis was measured on three local runs in a debug profile and re-verified against the working tree of 2026-10-01
+**Status:** Wave 1 and `C32` deployed on 2026-10-02; `C4` is implemented and locally validated. See [🔧 Wave 1 implementation record](#-wave-1-implementation-record) and [📏 Deployed baseline](#-deployed-baseline), where `M1` is measured in part. The rest of waves 2–4 remains open
 **Component:** `Diginsight.SmartDocs.Web` (host, navigation, caching), `Diginsight.SmartDocs.Web.Client` (menus, hydration), `Diginsight.SmartDocs.Web.Shared` (page loading, rendering)
 **Framework:** .NET 10 / ASP.NET Core / Blazor Web App (server prerender + global interactive WebAssembly), Diginsight.SmartCache 3.8.0.2, Diginsight.Core 3.8.0.2
 **Builds on:** [`20260925.02-startup-optimization`](../../202609/20260925.02-startup-optimization/overview.md) — the analysis of 2026-09-29 this page reviews and extends
@@ -66,6 +66,12 @@ publish: false
   - [`C32-end-the-crawler-trap` — what changed](#c32-end-the-crawler-trap--what-changed)
   - [What it changes in the plan](#what-it-changes-in-the-plan)
   - [What M1 didn't measure](#what-m1-didnt-measure)
+- [🚦 C4 implementation record](#-c4-implementation-record)
+- [🗂️ C29 implementation record](#-c29-implementation-record)
+- [♻️ C22 implementation record](#-c22-implementation-record)
+- [🧭 C11 and C12 implementation record](#-c11-and-c12-implementation-record)
+- [🖨️ C21 and C10 implementation record](#-c21-and-c10-implementation-record)
+- [🧩 C23 implementation record](#-c23-implementation-record)
 - [🧊 Parked items](#-parked-items)
 - [🧪 Verification](#-verification)
 - [💡 Conclusion](#-conclusion)
@@ -660,11 +666,11 @@ The second wave makes the folder record the one unit of folder metadata and take
 
 | # | Id | Change | Addresses | Effort | Risk | Status |
 |---|---|---|---|---|---|---|
-| 9 | `C29-folder-records` | Make the folder record a SmartCache `folder` entry holding every `metadata.yml` key, the folder's classification, and its aggregates, newest article included. Levels reference folder children instead of copying their metadata; `/_nav/children` returns the folder children's records beside the level, `/_nav/folder` returns one record, and the hub pushes changed records; the browser keeps one map of records; the global level flushes go. Supersedes `C5` | `N2`, `N15` | about three days | medium | 🟡 todo |
-| 10 | `C4-start-after-listen` | Run the warm-up as a background service after `ApplicationStarted`, behind a foreground gate and one concurrency budget; turn the per-request three-level warm into an enqueue | `N3` | about a day | low | 🟡 todo |
-| 11 | `C22-revalidate-in-background` | Serve cached levels, records, and pages past their interval and revalidate them in the background, so no reader pays a rebuild | `N7` | a day | low | 🟡 todo |
-| 12 | `C11-lazy-topbar` | Load dropdown children on first open, never during prerender | `N6` | hours | low | 🟡 todo |
-| 13 | `C12-hub-after-idle` | Connect the hub after the first idle period and delete `ConvergeTotalAsync` | `N5` | hours | low | 🟡 todo |
+| 9 | `C29-folder-records` | Make the folder record a SmartCache `folder` entry holding every `metadata.yml` key, the folder's classification, and its aggregates, newest article included. Levels reference folder children instead of copying their metadata; `/_nav/children` returns the folder children's records beside the level, `/_nav/folder` returns one record, and the hub pushes changed records; the browser keeps one map of records; the global level flushes go. Supersedes `C5` | `N2`, `N15` | about three days | medium | ✅ done |
+| 10 | `C4-start-after-listen` | Run the warm-up as a background service after `ApplicationStarted`, behind a foreground gate and one concurrency budget; turn the per-request three-level warm into an enqueue | `N3` | about a day | low | ✅ done |
+| 11 | `C22-revalidate-in-background` | Serve cached levels, records, and pages past their interval and revalidate them in the background, so no reader pays a rebuild | `N7` | a day | low | ✅ done |
+| 12 | `C11-lazy-topbar` | Load dropdown children on first open, never during prerender | `N6` | hours | low | ✅ done |
+| 13 | `C12-hub-after-idle` | Connect the hub after the first idle period and delete `ConvergeTotalAsync` | `N5` | hours | low | ✅ done |
 
 ### Wave 3 — render once, cache one way
 
@@ -672,9 +678,9 @@ The third wave makes rendering a per-change cost and puts every derived value be
 
 | # | Id | Change | Addresses | Effort | Risk | Status |
 |---|---|---|---|---|---|---|
-| 14 | `C21-cache-rendered-pages` | Add a SmartCache `page` kind; `/_page` returns rendered JSON with an `ETag`; the browser stops running Markdig | `N13` | two days | medium | 🟡 todo |
-| 15 | `C10-persist-prerender-state` | `[PersistentState]` on `ContentView`, `DynNav`, and `TopMenu`, plus a persistent navigation bootstrap service carrying the levels, folder records, and page on screen; drop the `/_site` fetch before `RunAsync`. Done together with `C21` | `N5` | two to three days | medium | 🟡 todo |
-| 16 | `C23-one-smartcache-model` | One key type with kind constants, a path-set rule, one configuration source replacing `ContentFreshness`, `ISizeableHeuristically` envelopes, and invalidation callbacks on `folder` keys so counts refold on every instance; remove the unbound `Diginsight:SmartCache:Enabled` | `N15`, `N19` | about a week | medium | 🟡 todo |
+| 14 | `C21-cache-rendered-pages` | Add a SmartCache `page` kind; `/_page` returns rendered JSON with an `ETag`; the browser stops running Markdig | `N13` | two days | medium | ✅ done |
+| 15 | `C10-persist-prerender-state` | `[PersistentState]` on `ContentView`, `DynNav`, and `TopMenu`, plus a persistent navigation bootstrap service carrying the levels, folder records, and page on screen; drop the `/_site` fetch before `RunAsync`. Done together with `C21` | `N5` | two to three days | medium | ✅ done |
+| 16 | `C23-one-smartcache-model` | One key type with kind constants, a path-set rule, one configuration source replacing `ContentFreshness`, `ISizeableHeuristically` envelopes, and invalidation callbacks on `folder` keys so counts refold on every instance; remove the unbound `Diginsight:SmartCache:Enabled` | `N15`, `N19` | about a week | medium | ✅ done |
 
 ### Wave 4 — any size
 
@@ -790,7 +796,9 @@ Two conclusions follow. Wave 1 does what it set out to do on the deployed instan
 
 `C32` reached the Learning Hub on 2026-10-02 at about 12:46 UTC, with commit `5f58c29`. There, two trap routes answered `404` with the self-contained page, and the home page and an article answered `200` with no relative URL. Once the restart's warm-up was over, the first full five minutes used 4 CPU-seconds, against 160–228 in each five minutes of the half hour before, and the crawler's requests, all answered `404`, fell to 24 at 0.25 s on average.
 
-Whether GPTBot may crawl the Learning Hub at all is the owner's decision, and `C32` doesn't make it: OpenAI's crawlers honour `robots.txt` rules for the `GPTBot` token. `C32` makes crawling cheap instead, whoever does it.
+A follow-up compared matched 15-minute windows around that deployment. CPU fell from 609.818 to 166.040 seconds (72.8%), request volume from 444 to 74 (83.3%), and the mean of the one-minute average response times from 3.9178 to 1.3223 seconds (66.3%). The post-deploy window still includes startup work; CPU per request isn't comparable because `C32` intentionally changed the request mix.
+
+The owner decided that GPTBot may crawl the Learning Hub's public content, with the decision configured per space rather than fixed for the host. `SpaceOptions.AllowGptBot` defaults to `false`; the Learning Hub opts in. The generated `robots.txt` repeats the application-endpoint exclusions for GPTBot, then allows or denies each space's route. [The per-space policy validation](_validation/20261002.05-validation-sequence.md) records both the allowed Learning Hub and a default-denied space.
 
 ### What it changes in the plan
 
@@ -802,6 +810,75 @@ Whether GPTBot may crawl the Learning Hub at all is the owner's decision, and `C
 ### What M1 didn't measure
 
 The parts that act on the instance were left for the owner: the time to listening after a deliberate restart, CPU with the instrumentation sources gated off — which is what settles `PL-1` — SmartCache's size and evictions, and how long counts stay stale after a publish. They can only be read once `C32` has freed the core. (📌 next steps)
+
+## 🚦 C4 implementation record
+
+`C4-start-after-listen` was implemented and validated locally on 2026-10-02. [The C4 validation sequence](_validation/20261002.04-validation-sequence.md) records the visible-browser run.
+
+- `NavigationWarmupService` is the one hosted worker for startup discovery, full warms after invalidation, and three-level look-ahead.
+- The worker waits for `ApplicationStarted`, then for the first completed response or a two-second grace.
+- `ForegroundRequestGate` makes the worker wait before every folder-level discovery or warm item while a request is active, with a bounded pause so continuous traffic can't starve maintenance.
+- `/_nav/children` and `/_nav/invalidate` enqueue deduplicated work. They no longer create untracked `Task.Run` warm-ups.
+- Startup keeps the snapshot seed, incremental count pushes, stale-cell pruning, final level rebuild, and snapshot save from wave 1.
+
+The first implementation gated once per root branch. The visible run rejected it when a page reached response start after 5.826 seconds while a large branch was active. The corrected implementation gates every folder level; the accepted run served the complete home page before the startup worker finished, and navigation totals still converged without a reload.
+
+## 🗂️ C29 implementation record
+
+`C29-folder-records` was implemented and validated locally on 2026-10-02. [The C29 validation sequence](_validation/20261002.06-validation-sequence.md) records the API and live-update run.
+
+- `FolderMeta` preserves every authored key as well as the typed navigation fields.
+- `FolderRecordProvider` stores one SmartCache `folder` record per prefix, including effective display metadata, classification, aggregate count, newest article, and coverage.
+- `/_nav/children` returns folder references and the referenced records beside the level. `/_nav/folder` returns one record.
+- `HttpNavProvider` keeps one folder-record map and materializes menu nodes from references; hub messages replace records in that map.
+- Aggregate changes invalidate and push the affected records plus the site root. They no longer flush every cached navigation level.
+
+The visible publish probe moved Architecture from 5 to 6 articles and the site from 48 to 49, then deletion returned both to baseline. The browser updated without a reload, and the temporary content was removed.
+
+## ♻️ C22 implementation record
+
+`C22-revalidate-in-background` was implemented and validated locally on 2026-10-02. [The C22 validation sequence](_validation/20261002.07-validation-sequence.md) records the stale and refreshed values.
+
+- `BackgroundRevalidationCache` retains the last value with its refresh time, deduplicates expired keys, and runs refreshes through one hosted worker.
+- A first read still waits and surfaces its error. A later read past the tolerance returns stale immediately and queues a refresh.
+- Successful refreshes replace pages, folder records, and levels. A failed refresh is logged and leaves the stale value usable.
+- Explicit content-path invalidation removes matching stale entries as well as SmartCache entries.
+
+The validation changed a temporary source without sending an invalidation. After the one-second tolerance, page, folder, and level reads all returned the previous version; three seconds later all three returned the changed version. The first implementation left folder records indefinitely fresh and was rejected before the structural tolerance was added.
+
+## 🧭 C11 and C12 implementation record
+
+`C11-lazy-topbar` and `C12-hub-after-idle` completed wave 2 on 2026-10-02. Their visible-browser runs are recorded in [the C11 validation sequence](_validation/20261002.08-validation-sequence.md) and [the C12 validation sequence](_validation/20261002.09-validation-sequence.md).
+
+- The top bar loads one dropdown on its first hover or click. Initial hydration fetches only the root level, and hover plus click share one in-flight task.
+- `DynNav` reads the root total once, renders, then starts the hub from `OnAfterRenderAsync` after `requestIdleCallback`.
+- `ConvergeTotalAsync` and its five-second polling loop are removed. Initial and changed folder records arrive through the C29 map and hub.
+
+In the accepted run, initial hydration made only `/_nav/children?prefix=`. Hovering **Arch** made the first Architecture request and displayed five links. In the next run, page load completed at 2,320 ms and SignalR negotiation started at 6,026 ms; after another 12 seconds, counts remained one root-total read and one negotiation.
+
+## 🖨️ C21 and C10 implementation record
+
+`C21-cache-rendered-pages` and `C10-persist-prerender-state` were implemented and validated together on 2026-10-02. Their runs are recorded in [the C21 validation sequence](_validation/20261002.10-validation-sequence.md) and [the C10 validation sequence](_validation/20261002.11-validation-sequence.md).
+
+- `RenderedPageProvider` owns SmartCache `page` entries. Server prerender and `/_page` use the same result.
+- `/_page` returns rendered HTML, title, TOC, and word count as JSON with a strong ETag. The WASM client no longer registers Markdig or downloads Markdown for page navigation.
+- `[PersistentState]` properties mark `ContentView`, `DynNav`, `TopMenu`, and `NavigationBootstrapState`.
+- The bootstrap record carries the site shell, rendered page, loaded levels, and folder records. WASM restores it before `RunAsync`; the old pre-run `/_site` fetch is gone.
+- The standard .NET 10 persistent-service payload wasn't emitted by this hosted page's two interactive roots, so a host middleware injects the same public bootstrap after prerender as a deterministic fallback.
+
+The accepted initial hydration made zero `_site`, `/_page`, `/_nav/children`, or `/_nav/folder` requests. A subsequent client navigation made one rendered-page request, and an in-memory marker proved the document didn't reload.
+
+## 🧩 C23 implementation record
+
+`C23-one-smartcache-model` completed wave 3 on 2026-10-02. [The C23 validation sequence](_validation/20261002.12-validation-sequence.md) records the composition check and live invalidation.
+
+- `ContentPathCacheKey` addresses content, listings, article heads, folder metadata, navigation levels and indexes, folder records, and rendered pages.
+- `ContentPathInvalidationRule` carries a set of changed paths. One rule invalidates every matching kind and branch.
+- Folder keys return a local refold callback, so an invalidation delivered by a SmartCache companion recomputes records on that instance.
+- Cached envelopes report their own estimated sizes rather than asking the generic walker to traverse arrays and rendered HTML.
+- Application freshness moved under `Diginsight:SmartCache:SmartDocs`; the separate `ContentFreshness` section and unbound `Diginsight:SmartCache:Enabled` setting are gone.
+
+The visible publish probe moved Architecture from 5 to 6 and the site from 48 to 49 through the unified invalidation model. Deletion returned both values to baseline and removed the probe.
 
 ## 🧊 Parked items
 
@@ -837,7 +914,7 @@ The following checks were run for this page and its revision:
 - No multi-instance deployment was measured, and the deployed instance wasn't profiled: the cross-instance gap of `N15` is established from code, `N19` from the read pattern over local files, and `PL-1` is open. (🟡 todo)
 - The cause of the hub reconnects in `N18` isn't established. (🟡 todo)
 - Wave 1 was implemented and validated in a visible browser against the previous build serving the same content, in 13 scenarios recorded in [the wave-1 validation sequence](_validation/20261002.01-validation-sequence.md). (✅ done)
-- Waves 2–4 aren't implemented, and their target figures are estimates. (🟡 todo)
+- Waves 2 and 3 are implemented and validated in visible-browser runs; wave 4 remains open. (🟡 todo)
 - `M1` was measured in part on 2026-10-02 on the deployed Learning Hub and docs site, without acting on them: three days of platform metrics, three hours of web-server log, and requests from outside before and after wave 1 was deployed. (✅ done)
 - `C32` was validated in a visible browser in seven steps, recorded in [the validation sequence for the route guard](_validation/20261002.02-validation-sequence.md), and its behavior confirmed on the deployed Learning Hub. (✅ done)
 - `C32`'s effect on the deployed Learning Hub was read from its platform metrics: 4 CPU-seconds in the first full five minutes after the warm-up, against 160–228 before. (✅ done)
@@ -903,7 +980,7 @@ Next steps:
 
 ## 📡 Signal sweep
 
-The conversation behind this page, including the review that produced version 1.1, was checked against the eight sweep questions of the signal-capture procedure. Six signals are recorded on [02-signals.md](02-signals.md): five primary, and one routed to an existing landing. `SIG-4` and `SIG-5` come from the implementation of wave 1, and `SIG-6` from the deployed measurement, each swept separately below the table.
+The conversation behind this page, including the review that produced version 1.1, was checked against the eight sweep questions of the signal-capture procedure. Six signals are recorded on [02-signals.md](02-signals.md): four pending on the primary list, one routed to an existing landing, and one closed. `SIG-4` and `SIG-5` come from the implementation of wave 1, and `SIG-6` from the deployed measurement, each swept separately below the table.
 
 | Sweep question | Result |
 |---|---|
@@ -976,6 +1053,15 @@ Related pages in this repository:
 - [Wave 1 validation sequence](_validation/20261002.01-validation-sequence.md) — the visible-browser run that validated wave 1 against the previous build.
 - [Route guard validation sequence](_validation/20261002.02-validation-sequence.md) — the visible-browser run that validated `C32`.
 - [Locked-restore validation sequence](_validation/20261002.03-validation-sequence.md) — the reproduction and smoke run that validated closing `SIG-6`.
+- [C4 validation sequence](_validation/20261002.04-validation-sequence.md) — the visible-browser run that validated the foreground-gated startup warm-up queue.
+- [Per-space GPTBot policy validation](_validation/20261002.05-validation-sequence.md) — the visible-browser run that validated the Learning Hub opt-in and the deny-by-default behavior.
+- [C29 validation sequence](_validation/20261002.06-validation-sequence.md) — the visible-browser run that validated folder-reference levels, complete records, and live pushed updates.
+- [C22 validation sequence](_validation/20261002.07-validation-sequence.md) — the visible-browser run that validated stale-while-revalidate pages, records, and levels.
+- [C11 validation sequence](_validation/20261002.08-validation-sequence.md) — the visible-browser run that validated lazy top-bar dropdown loading.
+- [C12 validation sequence](_validation/20261002.09-validation-sequence.md) — the visible-browser run that validated hub startup after idle and removal of convergence polling.
+- [C21 validation sequence](_validation/20261002.10-validation-sequence.md) — the visible-browser run that validated cached rendered JSON and removal of browser-side Markdown rendering.
+- [C10 validation sequence](_validation/20261002.11-validation-sequence.md) — the visible-browser run that validated zero-request hydration from the prerender bootstrap.
+- [C23 validation sequence](_validation/20261002.12-validation-sequence.md) — the visible-browser run that validated the unified SmartCache model and folder invalidation callback.
 
 Internal companion: `src/docs/90.00-issues/202610/20261001.01-perfanalysis/01-startup-and-navigation-optimization.analysis.internal.md` in the internal peer adds the identities of the profile and its spaces, the local paths, the per-space sizes on disk, the run and trace identifiers, the deployed overlays as read, and the commands, probes, and header-cache estimate as executed; for version 1.2, the infrastructure-name check against every configured space and the validation environment as run; for version 1.3, the deployed apps, plan, and settings as read, the measurement commands, and the build agent's restore failure as diagnosed.
 
@@ -990,6 +1076,5 @@ article_metadata:
   filename: "01-startup-and-navigation-optimization.analysis.md"
   created: "2026-10-01"
   last_updated: "2026-10-02"
-  version: "1.3"
+  version: "1.4"
 -->
-

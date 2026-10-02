@@ -8,13 +8,22 @@ namespace Diginsight.SmartDocs.Web.Navigation;
 public sealed class ServerNavProvider(
     INavBuilder builder,
     FolderMetricsIndex metrics,
+    FolderRecordProvider folders,
+    NavigationBootstrapState bootstrap,
     ILogger<ServerNavProvider> logger) : INavProvider
 {
     public async Task<IReadOnlyList<NavChild>> GetChildrenAsync(string prefix, CancellationToken ct = default)
     {
         using var activity = Observability.ActivitySource.StartMethodActivity(logger, () => new { prefix });
 
-        return NavRules.WithoutEmptySections(await builder.GetChildrenAsync(prefix, ct));
+        IReadOnlyList<NavChild> level =
+            NavRules.WithoutEmptySections(await builder.GetChildrenAsync(prefix, ct));
+        bootstrap.SetLevel(prefix, level);
+        FolderRecord?[] records = await Task.WhenAll(level
+            .Where(static child => child.IsSection && child.Prefix is not null)
+            .Select(child => GetFolderAsync(child.Prefix!, ct)));
+        bootstrap.SetFolderRecords(records.OfType<FolderRecord>());
+        return level;
     }
 
     public Task<FolderArticleStats?> GetTotalAsync(CancellationToken ct = default)
@@ -26,6 +35,9 @@ public sealed class ServerNavProvider(
             : null;
         return Task.FromResult(total);
     }
+
+    public async Task<FolderRecord?> GetFolderAsync(string prefix, CancellationToken ct = default) =>
+        await folders.GetAsync(prefix, ct);
 
     public async Task<IReadOnlyList<NavLeaf>> GetIndexAsync(CancellationToken ct = default)
     {

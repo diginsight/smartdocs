@@ -239,6 +239,9 @@ public sealed class SpaceOptions
     /// <summary>Repository this documentation was generated from, linked from the index.</summary>
     public string RepositoryUrl { get; set; } = string.Empty;
 
+    /// <summary>Whether GPTBot may crawl this space's published content. Denied by default.</summary>
+    public bool AllowGptBot { get; set; }
+
     /// <summary>Active content source for this space: <c>Blob</c> or <c>FileSystem</c>.</summary>
     public string Source { get; set; } = "Blob";
 

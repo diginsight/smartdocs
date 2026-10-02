@@ -48,6 +48,7 @@ public static class NavEndpoints
         });
 
         group.MapGet("/children", GetNavChildrenAsync);
+        group.MapGet("/folder", GetFolderAsync);
         group.MapGet("/version", GetNavVersion);
         group.MapGet("/total", GetNavTotal);
         group.MapGet("/index", GetNavIndexAsync);
@@ -56,25 +57,29 @@ public static class NavEndpoints
     }
 
     private static async Task<IResult> GetNavChildrenAsync(
-        string? prefix, INavBuilder nav, CachedDynamicNavBuilder cachedNav,
+        string? prefix, INavBuilder nav, INavigationWarmupQueue warmup,
+        FolderRecordProvider folders,
         IOptions<JsonOptions> json, HttpContext http, CancellationToken ct)
     {
         using var activity = Observability.ActivitySource.StartMethodActivity(logger, () => new { prefix });
 
-        var children = await nav.GetChildrenAsync(prefix ?? string.Empty, ct);
+        IReadOnlyList<NavChild> children = await nav.GetChildrenAsync(prefix ?? string.Empty, ct);
+        FolderRecord[] records = await Task.WhenAll(children
+            .Where(static child => child.IsSection && child.Prefix is not null)
+            .Select(child => folders.GetAsync(child.Prefix!, ct)));
+        var response = new NavLevelResponse(
+            children.Select(static child => child.IsSection && child.Prefix is not null
+                ? NavLevelReference.Folder(child.Prefix)
+                : NavLevelReference.Article(child)).ToArray(),
+            records);
 
-        // Fire-and-forget: warm +2 levels deeper so the next expand is instant.
-        _ = Task.Run(async () =>
-        {
-            try { await cachedNav.WarmLevelsAsync(prefix ?? string.Empty, 3, CancellationToken.None); }
-            catch { /* best-effort */ }
-        });
+        warmup.EnqueueLevels(prefix ?? string.Empty, 3);
 
         activity?.SetOutput(new { count = children.Count });
 
         // Serialized here rather than by Results.Json so the entity tag covers exactly the bytes sent:
         // a browser holding the same level revalidates it with a 304 instead of downloading it again.
-        byte[] body = JsonSerializer.SerializeToUtf8Bytes(children, json.Value.SerializerOptions);
+        byte[] body = JsonSerializer.SerializeToUtf8Bytes(response, json.Value.SerializerOptions);
         if (HttpValidators.IsNotModified(http, HttpValidators.Tag(body), HttpValidators.Revalidate))
         {
             return Results.StatusCode(StatusCodes.Status304NotModified);
@@ -82,6 +87,12 @@ public static class NavEndpoints
 
         return Results.Bytes(body, "application/json; charset=utf-8");
     }
+
+    private static async Task<IResult> GetFolderAsync(
+        string? prefix,
+        FolderRecordProvider folders,
+        CancellationToken cancellationToken) =>
+        Results.Json(await folders.GetAsync(prefix ?? string.Empty, cancellationToken));
 
     private static IResult GetNavVersion()
     {
@@ -110,7 +121,7 @@ public static class NavEndpoints
     private static IResult InvalidateNavCache(
         HttpContext http, string? path,
         IOptions<SiteOptions> siteOptions,
-        CachedDynamicNavBuilder nav, NavChangePublisher publisher)
+        CachedDynamicNavBuilder nav, NavChangePublisher publisher, INavigationWarmupQueue warmup)
     {
         using var activity = Observability.ActivitySource.StartMethodActivity(logger, () => new { path });
 
@@ -145,7 +156,7 @@ public static class NavEndpoints
 
         // Rebuild what was just dropped before a reader asks for it. The caller is a publish
         // pipeline waiting on this response, so the warm runs behind it rather than inside it.
-        nav.WarmInBackground();
+        warmup.EnqueueAll();
 
         return Results.Ok(new { version = CachedDynamicNavBuilder.Version });
     }

@@ -4,6 +4,7 @@ using Diginsight.SmartDocs.Web.Shared;
 using Diginsight.SmartDocs.Web.Shared.Sites;
 using Diginsight.SmartDocs.Web.Sites;
 using Microsoft.Extensions.Options;
+using System.Text;
 
 namespace Diginsight.SmartDocs.Web.Endpoints;
 
@@ -13,6 +14,12 @@ public static class SiteEndpoints
     {
         app.MapGet("/_site", (IOptions<SiteOptions> siteOptions, BrandingAssets branding) =>
             Results.Json(SiteShellOptions.From(siteOptions.Value, branding.LogoUrl)));
+
+        app.MapGet("/robots.txt", (IOptions<SiteOptions> siteOptions, HttpContext http) =>
+        {
+            http.Response.Headers.CacheControl = "public, max-age=300";
+            return Results.Text(BuildRobots(siteOptions.Value), "text/plain; charset=utf-8");
+        });
 
         // The publisher's mark, on one URL that does not name a space. The shell shows the same
         // header on every page — including the generated index, which has no space to resolve
@@ -46,5 +53,34 @@ public static class SiteEndpoints
         });
 
         return app;
+    }
+
+    private static string BuildRobots(SiteOptions site)
+    {
+        string[] applicationPaths = ["/_framework/", "/_nav/", "/_page/", "/_blazor/"];
+        var text = new StringBuilder()
+            .AppendLine("# Published pages may be crawled. Application endpoints may not.")
+            .AppendLine("User-agent: *");
+
+        foreach (string path in applicationPaths)
+        {
+            text.Append("Disallow: ").AppendLine(path);
+        }
+
+        text.AppendLine()
+            .AppendLine("User-agent: GPTBot");
+
+        foreach (string path in applicationPaths)
+        {
+            text.Append("Disallow: ").AppendLine(path);
+        }
+
+        foreach (SpaceOptions space in site.Spaces)
+        {
+            string path = space.IsRootMounted ? "/" : $"{space.NormalizedRouteBase}/";
+            text.Append(space.AllowGptBot ? "Allow: " : "Disallow: ").AppendLine(path);
+        }
+
+        return text.ToString();
     }
 }

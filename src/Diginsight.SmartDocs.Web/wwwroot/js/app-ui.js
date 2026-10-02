@@ -1,6 +1,21 @@
 // Draggable sidebar resizer. Drag the handle to resize; double-click to reset.
 // Width is stored in the CSS variable --sidebar-width and persisted to localStorage.
 window.appUi = {
+    readBootstrap: function () {
+        var element = document.getElementById('smartdocs-bootstrap');
+        return element ? element.textContent : null;
+    },
+
+    waitForIdle: function () {
+        return new Promise(function (resolve) {
+            if (window.requestIdleCallback) {
+                window.requestIdleCallback(function () { resolve(); }, { timeout: 2000 });
+            } else {
+                window.setTimeout(resolve, 0);
+            }
+        });
+    },
+
     initResizer: function () {
         try {
             var saved = localStorage.getItem('lh-sidebar-width');

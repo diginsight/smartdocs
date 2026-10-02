@@ -10,6 +10,9 @@ namespace Diginsight.SmartDocs.Web.Client.Layout;
 
 public partial class DynNav
 {
+    [PersistentState] public string? PersistedScope { get; set; }
+    [PersistentState] public NavChild[]? PersistedRoot { get; set; }
+
     private const int MaxResults = 200;
     private static readonly StringComparison OIC = StringComparison.OrdinalIgnoreCase;
 
@@ -34,13 +37,36 @@ public partial class DynNav
     // count polling: the server pushes root counts once warm-up finishes and per-folder counts on
     // every content change.
     private NavHubClient? _hub;
+    private bool _hubInitialized;
 
     protected override async Task OnInitializedAsync()
     {
         _current = CurrentRoute();
         _scope = SpaceScope.PrefixFor(Site, _current);
         NavMgr.LocationChanged += OnLocationChanged;
-        _root = await SpaceScope.LoadRootAsync(Provider, Site, _scope);
+        if (string.Equals(PersistedScope, _scope, OIC) && PersistedRoot is not null)
+        {
+            _root = PersistedRoot;
+        }
+        else if (Bootstrap.TryGetLevel(_scope, out IReadOnlyList<NavChild> bootstrapped))
+        {
+            _root = bootstrapped;
+        }
+        else
+        {
+            _root = await SpaceScope.LoadRootAsync(Provider, Site, _scope);
+        }
+
+        PersistedScope = _scope;
+        PersistedRoot = _root.ToArray();
+        Bootstrap.SetLevel(_scope, _root);
+        IEnumerable<string> recordPrefixes = _root
+            .Where(static child => child.IsSection && child.Prefix is not null)
+            .Select(static child => child.Prefix!)
+            .Prepend(string.Empty);
+        FolderRecord?[] records = await Task.WhenAll(
+            recordPrefixes.Select(prefix => Provider.GetFolderAsync(prefix)));
+        Bootstrap.SetFolderRecords(records.OfType<FolderRecord>());
         PublishRootStats();
         _scrollPending = true;
 
@@ -53,40 +79,26 @@ public partial class DynNav
             {
                 Stats.SetTotal(site);
             }
-            if (total is not { Coverage: Coverage.Complete })
-            {
-                _ = ConvergeTotalAsync();
-            }
-
-            _hub = Services.GetService<NavHubClient>();
-            if (_hub is not null)
-            {
-                _hub.MetadataChanged += OnAggregatesPushed;
-                _hub.CountsReady += OnAggregatesPushed;
-                _hub.Reconnected += OnHubReconnected;
-                await _hub.StartAsync();
-            }
         }
     }
 
-    // SignalR remains the immediate update path, but correctness must not depend on its first
-    // handshake. Pull the cheap site-root cell until startup discovery marks it complete.
-    private async Task ConvergeTotalAsync()
+    private async Task InitializeHubAfterIdleAsync()
     {
-        for (int attempt = 0; attempt < 48; attempt++)
+        if (!OperatingSystem.IsBrowser() || _hubInitialized)
         {
-            await Task.Delay(TimeSpan.FromSeconds(5));
-            FolderArticleStats? total = await Provider.GetTotalAsync();
-            if (total is not { } site)
-            {
-                continue;
-            }
+            return;
+        }
 
-            Stats.SetTotal(site);
-            if (site.Coverage == Coverage.Complete)
-            {
-                break;
-            }
+        _hubInitialized = true;
+        await JS.InvokeVoidAsync("appUi.waitForIdle");
+
+        _hub = Services.GetService<NavHubClient>();
+        if (_hub is not null)
+        {
+            _hub.MetadataChanged += OnAggregatesPushed;
+            _hub.CountsReady += OnAggregatesPushed;
+            _hub.Reconnected += OnHubReconnected;
+            await _hub.StartAsync();
         }
     }
 
@@ -110,18 +122,22 @@ public partial class DynNav
     // CountsReady). Apply them to the cached tree locally (no refetch), seed the footer total from
     // the authoritative root values (works even when the tree isn't rendered), and nudge open
     // sections to re-read their now-updated cached counts.
-    private void OnAggregatesPushed(IReadOnlyList<NavAggregateDelta> deltas)
+    private void OnAggregatesPushed(IReadOnlyList<FolderRecord> records)
         => _ = InvokeAsync(async () =>
         {
             // The empty prefix is the site root — the authoritative whole-site total. Applied before
             // any await so the footer updates immediately instead of queueing behind a tree
             // re-render, which can span dozens of open sections.
-            foreach (NavAggregateDelta d in deltas.Where(d => d.Prefix.Length == 0))
+            foreach (FolderRecord record in records.Where(record => record.Prefix.Length == 0))
             {
-                Stats.SetTotal(new FolderArticleStats(d.ArticleCount, d.LatestUtc, d.Author, d.Coverage));
+                Stats.SetTotal(new FolderArticleStats(
+                    record.ArticleCount,
+                    record.LatestArticleUtc,
+                    null,
+                    record.Coverage));
             }
 
-            (Provider as HttpNavProvider)?.ApplyAggregates(deltas);
+            (Provider as HttpNavProvider)?.ApplyFolderRecords(records);
             _root = await SpaceScope.LoadRootAsync(Provider, Site, _scope);
             PublishRootStats();
 
@@ -295,6 +311,11 @@ public partial class DynNav
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        if (firstRender)
+        {
+            await InitializeHubAfterIdleAsync();
+        }
+
         if (_scrollPending && _root is { Count: > 0 } && string.IsNullOrEmpty(_applied) && !Sidebar.Collapsed)
         {
             _scrollPending = false;

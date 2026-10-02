@@ -23,6 +23,7 @@ public sealed class CachedContentSource(
     IContentSource inner,
     IContentLister innerLister,
     ISmartCache smartCache,
+    BackgroundRevalidationCache revalidation,
     ContentFreshnessOptions freshness,
     ILogger<CachedContentSource> logger) : IContentSource, IContentLister
 {
@@ -67,12 +68,16 @@ public sealed class CachedContentSource(
             MaxAge = maxAge,
         };
 
-        return smartCache.GetAsync(
+        return revalidation.GetAsync(
             key,
-            async innerCt => new CachedContent(await inner.GetAsync(contentKey, innerCt)),
-            options,
-            callerType: typeof(CachedContentSource),
-            cancellationToken: ct);
+            maxAge,
+            innerCt => smartCache.GetAsync(
+                key,
+                async cacheCt => new CachedContent(await inner.GetAsync(contentKey, cacheCt)),
+                options,
+                callerType: typeof(CachedContentSource),
+                cancellationToken: innerCt),
+            ct);
     }
 
     /// <summary>
@@ -181,11 +186,31 @@ public sealed class CachedContentSource(
     }
 
     /// <summary>Serializable envelope for a folder listing (an array, so it round-trips through Redis).</summary>
-    public sealed record CachedChildren(ChildEntry[] Items);
+    public sealed record CachedChildren(ChildEntry[] Items) : ISizeableHeuristically
+    {
+        public HeuristicSizeResult GetSizeHeuristically(HeuristicSizeGetter innerGet) =>
+            new(128L + Items.Sum(static item =>
+                64L + 2L * (item.Name.Length + item.Path.Length)));
+    }
 
     /// <summary>Serializable envelope for a parsed article header; an absent file parses to <see cref="ArticleHead.Empty"/>.</summary>
-    public sealed record CachedArticleHead(ArticleHead Head);
+    public sealed record CachedArticleHead(ArticleHead Head) : ISizeableHeuristically
+    {
+        public HeuristicSizeResult GetSizeHeuristically(HeuristicSizeGetter innerGet) =>
+            new(192L + 2L * (
+                (Head.Title?.Length ?? 0) +
+                (Head.Author?.Length ?? 0)));
+    }
 
     /// <summary>Serializable envelope for parsed <c>metadata.yml</c> overrides; an absent file parses to <see cref="FolderMeta.None"/>.</summary>
-    public sealed record CachedFolderMeta(FolderMeta Meta);
+    public sealed record CachedFolderMeta(FolderMeta Meta) : ISizeableHeuristically
+    {
+        public HeuristicSizeResult GetSizeHeuristically(HeuristicSizeGetter innerGet) =>
+            new(192L + 2L * (
+                (Meta.Label?.Length ?? 0) +
+                (Meta.Short?.Length ?? 0) +
+                (Meta.Icon?.Length ?? 0) +
+                (Meta.TopbarAlign?.Length ?? 0) +
+                (Meta.Values?.Sum(static pair => pair.Key.Length + pair.Value.Length) ?? 0)));
+    }
 }

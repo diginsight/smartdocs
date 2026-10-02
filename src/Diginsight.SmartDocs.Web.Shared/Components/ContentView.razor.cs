@@ -9,6 +9,9 @@ public partial class ContentView
 {
     [Parameter] public string? Path { get; set; }
 
+    [PersistentState] public string? PersistedPageRoute { get; set; }
+    [PersistentState] public RenderedPage? PersistedPage { get; set; }
+
     private RenderedPage? _page;
     private bool _loading = true;
     private IReadOnlyList<Crumb> _trail = Array.Empty<Crumb>();
@@ -36,7 +39,24 @@ public partial class ContentView
             return;
         }
 
-        _page = await Loader.LoadAsync(Path);
+        string requestedRoute = Norm(Path);
+        if (string.Equals(PersistedPageRoute, requestedRoute, StringComparison.OrdinalIgnoreCase))
+        {
+            _page = PersistedPage;
+        }
+        else if (string.Equals(Bootstrap.PageRoute, requestedRoute, StringComparison.OrdinalIgnoreCase))
+        {
+            _page = Bootstrap.Page;
+        }
+        else
+        {
+            _page = await Loader.LoadAsync(Path);
+        }
+
+        PersistedPageRoute = requestedRoute;
+        PersistedPage = _page;
+        Bootstrap.PageRoute = requestedRoute;
+        Bootstrap.Page = _page;
         _loading = false;
         Toc.SetEntries(_page?.Toc ?? Array.Empty<TocEntry>());
 

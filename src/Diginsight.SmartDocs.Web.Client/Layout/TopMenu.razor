@@ -1,5 +1,6 @@
 @inject INavProvider NavProvider
 @inject Diginsight.SmartDocs.Web.Shared.Sites.SiteShellState Site
+@inject NavigationBootstrapState Bootstrap
 
 @if (_root is not null)
 {
@@ -8,7 +9,8 @@
         {
             @if (node.IsSection)
             {
-                <div class="topmenu-item @(IsOpen(node) ? "open" : null)">
+                <div class="topmenu-item @(IsOpen(node) ? "open" : null)"
+                     @onmouseenter="() => LoadChildrenAsync(node)">
                     <button class="topmenu-btn" type="button" @onclick="() => ToggleAsync(node)">
                         @if (!string.IsNullOrEmpty(node.Icon))
                         {
@@ -39,4 +41,3 @@
         }
     </nav>
 }
-

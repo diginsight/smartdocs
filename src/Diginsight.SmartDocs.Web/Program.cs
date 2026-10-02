@@ -12,6 +12,7 @@ using Diginsight.SmartDocs.Web.Components;
 using Diginsight.SmartDocs.Web.ContentSources;
 using Diginsight.SmartDocs.Web.Endpoints;
 using Diginsight.SmartDocs.Web.Navigation;
+using Diginsight.SmartDocs.Web.Rendering;
 using Diginsight.SmartDocs.Web.Shared;
 using Diginsight.SmartDocs.Web.Shared.Navigation;
 using Diginsight.SmartDocs.Web.Shared.Rendering;
@@ -20,6 +21,7 @@ using Diginsight.SmartDocs.Web.Shared.Sites;
 using Diginsight.SmartDocs.Web.Sites;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
+using Microsoft.AspNetCore.Components.Web;
 
 namespace Diginsight.SmartDocs.Web;
 
@@ -66,8 +68,10 @@ public class Program
             services.AddParallelService(configuration);
 
             // Razor Components host with interactive WebAssembly components (prerendered by default).
+            services.AddScoped<NavigationBootstrapState>();
             services.AddRazorComponents()
-                .AddInteractiveWebAssemblyComponents();
+                .AddInteractiveWebAssemblyComponents()
+                .RegisterPersistentService<NavigationBootstrapState>(RenderMode.InteractiveWebAssembly);
 
             // Dynamic responses worth compressing: navigation JSON and Markdown source. HTML is left
             // out on purpose — a prerendered page carries an antiforgery token next to reflected input,
@@ -92,7 +96,14 @@ public class Program
             // resolved value and the prerendered header already carries the mark.
             var brandingAssets = new BrandingAssets();
             services.AddSingleton(brandingAssets);
-            services.AddScoped(_ => new SiteShellState(siteOptions, brandingAssets.LogoUrl));
+            services.AddScoped(sp =>
+            {
+                SiteShellOptions shell = SiteShellOptions.From(siteOptions, brandingAssets.LogoUrl);
+                sp.GetRequiredService<NavigationBootstrapState>().Site = shell;
+                var state = new SiteShellState();
+                state.Apply(shell);
+                return state;
+            });
             services.AddScoped(_ => new ThemeState(ThemeCatalog.Resolve(siteOptions.Themes)));
             var spaceRegistry = new SpaceRegistry(siteOptions.Spaces);
             services.AddSingleton(spaceRegistry);
@@ -177,7 +188,7 @@ public class Program
             // How stale an answer may be when no invalidation call arrived. Bound eagerly, like the
             // site options above, because the content sources are built here rather than resolved.
             var freshness = new ContentFreshnessOptions();
-            configuration.GetSection("ContentFreshness").Bind(freshness);
+            configuration.GetSection("Diginsight:SmartCache:SmartDocs").Bind(freshness);
             services.AddSingleton(freshness);
 
             services.AddSingleton(sp => new SpaceContentRegistry(
@@ -197,13 +208,16 @@ public class Program
                     mounted,
                     mounted,
                     sp.GetRequiredService<ISmartCache>(),
+                    sp.GetRequiredService<BackgroundRevalidationCache>(),
                     freshness,
                     sp.GetRequiredService<ILogger<CachedContentSource>>());
             });
             services.AddSingleton<IContentSource>(sp => sp.GetRequiredService<CachedContentSource>());
             services.AddSingleton<IContentLister>(sp => sp.GetRequiredService<CachedContentSource>());
 
-            services.AddScoped<IMarkdownRenderer, MarkdigMarkdownRenderer>();
+            services.AddSingleton<IMarkdownRenderer, MarkdigMarkdownRenderer>();
+            services.AddSingleton<RenderedPageProvider>();
+            services.AddSingleton<IRenderedPageResolver>(sp => sp.GetRequiredService<RenderedPageProvider>());
             services.AddScoped<PageLoader>();
             services.AddScoped<TocState>();
             services.AddScoped<SidebarState>();
@@ -213,6 +227,9 @@ public class Program
             // IMemoryCache is registered here: SmartCache's builder registers its own, and SmartCache
             // itself keeps a private memory cache, so nothing in this application resolves one.
             services.AddSingleton<FolderMetricsIndex>();
+            services.AddSingleton<BackgroundRevalidationCache>();
+            services.AddHostedService(
+                sp => sp.GetRequiredService<BackgroundRevalidationCache>());
             // The inner builder gets a lazy handle on the decorator that wraps it, so the whole-tree
             // walk behind GetIndexAsync reads each level through the cache instead of re-listing the
             // tree. Lazy breaks the cycle: it is never forced in the constructor, only on first walk.
@@ -227,16 +244,31 @@ public class Program
             services.AddSingleton<CachedDynamicNavBuilder>(sp => new CachedDynamicNavBuilder(
                 sp.GetRequiredService<DynamicNavBuilder>(),
                 sp.GetRequiredService<ISmartCache>(),
+                sp.GetRequiredService<BackgroundRevalidationCache>(),
                 sp.GetRequiredService<IParallelService>(),
                 freshness,
                 sp.GetRequiredService<ILogger<CachedDynamicNavBuilder>>()));
             services.AddSingleton<INavBuilder>(sp => sp.GetRequiredService<CachedDynamicNavBuilder>());
+            services.AddSingleton(sp => new FolderRecordProvider(
+                sp.GetRequiredService<INavBuilder>(),
+                sp.GetRequiredService<IContentLister>(),
+                sp.GetRequiredService<FolderMetricsIndex>(),
+                sp.GetRequiredService<ISmartCache>(),
+                sp.GetRequiredService<BackgroundRevalidationCache>(),
+                freshness,
+                siteOptions));
             services.AddScoped<INavProvider, ServerNavProvider>();
 
             // Live navigation metadata push: SignalR hub + the publisher that broadcasts folder
             // aggregates on content change and once the startup warm-up has computed the counts.
             services.AddSignalR();
             services.AddSingleton<NavChangePublisher>();
+            services.AddSingleton<ForegroundRequestGate>();
+            services.AddSingleton<NavigationWarmupService>();
+            services.AddSingleton<INavigationWarmupQueue>(
+                sp => sp.GetRequiredService<NavigationWarmupService>());
+            services.AddHostedService(
+                sp => sp.GetRequiredService<NavigationWarmupService>());
 
             builder.UseDiginsightServiceProvider(true);
 
@@ -251,6 +283,14 @@ public class Program
             }
 
             app.UseResponseCompression();
+
+            app.UseMiddleware<NavigationBootstrapMiddleware>();
+
+            app.Use(async (context, next) =>
+            {
+                using IDisposable request = app.Services.GetRequiredService<ForegroundRequestGate>().Enter();
+                await next(context);
+            });
 
             // A route that names nothing in the content — the browser's /favicon.ico, a mistyped link,
             // or a crawler's misresolved relative link — is answered with a 404 here, before the page
@@ -282,72 +322,6 @@ public class Program
         // carries it. One read of one asset; a space that cannot answer is skipped with a warning.
         BrandingAssetResolver.Resolve(app.Services, logger);
 
-        // Build the navigation metrics projection in the background: seed from the previous run so
-        // the counter never starts from nothing, then discover + fold the tree one root branch at a
-        // time so the footer total climbs as a labelled lower bound instead of jumping.
-        _ = Task.Run(async () =>
-        {
-            try
-            {
-                var cachedNav = app.Services.GetRequiredService<CachedDynamicNavBuilder>();
-                var metrics = app.Services.GetRequiredService<FolderMetricsIndex>();
-                var publisher = app.Services.GetRequiredService<NavChangePublisher>();
-
-                string snapshotPath = SnapshotPath(app.Configuration);
-                if (await metrics.LoadSnapshotAsync(snapshotPath) > 0)
-                {
-                    cachedNav.InvalidateLevels();          // levels rebuild carrying the seeded counts
-                    await publisher.PublishCountsReadyAsync();
-                }
-
-                // A restart is just a global invalidation over a warm seed — same drain, no special path.
-                // The per-root loop publishes progress but does NOT flush the level cache: that flush is
-                // global (an empty-path rule is on every branch), so one per root section meant R+2 whole-tree
-                // wipes, each one discarding levels the very next root's discovery had to rebuild. The counts
-                // reach the client over SignalR regardless; the levels only need rebuilding once, at the end,
-                // when the aggregates have settled.
-                var reachable = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                foreach (var root in await cachedNav.GetChildrenAsync(string.Empty))
-                {
-                    if (!root.IsSection || root.Prefix is null)
-                    {
-                        continue;
-                    }
-
-                    reachable.UnionWith(await metrics.DiscoverAsync(root.Prefix));
-                    await metrics.DrainAsync();
-                    await publisher.PublishCountsReadyAsync();
-                }
-
-                // Folders that disappeared while the app was down must not linger in the snapshot.
-                metrics.PruneUnreachable(reachable);
-
-                // Root cell (the whole-site total) plus anything still dirty.
-                metrics.Invalidate(string.Empty);
-                await metrics.DrainAsync();
-                cachedNav.InvalidateLevels();
-
-                // Every level warm, then the authoritative final push. The flattened search index is
-                // deliberately NOT built here: its only consumer is the menu filter, which runs when a
-                // visitor types, and building it walks every article.
-                await cachedNav.WarmAllLevelsAsync();
-                await publisher.PublishCountsReadyAsync();
-
-                await metrics.SaveSnapshotAsync(snapshotPath);
-            }
-            catch (Exception ex)
-            {
-                logger.LogWarning(ex, "Nav metrics warm-up failed");
-            }
-        });
-
         app.Run();
     }
-
-    // Single derived artifact: one read at startup instead of one per folder, and no derived value
-    // is ever written into an authored content file.
-    private static string SnapshotPath(IConfiguration configuration) =>
-        configuration["Site:MetricsSnapshotPath"] is { Length: > 0 } configured
-            ? configured
-            : Path.Combine(AppContext.BaseDirectory, "nav-metrics-snapshot.json");
 }

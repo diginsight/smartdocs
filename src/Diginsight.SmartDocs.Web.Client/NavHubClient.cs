@@ -15,10 +15,10 @@ public sealed class NavHubClient(NavigationManager nav) : IAsyncDisposable
     private HubConnection? _connection;
 
     /// <summary>Raised when the server pushes updated folder aggregates after a content change.</summary>
-    public event Action<IReadOnlyList<NavAggregateDelta>>? MetadataChanged;
+    public event Action<IReadOnlyList<FolderRecord>>? MetadataChanged;
 
     /// <summary>Raised once the server's startup warm-up has computed the root counts.</summary>
-    public event Action<IReadOnlyList<NavAggregateDelta>>? CountsReady;
+    public event Action<IReadOnlyList<FolderRecord>>? CountsReady;
 
     /// <summary>Raised after the connection is re-established, so consumers can re-sync missed changes.</summary>
     public event Action? Reconnected;
@@ -36,10 +36,10 @@ public sealed class NavHubClient(NavigationManager nav) : IAsyncDisposable
             .WithAutomaticReconnect()
             .Build();
 
-        _connection.On<IReadOnlyList<NavAggregateDelta>>(
-            NavHubContract.MetadataChanged, deltas => MetadataChanged?.Invoke(deltas));
-        _connection.On<IReadOnlyList<NavAggregateDelta>>(
-            NavHubContract.CountsReady, deltas => CountsReady?.Invoke(deltas));
+        _connection.On<IReadOnlyList<FolderRecord>>(
+            NavHubContract.MetadataChanged, records => MetadataChanged?.Invoke(records));
+        _connection.On<IReadOnlyList<FolderRecord>>(
+            NavHubContract.CountsReady, records => CountsReady?.Invoke(records));
         _connection.Reconnected += _ =>
         {
             Reconnected?.Invoke();

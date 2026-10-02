@@ -1,5 +1,6 @@
 using Diginsight.SmartCache;
 using Diginsight.SmartCache.Externalization;
+using System.Collections.Concurrent;
 
 namespace Diginsight.SmartDocs.Web.Caching;
 
@@ -23,9 +24,19 @@ public sealed record ContentPathCacheKey(string Kind, string Path) : IInvalidata
     public bool IsInvalidatedBy(IInvalidationRule invalidationRule, out Func<Task>? invalidationCallback)
     {
         invalidationCallback = null;
-        return invalidationRule is ContentPathInvalidationRule rule
-            && (rule.Kind is null || string.Equals(rule.Kind, Kind, StringComparison.Ordinal))
-            && OnSameBranch(Path, rule.Path);
+        if (invalidationRule is not ContentPathInvalidationRule rule ||
+            (rule.Kind is not null && !string.Equals(rule.Kind, Kind, StringComparison.Ordinal)) ||
+            !rule.Paths.Any(path => OnSameBranch(Path, path)))
+        {
+            return false;
+        }
+
+        if (string.Equals(Kind, "folder", StringComparison.Ordinal))
+        {
+            invalidationCallback = FolderInvalidationCallbacks.Get(Path);
+        }
+
+        return true;
     }
 
     /// <summary>
@@ -57,4 +68,36 @@ public sealed record ContentPathCacheKey(string Kind, string Path) : IInvalidata
 /// <param name="Kind">When set, restricts the rule to entries of that <see cref="ContentPathCacheKey.Kind"/>
 /// (e.g. only <c>nav-level</c>); <c>null</c> matches every kind on the branch.</param>
 [CacheInterchangeName("LPIR")]
-public sealed record ContentPathInvalidationRule(string Path, string? Kind = null) : IInvalidationRule;
+public sealed record ContentPathInvalidationRule : IInvalidationRule
+{
+    public ContentPathInvalidationRule(string path, string? Kind = null)
+        : this([path], Kind)
+    {
+    }
+
+    public ContentPathInvalidationRule(IEnumerable<string> paths, string? Kind = null)
+    {
+        Paths = new HashSet<string>(
+            paths.Select(ContentPathCacheKey.Normalize),
+            StringComparer.OrdinalIgnoreCase);
+        this.Kind = Kind;
+    }
+
+    public IReadOnlySet<string> Paths { get; }
+
+    public string? Kind { get; }
+}
+
+internal static class FolderInvalidationCallbacks
+{
+    private static readonly ConcurrentDictionary<string, Func<Task>> Callbacks =
+        new(StringComparer.OrdinalIgnoreCase);
+
+    public static void Register(string path, Func<Task> callback) =>
+        Callbacks[ContentPathCacheKey.Normalize(path)] = callback;
+
+    public static Func<Task>? Get(string path) =>
+        Callbacks.TryGetValue(ContentPathCacheKey.Normalize(path), out Func<Task>? callback)
+            ? callback
+            : null;
+}

@@ -1,7 +1,0 @@
-# The pages are the content. These paths are the application's own machinery: the browser
-# runtime, the navigation and page APIs, and the live-update hub. None of them is a page.
-User-agent: *
-Disallow: /_framework/
-Disallow: /_nav/
-Disallow: /_page/
-Disallow: /_blazor/

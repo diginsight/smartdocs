@@ -1,4 +1,4 @@
-using System.Net.Http.Json;
+using System.Text.Json;
 using Diginsight.SmartDocs.Web.Client;
 using Diginsight.SmartDocs.Web.Shared;
 using Diginsight.SmartDocs.Web.Shared.Navigation;
@@ -6,6 +6,7 @@ using Diginsight.SmartDocs.Web.Shared.Rendering;
 using Diginsight.SmartDocs.Web.Shared.Services;
 using Diginsight.SmartDocs.Web.Shared.Sites;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
+using Microsoft.JSInterop;
 
 var builder = WebAssemblyHostBuilder.CreateDefault(args);
 
@@ -13,8 +14,9 @@ var builder = WebAssemblyHostBuilder.CreateDefault(args);
 builder.Services.AddScoped(_ => new HttpClient { BaseAddress = new Uri(builder.HostEnvironment.BaseAddress) });
 
 // In WASM, content is fetched over HTTP; rendering runs in-browser with the same Markdig engine.
-builder.Services.AddScoped<IContentSource, HttpContentSource>();
-builder.Services.AddScoped<IMarkdownRenderer, MarkdigMarkdownRenderer>();
+builder.Services.AddScoped<HttpContentSource>();
+builder.Services.AddScoped<IContentSource>(sp => sp.GetRequiredService<HttpContentSource>());
+builder.Services.AddScoped<IRenderedPageResolver>(sp => sp.GetRequiredService<HttpContentSource>());
 builder.Services.AddScoped<PageLoader>();
 builder.Services.AddScoped<TocState>();
 builder.Services.AddScoped<ThemeState>();
@@ -25,22 +27,20 @@ builder.Services.AddScoped<ArticleState>();
 builder.Services.AddSingleton<SiteShellState>();
 builder.Services.AddScoped<INavProvider, HttpNavProvider>();
 builder.Services.AddScoped<NavHubClient>();
+builder.Services.AddSingleton<NavigationBootstrapState>();
 
 WebAssemblyHost host = builder.Build();
-
-// The space list decides what a route renders (a space's page or the generated index) and how the
-// menus are scoped, so it has to be known before hydration re-renders the prerendered page.
-// MainLayout still fetches it if this load fails.
-try
+string? bootstrapJson = await host.Services.GetRequiredService<IJSRuntime>()
+    .InvokeAsync<string?>("appUi.readBootstrap");
+if (!string.IsNullOrWhiteSpace(bootstrapJson) &&
+    JsonSerializer.Deserialize<NavigationBootstrapState>(bootstrapJson) is { } restored)
 {
-    using var siteHttp = new HttpClient { BaseAddress = new Uri(builder.HostEnvironment.BaseAddress) };
-    if (await siteHttp.GetFromJsonAsync<SiteShellOptions>("_site") is { } site)
-    {
-        host.Services.GetRequiredService<SiteShellState>().Apply(site);
-    }
-}
-catch (Exception ex) when (ex is HttpRequestException or System.Text.Json.JsonException)
-{
+    NavigationBootstrapState bootstrap = host.Services.GetRequiredService<NavigationBootstrapState>();
+    bootstrap.Site = restored.Site;
+    bootstrap.PageRoute = restored.PageRoute;
+    bootstrap.Page = restored.Page;
+    bootstrap.Levels = restored.Levels;
+    bootstrap.FolderRecords = restored.FolderRecords;
 }
 
 await host.RunAsync();

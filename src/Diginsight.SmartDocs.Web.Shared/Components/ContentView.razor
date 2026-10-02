@@ -4,6 +4,7 @@
 @inject ArticleState Article
 @inject IJSRuntime JS
 @inject Diginsight.SmartDocs.Web.Shared.Sites.SiteShellState Site
+@inject NavigationBootstrapState Bootstrap
 @implements IDisposable
 
 <PageTitle>@(!string.IsNullOrWhiteSpace(_page?.Title) ? _page.Title : Site.Title)</PageTitle>

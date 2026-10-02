@@ -228,12 +228,15 @@ public sealed class FolderMetricsIndex(
     /// fold, marking each newly discovered folder dirty. Costs one level listing per folder — this
     /// is the expensive scan, and it runs in the background. Returns the prefixes it reached.
     /// </summary>
-    public async Task<IReadOnlyCollection<string>> DiscoverAsync(string root, CancellationToken ct = default)
+    public async Task<IReadOnlyCollection<string>> DiscoverAsync(
+        string root,
+        CancellationToken ct = default,
+        Func<CancellationToken, Task>? beforeLevel = null)
     {
         using var activity = Observability.ActivitySource.StartMethodActivity(logger, () => new { root });
 
         var visited = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        await WalkAsync(Normalize(root), NextStamp(), visited, ct);
+        await WalkAsync(Normalize(root), NextStamp(), visited, ct, beforeLevel);
         return visited;
     }
 
@@ -261,7 +264,12 @@ public sealed class FolderMetricsIndex(
         return removed;
     }
 
-    private async Task WalkAsync(string prefix, long stamp, HashSet<string> visited, CancellationToken ct)
+    private async Task WalkAsync(
+        string prefix,
+        long stamp,
+        HashSet<string> visited,
+        CancellationToken ct,
+        Func<CancellationToken, Task>? beforeLevel)
     {
         if (!visited.Add(prefix)) { return; }
 
@@ -284,11 +292,16 @@ public sealed class FolderMetricsIndex(
             }
         }
 
+        if (beforeLevel is not null)
+        {
+            await beforeLevel(ct);
+        }
+
         foreach (NavChild child in await Nav.GetChildrenAsync(prefix, ct))
         {
             if (child.IsSection && child.Prefix is not null)
             {
-                await WalkAsync(Normalize(child.Prefix), stamp, visited, ct);
+                await WalkAsync(Normalize(child.Prefix), stamp, visited, ct, beforeLevel);
             }
         }
     }
