@@ -32,7 +32,7 @@ public sealed class SpaceMountedContentSource : IContentSource, IContentLister
 
     public Task<ContentResult?> GetAsync(string contentKey, CancellationToken ct = default)
     {
-        using var activity = Observability.ActivitySource.StartMethodActivity(logger, () => new { contentKey });
+        using var activity = Observability.HotPathActivitySource.StartMethodActivity(logger, () => new { contentKey });
 
         return TryMap(contentKey, out SpaceContentAccess? access, out string inner)
             ? access.Source.GetAsync(inner, ct)
@@ -41,7 +41,7 @@ public sealed class SpaceMountedContentSource : IContentSource, IContentLister
 
     public async Task<IReadOnlyList<ChildEntry>> ListChildrenAsync(string prefix, CancellationToken ct = default)
     {
-        using var activity = Observability.ActivitySource.StartMethodActivity(logger, () => new { prefix });
+        using var activity = Observability.HotPathActivitySource.StartMethodActivity(logger, () => new { prefix });
 
         string rel = Normalize(prefix);
         if (rel.Length == 0)
@@ -68,7 +68,7 @@ public sealed class SpaceMountedContentSource : IContentSource, IContentLister
 
     public Task<string?> ReadHeadAsync(string key, CancellationToken ct = default)
     {
-        using var activity = Observability.ActivitySource.StartMethodActivity(logger, () => new { key });
+        using var activity = Observability.HotPathActivitySource.StartMethodActivity(logger, () => new { key });
 
         return TryMap(key, out SpaceContentAccess? access, out string inner)
             ? access.Lister.ReadHeadAsync(inner, ct)

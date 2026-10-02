@@ -10,9 +10,9 @@ publish: false
 # Startup and navigation at any scale: run review, caching model, and target design
 
 **Date:** 2026-10-01
-**Revised:** 2026-10-02, version 1.6 — `PL-1` was resolved against the premise it was parked on: on the profile a deployed instance runs, instrumentation takes 82–89% of the CPU of a request, about a third of it writing log records and about twice that in the activity machinery. `C1`, `C2`, and `C9` return as wave 0 and the strategy gains a rank above all five of its cost classes. A first attempt at this measurement, on the deployed instance itself, was **withdrawn**: it could not separate the request path from a startup walk still consuming a whole core, and the page records the withdrawal beside the measurement that replaced it. The same revision turned Always On on for both apps (`C33`), confirmed waves 2 and 3 deployed, and added `C34`, the validator `C29` had left off `/_nav/folder`. Version 1.5 closed waves 2 and 3 — `C29`, `C4`, `C22`, `C11`, `C12`, `C21`, `C10`, and `C23`, each with its own implementation record and visible-browser validation sequence — and added `M2`, the scale harness, with two points measured across a ten-fold step in corpus size. Version 1.4 confirmed `C32`'s effect over matched platform-metric windows, and moved navigation warm-up after listening into one foreground-gated queue (`C4`). Version 1.3 measured the deployed Learning Hub, read-only: a crawler trap, not navigation, took almost all of its CPU (`N20`), and `C32` ended it. Version 1.2, earlier the same day, recorded wave 1 as implemented and validated against the previous build. Version 1.1, of 2026-10-01, parked the instrumentation finding until a deployed instance is measured, generalized folder metadata from counts to one complete record per folder, added a cache-sizing finding, and re-ranked the strategy by what a runtime environment pays for
+**Revised:** 2026-10-02, version 1.7 — wave 0 implemented and measured: the per-lookup, per-file and per-level activities moved to a second activity source that the base settings switch off and the Development overlay switches on (`C2`, `C1`), and the application's own log category dropped from `Information` to `Warning` on deployed profiles (`C9`). A request costs **52% less CPU**, its p95 65% less, and no diagnostic was deleted. Version 1.6 resolved `PL-1`: on the profile a deployed instance runs, instrumentation takes 82–89% of the CPU of a request, about 59 points of it the application's own. A first attempt at that measurement, on the deployed instance itself, was **withdrawn** — it could not separate the request path from a startup walk still consuming a whole core — and the page records the withdrawal beside the measurement that replaced it. The same version turned Always On on for both apps (`C33`), confirmed waves 2 and 3 deployed, and added `C34`, the validator `C29` had left off `/_nav/folder`. Version 1.5 closed waves 2 and 3 — `C29`, `C4`, `C22`, `C11`, `C12`, `C21`, `C10`, and `C23`, each with its own implementation record and visible-browser validation sequence — and added `M2`, the scale harness, with two points measured across a ten-fold step in corpus size. Version 1.4 confirmed `C32`'s effect over matched platform-metric windows, and moved navigation warm-up after listening into one foreground-gated queue (`C4`). Version 1.3 measured the deployed Learning Hub, read-only: a crawler trap, not navigation, took almost all of its CPU (`N20`), and `C32` ended it. Version 1.2, earlier the same day, recorded wave 1 as implemented and validated against the previous build. Version 1.1, of 2026-10-01, parked the instrumentation finding until a deployed instance is measured, generalized folder metadata from counts to one complete record per folder, added a cache-sizing finding, and re-ranked the strategy by what a runtime environment pays for
 **Author:** Dario Airoldi
-**Status:** Waves 1, 2, and 3 are implemented, validated, and deployed, and `C32`, `C33`, and `C34` with them, all on 2026-10-02 — see [🔧 Wave 1 implementation record](#-wave-1-implementation-record) and the per-change records from [🚦 C4](#-c4-implementation-record) to [🧩 C23](#-c23-implementation-record). `M1` and `M2` are measured; `PL-1` is resolved, which opened [wave 0](#wave-0--stop-paying-for-instrumentation-on-the-hot-path) — now the highest-value work still open, ahead of wave 4 (`C24`–`C28`, `C16`). See [⚡ What instrumentation costs](#-what-instrumentation-costs)
+**Status:** Waves 0, 1, 2, and 3 are implemented and validated, and `C32`, `C33`, and `C34` with them, all on 2026-10-02 — see [🔌 Wave 0](#-wave-0-implementation-record), [🔧 Wave 1](#-wave-1-implementation-record), and the per-change records from [🚦 C4](#-c4-implementation-record) to [🧩 C23](#-c23-implementation-record). Waves 1 to 3 and `C34` are deployed; wave 0 reaches a deployed instance on the next deploy. `M1` and `M2` are measured and `PL-1` is resolved. **Wave 4 (`C24`–`C28`, `C16`) is the only wave still open**
 **Component:** `Diginsight.SmartDocs.Web` (host, navigation, caching), `Diginsight.SmartDocs.Web.Client` (menus, hydration), `Diginsight.SmartDocs.Web.Shared` (page loading, rendering)
 **Framework:** .NET 10 / ASP.NET Core / Blazor Web App (server prerender + global interactive WebAssembly), Diginsight.SmartCache 3.8.0.2, Diginsight.Core 3.8.0.2
 **Builds on:** [`20260925.02-startup-optimization`](../../202609/20260925.02-startup-optimization/overview.md) — the analysis of 2026-09-29 this page reviews and extends
@@ -56,9 +56,14 @@ publish: false
   - [Wave 4 — any size](#wave-4--any-size)
   - [Measured first — the crawler trap](#measured-first--the-crawler-trap)
   - [Changes outside the waves](#changes-outside-the-waves)
-- [🔧 Wave 1 implementation record](#-wave-1-implementation-record)
+- [🔌 Wave 0 implementation record](#-wave-0-implementation-record)
   - [What changed](#what-changed)
   - [Decisions the plan left open](#decisions-the-plan-left-open)
+  - [What it measured](#what-it-measured)
+  - [What wave 0 didn't change](#what-wave-0-didnt-change)
+- [🔧 Wave 1 implementation record](#-wave-1-implementation-record)
+  - [What changed](#what-changed-1)
+  - [Decisions the plan left open](#decisions-the-plan-left-open-1)
   - [What the validation showed](#what-the-validation-showed)
   - [What wave 1 didn't change](#what-wave-1-didnt-change)
 - [📏 Deployed baseline](#-deployed-baseline)
@@ -125,7 +130,9 @@ The following table compares the primary run with the target. The target column 
 
 **A deployed instance pays for something else first.** `M1` measured the deployed Learning Hub on 2026-10-02 from its platform metrics, its web-server log, and requests from outside. For at least three days it had spent 77–88% of its single core, at about 2 s per response, on one crawler requesting routes that don't exist: 5,852 of the 5,854 paths it asked for in three hours. The application answers an unknown route with status 200 and a full page of relative links, and the crawler resolves those links against the page's own URL, so every answer breeds new unknown routes ([`N20`](#n20-crawler-trap--unknown-routes-answer-200-and-breed-more)). Wave 1 doesn't touch that cost. `C32` ends it — a 404 before prerendering, rooted links, and a `robots.txt`. Deployed the same day, it cut the Learning Hub's CPU from 160–228 to 4 CPU-seconds per five minutes, and [📏 Deployed baseline](#-deployed-baseline) re-ranks waves 2–4 around it.
 
-**And then it pays for instrumentation.** With the trap gone and waves 1 to 3 deployed, the cost that remained was measured by comparing three configurations of the same host under load: as deployed, with log records suppressed, and with the activity sources gated off. On the profile a deployed instance runs — `Warning` by default, `Information` for the application's own category, log4net on — **82–89% of the CPU of a request is instrumentation**: about a third of it writing the log records, and about twice that in the activity machinery around them, which is paid before any log level is checked. This page had parked that question as [`PL-1`](#pl-1-runtime-instrumentation-cost--what-instrumentation-costs-in-a-deployed-instance) on the premise that it was a debug-profile cost, and left instrumentation off its ranking of what a runtime environment pays for. The premise was wrong. `C1-gate-hot-activities` and `C2-trim-hot-path-activities` return as [wave 0](#wave-0--stop-paying-for-instrumentation-on-the-hot-path), ahead of everything else still open. The first attempt at this measurement, taken on the deployed instance, was withdrawn: it could not separate the request path from a startup walk that was still consuming a whole core, and [⚡ What instrumentation costs](#-what-instrumentation-costs) records both the withdrawal and the measurement that replaced it.
+**And then it pays for instrumentation.** With the trap gone and waves 1 to 3 deployed, the cost that remained was measured by comparing three configurations of the same host under load: as deployed, with log records suppressed, and with the activity sources gated off. On the profile a deployed instance runs — `Warning` by default, `Information` for the application's own category, log4net on — **82–89% of the CPU of a request was instrumentation**: about a third of it writing the log records, and about twice that in the activity machinery around them, which is paid before any log level is checked. Of the whole, **about 59 points were the application's own** and changed here. This page had parked that question as [`PL-1`](#pl-1-runtime-instrumentation-cost--what-instrumentation-costs-in-a-deployed-instance) on the premise that it was a debug-profile cost, and left instrumentation off its ranking of what a runtime environment pays for. The premise was wrong. The first attempt at this measurement, taken on the deployed instance, was withdrawn: it could not separate the request path from a startup walk that was still consuming a whole core, and [⚡ What instrumentation costs](#-what-instrumentation-costs) records both the withdrawal and the measurement that replaced it.
+
+**Wave 0 answered it the same day.** The per-lookup, per-file and per-level activities moved to a second activity source that the base settings switch off and the Development overlay switches on, and the application's own log category dropped to `Warning` outside local runs. **A request costs 52% less CPU — 212.9 ms to 102.1 ms — and its p95 drops 65%, with no diagnostic deleted:** a local trace is unchanged, and a deployed instance is one configuration key away from the full detail. [🔌 Wave 0 implementation record](#-wave-0-implementation-record) records how, and what it left behind.
 
 ## 🔁 Review of the 2026-09-29 analysis
 
@@ -625,7 +632,7 @@ The table ranks eight levers by their effect on a runtime environment. *Holds at
 
 | Rank | Lever | What it removes in a runtime environment | Holds at any size | Effort | Changes |
 |---|---|---|---|---|---|
-| 0 | Stop paying for instrumentation on the hot path | 82–89% of the CPU of a request, measured on the profile a deployed instance runs. About 59 points are the application's own — 43 its activities and 16 its `Information` records — and change in this repository; the remaining 29 belong to the library sources and to `SIG-1` and `SIG-2` | yes — it's per call, not per document | hours each for the 59 points; the rest upstream | `C2`, `C9`, `C1`, with `C3`/`SIG-1` and `SIG-2` upstream |
+| 0 | Stop paying for instrumentation on the hot path | 82–89% of the CPU of a request before wave 0. About 59 points were the application's own — 43 its activities and 16 its `Information` records — and wave 0 removed them by configuration, halving a request's CPU; the remaining 29 belong to the library sources and to `SIG-1` and `SIG-2` | yes — it's per call, not per document | done in hours; the rest upstream | `C2`, `C9`, `C1`, with `C3`/`SIG-1` and `SIG-2` upstream |
 | 1 | Stop accidental work | the whole-tree walk triggered by the first page and by every unknown file; the 228–394 KB index downloaded on every session's first page; image folders crawled and shown as sections; the refold of an unchanged snapshot | yes | hours each | `C17`, `C7`, `C18`, `C19` |
 | 2 | Make every repeat free | full re-downloads of unchanged pages, levels, and images; uncompressed JSON; two round trips per blob | yes | a day | `C20`, `C34` |
 | 3 | Fit the cache to its purpose | origin re-reads caused by a cap filled with header text; a redundant registration | yes | hours | `C31`, `C30` |
@@ -658,15 +665,15 @@ The local runs measured a debug profile. One deployed baseline ranks the waves b
 
 ### Wave 0 — stop paying for instrumentation on the hot path
 
-`PL-1`'s measurement put this wave ahead of everything still open: on the profile a deployed instance runs it is the largest cost per request, it doesn't depend on the corpus, and **about two-thirds of it is the application's own instrumentation**, changeable here without waiting for a library release. It was added on 2026-10-02 and isn't started.
+`PL-1`'s measurement put this wave ahead of everything still open: on the profile a deployed instance runs it is the largest cost per request, it doesn't depend on the corpus, and **about two-thirds of it is the application's own instrumentation**, changeable here without waiting for a library release. It was added on 2026-10-02 and implemented the same day; [🔌 Wave 0 implementation record](#-wave-0-implementation-record) states how, and what it measured.
 
 | # | Id | Change | Addresses | Effort | Risk | Status |
 |---|---|---|---|---|---|---|
-| 0b | `C2-trim-hot-path-activities` | Keep one activity per request rather than one per lookup and per file read, so the application starts the activities a reader's trace needs and not the ones only a local debugging session reads. Measured at 43% of a request | `PL-1`, `N1` | hours | low | 🟡 todo |
-| 0c | `C9-local-log-defaults` | Lower the application's own category from `Information` to `Warning` on deployed instances and keep the richer levels for local runs. Measured at 16% of a request | `PL-1` | hours | low | 🟡 todo |
-| 0d | `C1-gate-hot-activities` | Gate what the application starts on the hot path behind a check that costs nothing when nobody is listening. It can't reach the library sources' 29% selectively: a wildcard `false` vetoes a more specific `true`, so gating them means enumerating them | `PL-1`, `N1` | hours | low | 🟡 todo |
+| 0b | `C2-trim-hot-path-activities` | Keep one activity per request rather than one per lookup and per file read, so the application starts the activities a reader's trace needs and not the ones only a local debugging session reads. Measured at 43% of a request — resolved as a second activity source for the per-item activities, gated by configuration rather than removed | `PL-1`, `N1` | hours | low | ✅ done |
+| 0c | `C9-local-log-defaults` | Lower the application's own category from `Information` to `Warning` on deployed instances and keep the richer levels for local runs. Measured at 16% of a request | `PL-1` | hours | low | ✅ done |
+| 0d | `C1-gate-hot-activities` | Gate what the application starts on the hot path behind a check that costs nothing when nobody is listening — subsumed by `C2`: the hot-path source *is* the gate, and switching it off costs nothing at the call site. It can't reach the library sources' 29% selectively: a wildcard `false` vetoes a more specific `true`, so gating them means enumerating them | `PL-1`, `N1` | hours | low | ✅ done |
 
-The library halves stay upstream: `C3-fix-options-cache-upstream` is `SIG-1` on the [earlier work item's signals page](../../202609/20260925.02-startup-optimization/01-signals.md), and SmartCache's per-lookup activities and records are `SIG-2` on [this work item's signals page](02-signals.md). They carry the remaining 29%; the rest doesn't wait on them.
+The library halves stay upstream: `C3-fix-options-cache-upstream` is `SIG-1` on the [earlier work item's signals page](../../202609/20260925.02-startup-optimization/01-signals.md), and SmartCache's per-lookup activities and records are `SIG-2` on [this work item's signals page](02-signals.md). They carry most of what remains.
 
 ### Wave 1 — remove accidental work
 
@@ -742,6 +749,47 @@ The table says where each remaining change of the earlier analysis went.
 | `C8-exclusions-any-depth` | Folded into `C18`. |
 | `C13-content-index`, `C14-manifest` | Superseded by `C24`. |
 | `C15-flat-reconcile` | Superseded by `C25` as the freshness mechanism; a flat listing stays as its idle safety net. |
+
+## 🔌 Wave 0 implementation record
+
+Wave 0 was implemented and measured on 2026-10-02, immediately after `PL-1` attributed the cost.
+
+### What changed
+
+| Id | As implemented | Main files |
+|---|---|---|
+| `C2` | A second activity source, `Diginsight.SmartDocs.Web.HotPath`, carries the 14 activities started once per cache lookup, per file read, or per menu level — the content sources, the mounted-namespace decorator, the cached level builder's `GetChildrenAsync`, and the navigation builder. The 27 started once per request, per change, or at startup stay on the assembly's own source. Nothing was deleted. | `Observability.cs`, `CachedContentSource.cs`, `FileSystemContentSource.cs`, `BlobContentSource.cs`, `SpaceMountedContentSource.cs`, `DynamicNavBuilder.cs`, `CachedDynamicNavBuilder.cs` |
+| `C9` | The base settings lower the application's own category from `Information` to `Warning`, and the Development overlay keeps it at `Trace`. | `appsettings.json`, `appsettings.Development.json` |
+| `C1` | The base settings list `Diginsight.SmartDocs.Web.HotPath` as `false`; the Development overlay lists it as `true`. The gate is the source subscription, so a switched-off activity costs nothing at the call site and needs no `if` around it. | `appsettings.json`, `appsettings.Development.json` |
+
+### Decisions the plan left open
+
+- **Gated, not deleted.** The plan said "remove the activities whose only consumer is a developer reading a local trace". Removing them would have made a local trace permanently poorer, and this application's owner enables that detail on purpose. A second source keeps every activity and moves the decision to configuration, where a deployed instance answers it one way and a developer the other.
+- **Named under the assembly's own source.** `Diginsight.SmartDocs.Web.HotPath` rather than a sibling name, so the relationship is legible in a trace. It has to be listed explicitly as `false`, because the `Diginsight.*` entry would otherwise switch it on — and a wildcard `false` could not have been used to switch it off selectively, since a wildcard `false` vetoes a more specific `true`.
+- **`C1` collapsed into `C2`.** The plan had `C1` gate hot activities behind a cheap check. A source that isn't subscribed already returns no activity, so the separate source *is* the check; a hand-written `if` would have added a branch and a maintenance obligation at 14 sites for nothing.
+- **The scale overlay was realigned.** `appsettings.scale.json` restated the old `Information` level; it now restates `Warning`, so a scale measurement isn't taken against a profile no deployed instance runs.
+
+### What it measured
+
+Before and after, taken in one session on one machine, with the idle rate subtracted:
+
+| Configuration | CPU per request | p50 | p95 | Wall for 400 requests |
+|---|---|---|---|---|
+| Before — `Information`, hot-path activities on | 212.9 ms | 36.5 ms | 376.9 ms | 39.0 s |
+| After — `Warning`, hot-path activities off | 102.1 ms | 25.5 ms | 131.4 ms | 18.7 s |
+| Floor — every `Diginsight.*` source gated off | 24.1 ms | 14.6 ms | 28.3 ms | 6.9 s |
+
+**A request costs 52% less CPU, its p95 drops by 65%, and the diagnostics are one configuration key away.** A second matched pair, taken after the documentation was written, reproduced it: 224.0 ms to 102.7 ms, a 54% fall, with the p95 down 67%. What remains above the floor is 78 ms, and it isn't the application's any more: the Diginsight library sources and the per-request activities carry it.
+
+One lever inside that 78 ms is configuration rather than code, and was found while measuring: **OpenTelemetry tracing costs about 20 ms per request with no exporter configured at all.** `OpenTelemetry:EnableTraces` is `true` and `AzureMonitorConnectionString` is empty, so spans are created and sampled for nothing. Turning traces off took the same request from 102.1 ms to 82.5 ms. Whether a deployed instance should keep them on against a future exporter is the owner's call, so it is recorded rather than changed. (📌 next steps)
+
+### What wave 0 didn't change
+
+- **The library sources.** SmartCache and Components still start their own activities and write their own records, measured at about 29% of a request before this wave. `SIG-1` and `SIG-2` carry them.
+- **Any diagnostic.** Every activity that existed still exists. A local run is unchanged: the Development overlay switches the hot-path source on and keeps `Trace`.
+- **The deployed instance.** The change is in the base settings, so it reaches a deployed instance on the next deploy; the figures above are local.
+
+
 
 ## 🔧 Wave 1 implementation record
 
@@ -1084,7 +1132,10 @@ The following checks were run for this page and its revision:
 - Wave 1 was implemented and validated in a visible browser against the previous build serving the same content, in 13 scenarios recorded in [the wave-1 validation sequence](_validation/20261002.01-validation-sequence.md). (✅ done)
 - Waves 2 and 3 were implemented and validated in nine visible-browser runs, recorded in validation sequences `04` and `06`–`12`, one per change. (✅ done)
 - Waves 1 to 3 are deployed: commit `7408cfc` reached both apps on 2026-10-02 at 16:24 UTC, and `/_nav/children` was confirmed on the live Learning Hub returning folder references beside a record map, the shape `C29` introduced. (✅ done)
-- Wave 0 — `C1`, `C2`, `C9` — was opened by `PL-1`'s measurement and hasn't been started. (🟡 todo)
+- Wave 0 — `C2`, `C9`, `C1` — was implemented and measured on 2026-10-02: a request's CPU fell from 212.9 ms to 102.1 ms and its p95 from 376.9 ms to 131.4 ms, in a matched before-and-after taken in one session on one machine. (✅ done — see [🔌 Wave 0 implementation record](#-wave-0-implementation-record))
+- Every endpoint was exercised after wave 0 in the Development profile, with the hot-path source on: the home page, a level, a folder record, a rendered page, a prerendered article, the icon route, and `robots.txt` all answered as before. (✅ done)
+- Every `appsettings` overlay was parsed and its hot-path and log-level keys read back, so no profile was left stating a level that no instance runs. (✅ done)
+- Wave 0 hasn't been deployed: it reaches an instance on the next deploy, and its figures are local. (🟡 todo)
 - Wave 4 — `C24`, `C25`, `C26`, `C27`, `C28`, and `C16` — hasn't been started. (🟡 todo)
 - The scale harness was built and two points measured against waves 1 to 3, over generated trees of 1,000 and 10,000 articles with the root level held constant. (✅ done — see [📐 Scale baseline](#-scale-baseline))
 - The criterion's own tree, 10,000 sections and 100,000 articles, hasn't been run, so no memory ceiling is established. (🟡 todo)
@@ -1171,7 +1222,7 @@ The target is done when these hold:
 - No reader waits for a revalidation: at any time after start, the p95 of `/_page` and `/_nav/children` stays within 20% of the cached figure. (🟡 todo — `C22` serves stale and revalidates in the background and `C4` keeps the warm-up off the request path; on the deployed instance under load the p95 is dominated by instrumentation, so this can only be judged after wave 0)
 - After any publish, the counts on screen are exact on every instance within one coalescing window plus the event latency. (🟡 todo — exact on one instance since wave 1, and `C23` gives a folder key an invalidation callback that refolds wherever the broadcast lands; no multi-instance deployment has been measured, and the coalescing window needs `C28`)
 - A generated tree ten times larger — about 10,000 sections and 100,000 articles — leaves startup time, first-page reads, and server memory unchanged within 10%. (🟡 todo — a controlled ten-fold step holds first-page bytes identical and memory within 0.2% at 20 s, but memory diverges 5.8% once the background crawl runs on; see [📐 Scale baseline](#-scale-baseline). The criterion's own tree hasn't been run, and the divergence needs `C24`)
-- A request costs no more CPU with its diagnostics available than with them gated off. (🟡 todo — added on 2026-10-02, when the difference was measured at 82–89% of a request on the profile a deployed instance runs. It is what wave 0 is for)
+- A request costs no more CPU with its diagnostics available than with them gated off. (🟡 todo — wave 0 removed the application's own share, taking a request from 212.9 ms to 102.1 ms with every activity still available by configuration. The library sources' share, and about 20 ms of OpenTelemetry tracing with no exporter, remain)
 
 ## 💡 Conclusion
 
@@ -1181,7 +1232,7 @@ The four questions have short answers, and a fifth answer the page didn't set ou
 - **The cheapest wins are new.** A static icon, prev/next from the level, validators on every response, a cache that stores parsed records instead of raw text, and the asset-folder rule each take hours — and all of them landed in wave 1.
 - **Caching should be one model.** SmartCache in the host for every derived value — rendered pages and complete folder records included — and HTTP validators in the browser, carrying the same versions.
 - **At any size, the folder is the unit.** One record and one level per folder, read when shown, rewritten when changed, never loaded all at once — and the record carries all of the folder's metadata, so anything a publisher adds to `metadata.yml` reaches the reader.
-- **The largest cost was never navigation.** Twice over. The deployed instance's core went to a crawler trap, which `C32` ended; what remains of a request's CPU is 82–89% instrumentation, about a third of it the log records and twice that the activity machinery, which wave 0 is for. Neither appeared in a local run of the application's own code, and the second needed a controlled host to measure after the deployed instance proved unable to separate it from its own startup walk.
+- **The largest cost was never navigation.** Twice over. The deployed instance's core went to a crawler trap, which `C32` ended; of what a request then cost, 82–89% was instrumentation, about 59 points of it the application's own — which wave 0 removed, halving a request's CPU without deleting a single diagnostic. Neither appeared in a local run of the application's own code, and the second needed a controlled host and three configurations to measure, after the deployed instance proved unable to separate it from its own startup walk.
 
 Next steps:
 
@@ -1195,6 +1246,9 @@ Next steps:
 - Turn Always On on, per deployed app (`C33`). (✅ done — 2026-10-02, both SmartDocs apps; the docs site's first request when idle went from `504` after 110.7 s to 422 ms)
 - Complete `M1` on the instance — a deliberate restart and steady-state CPU and response time. (✅ done — 2026-10-02)
 - Settle `PL-1` by comparing a request's CPU with instrumentation on and off. (✅ done — 2026-10-02 on a controlled host, after the deployed attempt was withdrawn: [⚡ What instrumentation costs](#-what-instrumentation-costs))
+- Implement wave 0 — `C2`, `C9`, and `C1` — and re-measure. (✅ done — 2026-10-02, a 52% fall in CPU per request with every diagnostic kept: [🔌 Wave 0 implementation record](#-wave-0-implementation-record))
+- Deploy wave 0 and read the deployed instance's CPU per request again. (📌 next steps)
+- Decide whether `OpenTelemetry:EnableTraces` should stay on with no exporter configured; it costs about 20 ms of the remaining 102 ms. (📌 next steps)
 - Confirm the instrumentation shares on a deployed instance that isn't sharing a core, or with a profiler on the instance. (📌 next steps)
 - Give `/_nav/folder` the validator `C20` gave the other endpoints (`C34`). (✅ done — 2026-10-02, verified locally before and after)
 - Implement wave 0 — `C1`, `C2`, and `C9` — and re-run the instrumentation comparison to confirm the cost is gone with the diagnostics kept. It is now the highest-value work open. (📌 next steps)
@@ -1245,6 +1299,8 @@ Waves 2 and 3, also on 2026-10-02, were swept with the same questions. They adde
 `C33`, the completion of `M1`, and `C34`, all on 2026-10-02, were swept together. They changed the standing of two existing records rather than adding one. `SIG-2` — SmartCache's two nested activities and per-lookup `Debug` records on every lookup — had its relevance lowered to `low` on the grounds that its cost was a debug-profile concern pending `PL-1`; `PL-1` now measures instrumentation at 82–89% of a request on the profile a deployed instance runs, so its relevance is raised. `SIG-1` of the earlier work item — the options rebind per activity — had argued its production rationale from configuration; the three-way comparison now shows that suppressing the records recovers only about a third of the cost, which is direct evidence for the mechanism that record describes, and it says so. Nothing new belongs elsewhere: `C34` is a validator this work item's own `C20` established and its own `C29` omitted, and wave 0 is this work item's to implement. Two decisions were made with the owner and written here rather than to another file: Always On on for both SmartDocs apps and for neither of the three unrelated apps sharing their plan, and the deployed instance returned to its base configuration rather than left with instrumentation gated off, because gating the whole source off trades diagnostics for CPU and that trade is the owner's.
 
 One framing landed wrong and was corrected in the same session, and it is recorded here as a lesson rather than a signal because it changed this page's own method. This page first reported instrumentation at "about 90% of the CPU of every request" on the authority of a two-way comparison taken from App Service platform metrics. The owner questioned the figure — logging is enabled in deployed environments, and a tenfold difference attributed to it looked implausible. Re-measuring with an idle window showed the instance burning 45–51 CPU-seconds per minute while serving three requests, so the figure had charged a startup walk to the request path; and adding a third configuration showed that about a third of the real cost is the log records, which the two-way comparison had silently folded into the activity machinery. The conclusion — that wave 0 outranks what remains — survived; the number and its attribution did not. No governing artifact fell short: the validation rules bind a visible browser and a local build, and the measurement acted on a deployed instance, so the run recorded its window, its commands, and its restoration instead.
+
+Wave 0's implementation was swept last. It added no record and left one question with the owner: `OpenTelemetry:EnableTraces` is `true` with no exporter configured, which costs about 20 ms of a request for spans nothing collects. That belongs to this deployment's configuration rather than to another repository or another component, so it is a next step on this page. The change itself stayed inside this work item: a second activity source and two configuration levels, no library behaviour relied upon beyond the subscription semantics the measurement established, and no diagnostic removed. One of those semantics is worth repeating wherever Diginsight is configured, and it is stated in the base settings beside the key it governs: a wildcard `false` vetoes a more specific `true`, so a source meant to be switchable has to be listed explicitly.
 
 ## 📚 References
 
@@ -1325,5 +1381,5 @@ article_metadata:
   filename: "01-startup-and-navigation-optimization.analysis.md"
   created: "2026-10-01"
   last_updated: "2026-10-02"
-  version: "1.6"
+  version: "1.7"
 -->

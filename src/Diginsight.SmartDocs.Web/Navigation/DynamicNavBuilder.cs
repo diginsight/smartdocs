@@ -48,7 +48,7 @@ public sealed class DynamicNavBuilder(
 
     public async Task<IReadOnlyList<NavChild>> GetChildrenAsync(string prefix, CancellationToken ct = default)
     {
-        using var activity = Observability.ActivitySource.StartMethodActivity(logger, () => new { prefix });
+        using var activity = Observability.HotPathActivitySource.StartMethodActivity(logger, () => new { prefix });
 
         prefix = (prefix ?? string.Empty).Replace('\\', '/').Trim('/');
         return await BuildLevelAsync(prefix, ct);
@@ -56,7 +56,7 @@ public sealed class DynamicNavBuilder(
 
     public async Task<IReadOnlyList<NavLeaf>> GetIndexAsync(CancellationToken ct = default)
     {
-        using var activity = Observability.ActivitySource.StartMethodActivity(logger);
+        using var activity = Observability.HotPathActivitySource.StartMethodActivity(logger);
 
         var leaves = new List<NavLeaf>();
         await WalkAsync(string.Empty, string.Empty, leaves, ct);
@@ -87,7 +87,7 @@ public sealed class DynamicNavBuilder(
 
     private async Task<IReadOnlyList<NavChild>> BuildLevelAsync(string prefix, CancellationToken ct)
     {
-        using var activity = Observability.ActivitySource.StartMethodActivity(logger, () => new { prefix });
+        using var activity = Observability.HotPathActivitySource.StartMethodActivity(logger, () => new { prefix });
 
         // A content source that has nothing (or hasn't settled) may yield null; treat it as empty
         // so the level renders as "no children yet" instead of throwing on the LINQ below.
@@ -197,7 +197,7 @@ public sealed class DynamicNavBuilder(
     /// <param name="kids">The folder's already-materialised children, listed once by the caller.</param>
     private async Task<NavChild?> ClassifyFolderAsync(ChildEntry folder, IReadOnlyList<ChildEntry> kids, FolderMeta meta, CancellationToken ct)
     {
-        using var activity = Observability.ActivitySource.StartMethodActivity(logger, () => new { folder });
+        using var activity = Observability.HotPathActivitySource.StartMethodActivity(logger, () => new { folder });
 
         var subFolders = kids.Where(k => k.IsFolder && !NavRules.IsExcludedName(k.Name)
                                          && !assetFolders.Contains(k.Name) && !BuildOutput.Contains(k.Name)).ToList();

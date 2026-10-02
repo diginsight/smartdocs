@@ -70,7 +70,7 @@ public sealed class CachedDynamicNavBuilder(
 
     public async Task<IReadOnlyList<NavChild>> GetChildrenAsync(string prefix, CancellationToken ct = default)
     {
-        using var activity = Observability.ActivitySource.StartMethodActivity(logger, () => new { prefix });
+        using var activity = Observability.HotPathActivitySource.StartMethodActivity(logger, () => new { prefix });
 
         prefix = (prefix ?? string.Empty).Replace('\\', '/').Trim('/');
 

@@ -32,7 +32,7 @@ public sealed class BlobContentSource : IContentSource, IContentLister
 
     public async Task<ContentResult?> GetAsync(string contentKey, CancellationToken ct = default)
     {
-        using var activity = Observability.ActivitySource.StartMethodActivity(_logger, () => new { contentKey });
+        using var activity = Observability.HotPathActivitySource.StartMethodActivity(_logger, () => new { contentKey });
 
         // One round trip: a download that answers 404 is the "not found" an existence check would
         // have reported, without paying for the check on every blob that does exist.
@@ -58,7 +58,7 @@ public sealed class BlobContentSource : IContentSource, IContentLister
 
     public async Task<IReadOnlyList<ChildEntry>> ListChildrenAsync(string prefix, CancellationToken ct = default)
     {
-        using var activity = Observability.ActivitySource.StartMethodActivity(_logger, () => new { prefix });
+        using var activity = Observability.HotPathActivitySource.StartMethodActivity(_logger, () => new { prefix });
 
         string p = (prefix ?? string.Empty).Replace('\\', '/').TrimStart('/');
         if (p.Length > 0 && !p.EndsWith('/'))
@@ -90,7 +90,7 @@ public sealed class BlobContentSource : IContentSource, IContentLister
 
     public async Task<string?> ReadHeadAsync(string key, CancellationToken ct = default)
     {
-        using var activity = Observability.ActivitySource.StartMethodActivity(_logger, () => new { key });
+        using var activity = Observability.HotPathActivitySource.StartMethodActivity(_logger, () => new { key });
 
         BlobClient blob = _container.GetBlobClient(key);
         try
