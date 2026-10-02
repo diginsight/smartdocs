@@ -34,13 +34,19 @@ public sealed class BlobContentSource : IContentSource, IContentLister
     {
         using var activity = Observability.ActivitySource.StartMethodActivity(_logger, () => new { contentKey });
 
+        // One round trip: a download that answers 404 is the "not found" an existence check would
+        // have reported, without paying for the check on every blob that does exist.
         BlobClient blob = _container.GetBlobClient(contentKey);
-        if (!await blob.ExistsAsync(ct))
+        Response<BlobDownloadResult> response;
+        try
+        {
+            response = await blob.DownloadContentAsync(ct);
+        }
+        catch (RequestFailedException ex) when (ex.Status == 404)
         {
             return null;
         }
 
-        var response = await blob.DownloadContentAsync(ct);
         byte[] bytes = response.Value.Content.ToArray();
         string contentType = string.IsNullOrEmpty(response.Value.Details.ContentType)
             ? "text/plain; charset=utf-8"

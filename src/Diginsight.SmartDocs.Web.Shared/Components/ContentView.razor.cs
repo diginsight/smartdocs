@@ -68,9 +68,12 @@ public partial class ContentView
         string route = Norm(Path);
         _trail = route.Length == 0 ? Array.Empty<Crumb>() : await BuildTrailFromRouteAsync(route);
 
-        // Prev/next needs the ordered flat index; load it in the background so it never blocks the
-        // article — this also warms the index for menu search — and it renders itself when ready.
-        _ = LoadPrevNextAsync(Path);
+        // Prev/next only for an article that exists — a route that rendered nothing has no place in
+        // the reading order. It loads in the background so it never blocks the article.
+        if (_page is not null)
+        {
+            _ = LoadPrevNextAsync(Path);
+        }
     }
 
     // After each render on the interactive client, turn any ```mermaid blocks into SVG. OnAfterRender
@@ -92,40 +95,22 @@ public partial class ContentView
         }
     }
 
-    // Prev/next comes from the ordered flat index. It runs in the background (launched from
-    // OnParametersSetAsync) so a cold whole-tree index walk never blocks the article or breadcrumb;
-    // it renders itself when ready.
+    // Prev/next follow the menu's reading order — depth-first over the levels, the order the flat
+    // index used to list — but are computed from levels instead of the whole-tree index: the levels
+    // of the active branch, already loaded for the breadcrumb and the sidebar, plus, at a folder's
+    // edge, the neighbouring section's levels. The walk stays inside the reader's space.
     private async Task LoadPrevNextAsync(string? forPath)
     {
         try
         {
-            IReadOnlyList<NavLeaf> index = await NavProvider.GetIndexAsync();
+            (NavLeaf? prev, NavLeaf? next) = await FindNeighboursAsync(Norm(forPath));
             if (Norm(forPath) != Norm(Path))
             {
-                return; // navigated away while the index was loading
+                return; // navigated away while the neighbours were loading
             }
 
-            // Prev/next never crosses into another space: the reader stays in the documentation set
-            // the switcher says they are in.
-            string space = SpaceSegment(forPath);
-            if (space.Length > 0)
-            {
-                index = index.Where(l => SpaceSegment(l.Route) == space).ToList();
-            }
-
-            string cur = Norm(forPath);
-            int idx = -1;
-            for (int i = 0; i < index.Count; i++)
-            {
-                if (Norm(index[i].Route) == cur)
-                {
-                    idx = i;
-                    break;
-                }
-            }
-
-            _prev = idx > 0 ? index[idx - 1] : null;
-            _next = idx >= 0 && idx < index.Count - 1 ? index[idx + 1] : null;
+            _prev = prev;
+            _next = next;
 
             await InvokeAsync(StateHasChanged);
         }
@@ -133,6 +118,115 @@ public partial class ContentView
         {
             // Background prev/next is best-effort; never surface a fault (e.g. disposed mid-navigation).
         }
+    }
+
+    private const int MaxTreeDepth = 32;
+
+    private async Task<(NavLeaf? Prev, NavLeaf? Next)> FindNeighboursAsync(string route)
+    {
+        if (route.Length == 0)
+        {
+            return (null, null);
+        }
+
+        // Locate the article: from the space's top level down the branch that contains it, keeping the
+        // level and position at each depth.
+        var branch = new List<(IReadOnlyList<NavChild> Level, int Index)>();
+        string prefix = ScopePrefix(route);
+        for (int depth = 0; depth < MaxTreeDepth; depth++)
+        {
+            IReadOnlyList<NavChild> level = await LevelAsync(prefix);
+            int leaf = IndexOf(level, n => IsLeaf(n) && Norm(n.Route) == route);
+            if (leaf >= 0)
+            {
+                branch.Add((level, leaf));
+                return (await StepAsync(branch, -1), await StepAsync(branch, +1));
+            }
+
+            int section = IndexOf(level, n => n.IsSection && n.Prefix is { Length: > 0 } p && IsAncestorOrSelf(Norm(p), route));
+            if (section < 0)
+            {
+                return (null, null); // not in the menu (hidden, or a section's own landing page)
+            }
+
+            branch.Add((level, section));
+            prefix = level[section].Prefix!;
+        }
+
+        return (null, null);
+    }
+
+    // The nearest article before (direction -1) or after (+1) the located one: siblings first, then
+    // the ancestors' siblings, descending into any section found on the way.
+    private async Task<NavLeaf?> StepAsync(List<(IReadOnlyList<NavChild> Level, int Index)> branch, int direction)
+    {
+        for (int frame = branch.Count - 1; frame >= 0; frame--)
+        {
+            (IReadOnlyList<NavChild> level, int index) = branch[frame];
+            for (int i = index + direction; i >= 0 && i < level.Count; i += direction)
+            {
+                if (await EdgeLeafAsync(level[i], direction, 0) is { } found)
+                {
+                    return found;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    // The first (+1) or last (-1) article under a node, in reading order.
+    private async Task<NavLeaf?> EdgeLeafAsync(NavChild node, int direction, int depth)
+    {
+        if (IsLeaf(node))
+        {
+            return new NavLeaf(node.Text, node.Route!, string.Empty, node.Date, node.Author);
+        }
+
+        if (!node.IsSection || node.Prefix is not { Length: > 0 } prefix || depth >= MaxTreeDepth)
+        {
+            return null;
+        }
+
+        IReadOnlyList<NavChild> level = await NavProvider.GetChildrenAsync(prefix);
+        for (int i = direction > 0 ? 0 : level.Count - 1; i >= 0 && i < level.Count; i += direction)
+        {
+            if (await EdgeLeafAsync(level[i], direction, depth + 1) is { } found)
+            {
+                return found;
+            }
+        }
+
+        return null;
+    }
+
+    // A level as the reading order sees it. At the site root a root-mounted space shares its level
+    // with the other spaces' mount points, which belong to the space switcher, not to this space.
+    private async Task<IReadOnlyList<NavChild>> LevelAsync(string prefix)
+    {
+        IReadOnlyList<NavChild> level = await NavProvider.GetChildrenAsync(prefix);
+        return prefix.Length == 0
+            ? level.Where(n => !(n.IsSection && Site.IsMountSegment(n.Prefix))).ToList()
+            : level;
+    }
+
+    // An entry the reading order visits: an article, or a folder collapsed into a single link.
+    private static bool IsLeaf(NavChild n) => !n.IsSection && !string.IsNullOrEmpty(n.Route);
+
+    private static bool IsAncestorOrSelf(string ancestor, string route) =>
+        route == ancestor || route.StartsWith(ancestor + "/", StringComparison.Ordinal);
+
+    private static int IndexOf(IReadOnlyList<NavChild> level, Func<NavChild, bool> match)
+    {
+        for (int i = 0; i < level.Count; i++)
+        {
+            if (match(level[i]))
+            {
+                return i;
+            }
+        }
+
+        return -1;
     }
 
     // Builds a breadcrumb from a route's ancestor levels. Each level is cheap and cached, so this
@@ -169,9 +263,10 @@ public partial class ContentView
     private static string Norm(string? route) =>
         (route ?? string.Empty).Replace('\\', '/').Trim('/').ToLowerInvariant();
 
-    // Route-base segment of the prefixed space owning a route, or empty for the root space.
-    private string SpaceSegment(string? route) =>
-        Site.ResolveSpace(route) is { IsRootMounted: false } space ? space.Segment.ToLowerInvariant() : string.Empty;
+    // Nav prefix of the space owning a route: a prefixed space's route-base segment, as configured,
+    // or empty for the root-mounted space.
+    private string ScopePrefix(string? route) =>
+        Site.ResolveSpace(route) is { IsRootMounted: false } space ? space.Segment : string.Empty;
 
     /// <summary>Derive a human-readable title from the current path for section landing pages.</summary>
     private string SectionTitle()

@@ -99,14 +99,33 @@ public static class NavRules
         name.StartsWith('_') || name.StartsWith('.') ||
         name.EndsWith(".changelog.md", StringComparison.OrdinalIgnoreCase);
 
+    /// <summary>
+    /// Folder names that hold images and media rather than pages. They never form menu entries, at any
+    /// depth; a deployment can add names through <c>Site:AssetFolders</c>.
+    /// </summary>
+    public static IReadOnlyCollection<string> AssetFolderNames { get; } =
+        ["images", "img", "assets", "asset", "media", "attachments", "files"];
+
     /// <summary>Asset folders hold images/media, not navigable pages — they never form menu sections.</summary>
     public static bool IsAssetFolder(string name) =>
-        name.ToLowerInvariant() is "images" or "img" or "assets" or "media" or "attachments" or "files";
+        AssetFolderNames.Contains(name, StringComparer.OrdinalIgnoreCase);
 
     /// <summary>A markdown content file eligible for the menu.</summary>
     public static bool IsMarkdown(string name) =>
         name.EndsWith(".md", StringComparison.OrdinalIgnoreCase) ||
         name.EndsWith(".qmd", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// A section known to hold no navigable article anywhere below it: a folder of empty folders, or of
+    /// unpublished articles. Menus don't show it, but it stays in its level, so the metrics walk keeps
+    /// tracking it and it reappears the moment an article is published inside it.
+    /// </summary>
+    public static bool IsEmptySection(NavChild node) =>
+        node.IsSection && node.CountCoverage == Coverage.Complete && node.ArticleCount == 0;
+
+    /// <summary>The level as menus show it: without the sections <see cref="IsEmptySection"/> rules out.</summary>
+    public static IReadOnlyList<NavChild> WithoutEmptySections(IReadOnlyList<NavChild> level) =>
+        level.Any(IsEmptySection) ? level.Where(static n => !IsEmptySection(n)).ToList() : level;
 
     private static string Titleize(string s)
     {

@@ -1,4 +1,5 @@
 using Diginsight.Diagnostics;
+using Diginsight.Runtime;
 using Diginsight.SmartCache;
 using Diginsight.SmartDocs.Web.Caching;
 using Diginsight.SmartDocs.Web.Shared;
@@ -14,7 +15,7 @@ namespace Diginsight.SmartDocs.Web.ContentSources;
 /// <para>
 /// Only text Markdown keys (<c>.md</c>/<c>.qmd</c>) are cached for the full-content fetch; binary
 /// assets (images, downloads) pass straight through so Redis is not bloated with large payloads.
-/// Listing and head reads are cached separately, on a shorter structural tolerance: they are the
+/// Listings and parsed headers are cached separately, on a shorter structural tolerance: they are the
 /// primitives navigation is built from, and every layer above them repeats the same few calls.
 /// </para>
 /// </summary>
@@ -101,28 +102,53 @@ public sealed class CachedContentSource(
     }
 
     /// <summary>
-    /// Cached front-matter head. Same tolerance as the listing: a level's labels and dates come
+    /// Raw header text, uncached. Navigation reads headers through <see cref="ReadArticleHeadAsync"/>
+    /// and <see cref="ReadFolderMetaAsync"/>, which cache the parsed fields: the text itself — the
+    /// first 8 KB of every article — once filled most of the cache to keep a few hundred bytes of it.
+    /// </summary>
+    public Task<string?> ReadHeadAsync(string key, CancellationToken ct = default) =>
+        innerLister.ReadHeadAsync(key, ct);
+
+    /// <summary>
+    /// Cached, parsed article header. Same tolerance as the listing: a level's labels and dates come
     /// from these reads, and a folder's children are re-scored on every level rebuild.
     /// </summary>
-    public async Task<string?> ReadHeadAsync(string key, CancellationToken ct = default)
+    public async Task<ArticleHead> ReadArticleHeadAsync(string key, CancellationToken ct = default)
     {
-        var cacheKey = new ContentPathCacheKey("head", ContentPathCacheKey.Normalize(key));
+        // Not "head": that kind held the raw header text, and a Redis store or a companion still on the
+        // previous version could hand such an entry back to be read as a parsed header.
+        var cacheKey = new ContentPathCacheKey("article-head", ContentPathCacheKey.Normalize(key));
 
-        var options = new SmartCacheOperationOptions
-        {
-            CoalesceRacingCacheMisses = true,
-            MaxAge = freshness.Structure,
-        };
-
-        CachedHead envelope = await smartCache.GetAsync(
+        CachedArticleHead envelope = await smartCache.GetAsync(
             cacheKey,
-            async innerCt => new CachedHead(await innerLister.ReadHeadAsync(key, innerCt)),
-            options,
+            async innerCt => new CachedArticleHead(FrontMatter.ParseHead(await innerLister.ReadHeadAsync(key, innerCt))),
+            StructureOptions(),
             callerType: typeof(CachedContentSource),
             cancellationToken: ct);
 
-        return envelope.Text;
+        return envelope.Head;
     }
+
+    /// <summary>Cached, parsed <c>metadata.yml</c> overrides, on the same tolerance as the listing.</summary>
+    public async Task<FolderMeta> ReadFolderMetaAsync(string key, CancellationToken ct = default)
+    {
+        var cacheKey = new ContentPathCacheKey("folder-meta", ContentPathCacheKey.Normalize(key));
+
+        CachedFolderMeta envelope = await smartCache.GetAsync(
+            cacheKey,
+            async innerCt => new CachedFolderMeta(FolderMeta.Parse(await innerLister.ReadHeadAsync(key, innerCt))),
+            StructureOptions(),
+            callerType: typeof(CachedContentSource),
+            cancellationToken: ct);
+
+        return envelope.Meta;
+    }
+
+    private SmartCacheOperationOptions StructureOptions() => new()
+    {
+        CoalesceRacingCacheMisses = true,
+        MaxAge = freshness.Structure,
+    };
 
     private static bool IsCacheable(string contentKey) =>
         contentKey.EndsWith(".md", StringComparison.OrdinalIgnoreCase) ||
@@ -131,12 +157,35 @@ public sealed class CachedContentSource(
     /// <summary>
     /// Serializable envelope so both hits and misses (a <c>null</c> <see cref="ContentResult"/>)
     /// round-trip through the in-memory and Redis stores.
+    /// <para>
+    /// It reports its own size. SmartCache measures an entry by walking it, which for a byte array
+    /// means one boxed visit per byte; and it derives eviction priority from size alone. An article
+    /// body is the cheapest entry to lose — a miss costs one origin read, where a lost level or header
+    /// costs a rebuild — so a body reports at least the low-priority threshold and is compacted before
+    /// any record when the cache reaches its cap.
+    /// </para>
     /// </summary>
-    public sealed record CachedContent(ContentResult? Result);
+    public sealed record CachedContent(ContentResult? Result) : ISizeableHeuristically
+    {
+        // The library's default threshold. A deployment that overrides LowPrioritySizeThreshold keeps
+        // bodies sized honestly but no longer pinned to the lowest priority.
+        private static readonly long LowPriorityFloor = new SmartCacheCoreOptions().LowPrioritySizeThreshold;
+
+        public HeuristicSizeResult GetSizeHeuristically(HeuristicSizeGetter innerGet)
+        {
+            long size = Result is { } r
+                ? r.Bytes.LongLength + sizeof(char) * ((r.ContentType?.Length ?? 0) + (r.ETag?.Length ?? 0))
+                : 0;
+            return new HeuristicSizeResult(Math.Max(size, LowPriorityFloor));
+        }
+    }
 
     /// <summary>Serializable envelope for a folder listing (an array, so it round-trips through Redis).</summary>
     public sealed record CachedChildren(ChildEntry[] Items);
 
-    /// <summary>Serializable envelope for a head read, so an absent file caches as a miss rather than re-probing.</summary>
-    public sealed record CachedHead(string? Text);
+    /// <summary>Serializable envelope for a parsed article header; an absent file parses to <see cref="ArticleHead.Empty"/>.</summary>
+    public sealed record CachedArticleHead(ArticleHead Head);
+
+    /// <summary>Serializable envelope for parsed <c>metadata.yml</c> overrides; an absent file parses to <see cref="FolderMeta.None"/>.</summary>
+    public sealed record CachedFolderMeta(FolderMeta Meta);
 }

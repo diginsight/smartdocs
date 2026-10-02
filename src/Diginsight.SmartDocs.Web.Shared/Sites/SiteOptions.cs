@@ -36,6 +36,14 @@ public sealed class SiteOptions
     /// </summary>
     public IList<ThemeOption> Themes { get; set; } = new List<ThemeOption>();
 
+    /// <summary>
+    /// Folder names to treat as asset folders in addition to the built-in set
+    /// (<c>images</c>, <c>img</c>, <c>assets</c>, <c>asset</c>, <c>media</c>, <c>attachments</c>,
+    /// <c>files</c>). An asset folder never appears in navigation, at any depth. Declared only by an
+    /// environment overlay, for the same array-binding reason as <see cref="Themes"/>.
+    /// </summary>
+    public IList<string> AssetFolders { get; set; } = new List<string>();
+
     public IList<SpaceOptions> Spaces { get; set; } = new List<SpaceOptions>();
 }
 

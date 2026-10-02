@@ -69,6 +69,16 @@ public class Program
             services.AddRazorComponents()
                 .AddInteractiveWebAssemblyComponents();
 
+            // Dynamic responses worth compressing: navigation JSON and Markdown source. HTML is left
+            // out on purpose — a prerendered page carries an antiforgery token next to reflected input,
+            // the combination compression side channels exploit. Static web assets are served
+            // precompressed by MapStaticAssets and pass through untouched.
+            services.AddResponseCompression(options =>
+            {
+                options.EnableForHttps = true;
+                options.MimeTypes = ["application/json", "text/markdown", "text/plain", "image/svg+xml"];
+            });
+
             // The site and the spaces it publishes. Bound eagerly rather than through IOptions because
             // the route table and the per-space content sources are built during startup, before any
             // request exists — and because a misconfigured space must stop the host here, loudly,
@@ -119,6 +129,14 @@ public class Program
             SmartCacheBuilder smartCacheBuilder = services
                 .AddSmartCache(configuration, environment, observabilityManager.LoggerFactory)
                 .AddHttp();
+
+            // The library caps its memory cache at 10,000,000 units of estimated size, which a startup
+            // warm-up of raw article headers alone nearly filled. The cap is a deployment decision, so
+            // it comes from configuration; without a value the library default stays in force.
+            if (configuration.GetValue<long?>("Diginsight:SmartCache:SizeLimit") is > 0 and long sizeLimit)
+            {
+                smartCacheBuilder.SetSizeLimit(sizeLimit);
+            }
 
             // Distributed cross-instance invalidation via Service Bus is opt-in: only wire the Service
             // Bus companion when it is actually configured. Otherwise AddSmartCache's default
@@ -191,8 +209,9 @@ public class Program
             services.AddScoped<SidebarState>();
             services.AddScoped<NavStats>();
             services.AddScoped<ArticleState>();
-            // Dynamic, spec-compliant menu built on demand from the live content hierarchy.
-            services.AddMemoryCache();
+            // Dynamic, spec-compliant menu built on demand from the live content hierarchy. No
+            // IMemoryCache is registered here: SmartCache's builder registers its own, and SmartCache
+            // itself keeps a private memory cache, so nothing in this application resolves one.
             services.AddSingleton<FolderMetricsIndex>();
             // The inner builder gets a lazy handle on the decorator that wraps it, so the whole-tree
             // walk behind GetIndexAsync reads each level through the cache instead of re-listing the
@@ -203,7 +222,8 @@ public class Program
                 sp.GetRequiredService<IParallelService>(),
                 new Lazy<INavBuilder>(() => sp.GetRequiredService<CachedDynamicNavBuilder>()),
                 sp.GetRequiredService<ILogger<DynamicNavBuilder>>(),
-                spaceRegistry));
+                spaceRegistry,
+                siteOptions.AssetFolders));
             services.AddSingleton<CachedDynamicNavBuilder>(sp => new CachedDynamicNavBuilder(
                 sp.GetRequiredService<DynamicNavBuilder>(),
                 sp.GetRequiredService<ISmartCache>(),
@@ -229,6 +249,12 @@ public class Program
                 app.UseHsts();
                 app.UseHttpsRedirection();
             }
+
+            app.UseResponseCompression();
+
+            // A request for a file name the page router would otherwise prerender as an article — the
+            // browser's /favicon.ico, a mistyped image URL — is answered with a plain 404 here.
+            app.UseFileRequestGuard();
 
             app.UseAntiforgery();
 

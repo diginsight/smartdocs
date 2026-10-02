@@ -15,6 +15,17 @@ public interface IContentLister
 
     /// <summary>Reads just the leading frontmatter/header text of a file (no full download).</summary>
     Task<string?> ReadHeadAsync(string key, CancellationToken ct = default);
+
+    /// <summary>
+    /// Reads an article's header and parses it into the fields navigation uses. A caching lister
+    /// overrides this to keep the parsed fields rather than the header text they came from.
+    /// </summary>
+    async Task<ArticleHead> ReadArticleHeadAsync(string key, CancellationToken ct = default) =>
+        FrontMatter.ParseHead(await ReadHeadAsync(key, ct));
+
+    /// <summary>Reads a folder's <c>metadata.yml</c> and parses its overrides.</summary>
+    async Task<FolderMeta> ReadFolderMetaAsync(string key, CancellationToken ct = default) =>
+        FolderMeta.Parse(await ReadHeadAsync(key, ct));
 }
 
 /// <summary>One built menu node returned by the nav API for a single level.</summary>

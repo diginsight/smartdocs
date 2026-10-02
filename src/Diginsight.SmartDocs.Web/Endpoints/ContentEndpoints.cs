@@ -1,6 +1,8 @@
 using Diginsight.Components.Azure.Extensions;
 using Diginsight.Diagnostics;
+using Diginsight.SmartDocs.Web.Caching;
 using Diginsight.SmartDocs.Web.Shared;
+using Diginsight.SmartDocs.Web.Shared.Navigation;
 using Diginsight.SmartDocs.Web.Shared.Services;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -30,15 +32,32 @@ public static class ContentEndpoints
         return app;
     }
 
-    private static async Task<IResult> GetContentRawAsync(string key, IContentSource source, CancellationToken ct)
+    private static async Task<IResult> GetContentRawAsync(
+        string key, IContentSource source, ContentFreshnessOptions freshness, HttpContext http, CancellationToken ct)
     {
         using var activity = Observability.ActivitySource.StartMethodActivity(logger, () => new { key });
 
         ContentResult? result = await source.GetAsync(key, ct);
         activity?.SetOutput(new { found = result is not null });
-        return result is null
-            ? Results.NotFound()
-            : Results.Bytes(result.Bytes, result.ContentType ?? "text/markdown; charset=utf-8");
+        if (result is null)
+        {
+            return Results.NotFound();
+        }
+
+        // Images and attachments: the browser may reuse its copy for the same tolerance the server
+        // applies to content, and revalidates it afterwards instead of downloading it again. Markdown
+        // read here — the client's fallback when it can't resolve a route — revalidates every time,
+        // because an article invalidated by a publish must not linger in the browser.
+        string etag = HttpValidators.Tag(key, result.ETag);
+        string cacheControl = NavRules.IsMarkdown(key)
+            ? HttpValidators.Revalidate
+            : $"public, max-age={(int)freshness.Content.TotalSeconds}";
+        if (HttpValidators.IsNotModified(http, etag, cacheControl))
+        {
+            return Results.StatusCode(StatusCodes.Status304NotModified);
+        }
+
+        return Results.Bytes(result.Bytes, result.ContentType ?? "text/markdown; charset=utf-8");
     }
 
     /// <summary>
@@ -64,6 +83,15 @@ public static class ContentEndpoints
             // The renderer resolves links and images relative to the file the Markdown came from,
             // which the client can no longer infer once the probing happens here.
             http.Response.Headers[ContentKeyHeader] = key;
+
+            // The tag covers the resolved key as well as the bytes: a 304 hands the browser back its
+            // stored response, key header included, so the key must be part of what was validated.
+            string etag = HttpValidators.Tag(key, result.ETag);
+            if (HttpValidators.IsNotModified(http, etag, HttpValidators.Revalidate))
+            {
+                return Results.StatusCode(StatusCodes.Status304NotModified);
+            }
+
             return Results.Bytes(result.Bytes, result.ContentType ?? "text/markdown; charset=utf-8");
         }
 

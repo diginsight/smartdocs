@@ -14,6 +14,16 @@ public sealed record FrontMatterInfo(string? Title, bool Publish, bool Draft, st
 }
 
 /// <summary>
+/// What navigation needs from an article's header, parsed once: the title (from front matter, else
+/// the first H1), whether the article is hidden, and its author and date. A few hundred bytes, where
+/// the header text it is parsed from is several kilobytes.
+/// </summary>
+public sealed record ArticleHead(string? Title, bool Hidden, string? Author, DateTimeOffset? Date)
+{
+    public static readonly ArticleHead Empty = new(null, false, null, null);
+}
+
+/// <summary>
 /// Reads and parses only the leading YAML frontmatter block of a Markdown file. The reader stops
 /// at the closing <c>---</c> (capped) so callers touch just the header, never the whole article.
 /// </summary>
@@ -51,25 +61,29 @@ public static class FrontMatter
     }
 
     /// <summary>Title from frontmatter, else the first H1 heading, else null.</summary>
-    public static string? ResolveTitle(string? leadingText)
+    public static string? ResolveTitle(string? leadingText) => ParseHead(leadingText).Title;
+
+    /// <summary>
+    /// Parses a file's leading text once into the fields navigation uses. Equivalent to calling
+    /// <see cref="Parse"/>, <see cref="ResolveTitle"/> and <see cref="ParseDate"/> separately, which
+    /// parsed the front matter twice.
+    /// </summary>
+    public static ArticleHead ParseHead(string? leadingText)
     {
+        if (string.IsNullOrEmpty(leadingText))
+        {
+            return ArticleHead.Empty;
+        }
+
         FrontMatterInfo fm = Parse(leadingText);
-        if (!string.IsNullOrWhiteSpace(fm.Title))
+        string? title = fm.Title;
+        if (string.IsNullOrWhiteSpace(title))
         {
-            return fm.Title;
+            Match h1 = H1Rx.Match(StripHeader(leadingText));
+            title = h1.Success ? Clean(h1.Groups[1].Value) : null;
         }
 
-        if (!string.IsNullOrEmpty(leadingText))
-        {
-            string body = StripHeader(leadingText);
-            Match h1 = H1Rx.Match(body);
-            if (h1.Success)
-            {
-                return Clean(h1.Groups[1].Value);
-            }
-        }
-
-        return null;
+        return new ArticleHead(title, fm.Hidden, fm.Author, ParseDate(fm.Date));
     }
 
     /// <summary>Parses a frontmatter <c>date:</c> string into a UTC-assumed offset (null when absent/unparseable).</summary>

@@ -77,7 +77,7 @@ public sealed class FolderMetricsIndex(
         _cells.ToDictionary(
             kv => kv.Key,
             kv => new FolderCellView(kv.Value.Count, kv.Value.Latest, kv.Value.Coverage,
-                kv.Value.Invalidated, kv.Value.Settled, kv.Value.SettledAtUtc),
+                kv.Value.Invalidated, kv.Value.Settled, kv.Value.SettledAtUtc, kv.Value.Discovered),
             StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
@@ -92,6 +92,7 @@ public sealed class FolderMetricsIndex(
         while (true)
         {
             Cell cell = _cells.GetOrAdd(p, static _ => new Cell());
+            cell.Discovered = true;          // an explicit request to refold, whether or not the crawl got here
             InterlockedMax(ref cell.Invalidated, stamp);
 
             if (p.Length == 0)
@@ -151,7 +152,7 @@ public sealed class FolderMetricsIndex(
             using var activity = Observability.ActivitySource.StartMethodActivity(logger);
 
             List<string> dirty = _cells
-                .Where(kv => kv.Value.Invalidated > kv.Value.Settled)
+                .Where(kv => IsFoldable(kv.Value))
                 .Select(kv => kv.Key)
                 .OrderByDescending(Depth)                     // deepest-first ⇒ children settle before parents
                 .ToList();
@@ -164,7 +165,11 @@ public sealed class FolderMetricsIndex(
             var changed = new List<string>();
             foreach (string prefix in dirty)
             {
-                Cell cell = _cells[prefix];
+                if (!_cells.TryGetValue(prefix, out Cell? cell))
+                {
+                    continue;                                 // pruned since the pass began
+                }
+
                 long observed = Interlocked.Read(ref cell.Invalidated);   // capture BEFORE
 
                 (int count, DateTimeOffset? latest, Coverage coverage) = await FoldAsync(prefix, ct);
@@ -204,7 +209,7 @@ public sealed class FolderMetricsIndex(
                 }
             }
 
-            if (_cells.Any(kv => kv.Value.Invalidated > kv.Value.Settled))
+            if (_cells.Values.Any(IsFoldable))
             {
                 ScheduleDrain();      // arrived mid-drain → next pass
             }
@@ -263,9 +268,20 @@ public sealed class FolderMetricsIndex(
         // Only newly discovered folders are marked dirty. Re-walking a branch that is already
         // tracked must not re-dirty it, or the startup scan would keep invalidating what the
         // concurrent drain has just settled.
-        if (_cells.TryAdd(prefix, new Cell { Invalidated = stamp }))
+        if (_cells.TryAdd(prefix, new Cell { Invalidated = stamp, Discovered = true }))
         {
             ScheduleDrain();
+        }
+        else if (_cells.TryGetValue(prefix, out Cell? known) && !known.Discovered)
+        {
+            // A cell seeded from the snapshot becomes foldable once the crawl reaches it: folding it
+            // earlier would build its level ahead of the crawl, which is how the first drain used to
+            // build every other space's menus before discovering them.
+            known.Discovered = true;
+            if (IsFoldable(known))
+            {
+                ScheduleDrain();
+            }
         }
 
         foreach (NavChild child in await Nav.GetChildrenAsync(prefix, ct))
@@ -294,7 +310,18 @@ public sealed class FolderMetricsIndex(
         {
             if (child.IsSection && child.Prefix is not null)
             {
-                if (!_cells.TryGetValue(Normalize(child.Prefix), out Cell? sub) || sub.Coverage == Coverage.None)
+                string childPrefix = Normalize(child.Prefix);
+                if (!_cells.TryGetValue(childPrefix, out Cell? sub))
+                {
+                    // A section nothing registered — a folder created after the crawl. Registering it
+                    // lets the next pass fold it; left unregistered, this fold would stay a lower bound
+                    // and the drain would re-arm on it indefinitely.
+                    _cells.TryAdd(childPrefix, new Cell { Invalidated = NextStamp(), Discovered = true });
+                    allKnown = false;
+                    continue;
+                }
+
+                if (sub.Coverage == Coverage.None)
                 {
                     allKnown = false;         // unknown child contributes NOTHING (not zero)
                     continue;
@@ -326,6 +353,11 @@ public sealed class FolderMetricsIndex(
 
     // Complete outranks Partial outranks None: a lower bound may never replace a true total.
     private static bool Supersedes(Coverage incoming, Coverage current) => incoming >= current;
+
+    // Dirty, and not a snapshot-seeded folder still waiting for the crawl: such a cell keeps showing its
+    // last-known value, without being refolded, until the crawl reaches it or an invalidation names it.
+    private static bool IsFoldable(Cell cell) =>
+        cell.Discovered && Interlocked.Read(ref cell.Invalidated) > Interlocked.Read(ref cell.Settled);
 
     private static DateTimeOffset? Newer(DateTimeOffset? a, DateTimeOffset? b) =>
         b is { } y && (a is not { } x || y > x) ? b : a;
@@ -382,7 +414,10 @@ public sealed class FolderMetricsIndex(
     /// <summary>
     /// Seeds the index from a previous run so a restart shows the last known counts immediately
     /// instead of climbing from nothing. Every seeded cell is left <em>dirty</em>, so a restart is
-    /// simply a global invalidation over a warm seed — not a separate code path.
+    /// simply a global invalidation over a warm seed — not a separate code path. A seeded folder keeps
+    /// its last-known value, without being refolded, until this run's crawl reaches it: folding it
+    /// earlier would build its level ahead of the crawl. The site root is the exception, because its
+    /// level is the first one built, so the total can follow each branch as the crawl settles it.
     /// </summary>
     public async Task<int> LoadSnapshotAsync(string path, CancellationToken ct = default)
     {
@@ -409,6 +444,7 @@ public sealed class FolderMetricsIndex(
                 cell.Coverage = entry.Coverage;
                 cell.Invalidated = stamp;
                 cell.Settled = 0;
+                cell.Discovered = prefix.Length == 0;
             }
 
             logger.LogInformation("Nav metrics seeded from snapshot: {Count} folders", payload.Count);
@@ -435,6 +471,11 @@ public sealed class FolderMetricsIndex(
         public long Invalidated;
         public long Settled;
         public DateTimeOffset? SettledAtUtc;
+
+        // False only for a cell seeded from the snapshot that this run's crawl hasn't reached yet. Any
+        // other cell — created by the crawl, by an invalidation, or as an ancestor of either — is a
+        // folder this run already knows exists.
+        public volatile bool Discovered = true;
     }
 
     private sealed record SnapshotEntry(int Count, DateTimeOffset? Latest, Coverage Coverage);
@@ -450,7 +491,8 @@ public sealed record FolderCellView(
     Coverage Coverage,
     long Invalidated,
     long Settled,
-    DateTimeOffset? SettledAtUtc)
+    DateTimeOffset? SettledAtUtc,
+    bool Discovered)
 {
     public bool IsDirty => Invalidated > Settled;
 }

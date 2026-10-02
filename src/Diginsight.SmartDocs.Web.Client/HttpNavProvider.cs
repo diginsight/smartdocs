@@ -15,15 +15,19 @@ public sealed class HttpNavProvider(HttpClient http) : INavProvider
     public Task<IReadOnlyList<NavChild>> GetChildrenAsync(string prefix, CancellationToken ct = default)
     {
         prefix ??= string.Empty;
-        if (_children.TryGetValue(prefix, out Task<IReadOnlyList<NavChild>>? existing))
+        if (!_children.TryGetValue(prefix, out Task<IReadOnlyList<NavChild>>? level))
         {
-            return existing;
+            level = FetchChildrenAsync(prefix, ct);
+            _children[prefix] = level;
         }
 
-        Task<IReadOnlyList<NavChild>> task = FetchChildrenAsync(prefix, ct);
-        _children[prefix] = task;
-        return task;
+        // The cache keeps the level as served, empty sections included, so a pushed count that makes
+        // one non-empty brings it back on the next read; only what callers see is filtered.
+        return VisibleAsync(level);
     }
+
+    private static async Task<IReadOnlyList<NavChild>> VisibleAsync(Task<IReadOnlyList<NavChild>> level) =>
+        NavRules.WithoutEmptySections(await level);
 
     /// <summary>Drops the cached task for <paramref name="prefix"/> so the next fetch re-hits the API.</summary>
     public Task<IReadOnlyList<NavChild>> RefreshChildrenAsync(string prefix, CancellationToken ct = default)

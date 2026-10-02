@@ -23,6 +23,10 @@ public sealed class NavChangePublisher(
 {
     private int _wired;
 
+    // Coalesces whole-site rediscoveries: requests arriving while one runs trigger exactly one more.
+    private int _rediscovering;
+    private int _rediscoverRequested;
+
     /// <summary>Subscribes to drain results. Called once at startup; idempotent.</summary>
     public void Wire()
     {
@@ -37,6 +41,7 @@ public sealed class NavChangePublisher(
     /// <summary>
     /// Records a changed content <paramref name="path"/>: stamps the folder and every ancestor as
     /// needing a refold. Synchronous, O(depth), no I/O — the drain is scheduled and debounced.
+    /// An empty path is a whole-site change, handled by <see cref="RediscoverInBackground"/>.
     /// </summary>
     public void PublishChangeAsync(string path)
     {
@@ -44,8 +49,69 @@ public sealed class NavChangePublisher(
         // one that was cached before this change.
         nav.InvalidateLevels();
 
-        string folder = FolderOf((path ?? string.Empty).Replace('\\', '/').Trim('/'));
-        metrics.Invalidate(folder);
+        string normalized = (path ?? string.Empty).Replace('\\', '/').Trim('/');
+        if (normalized.Length == 0)
+        {
+            // A whole-site change — the call the publish pipeline makes — may have added or removed
+            // folders anywhere. Stamping only the root used to leave every section's count as it was
+            // before the publish, still marked complete; now every cell refolds, and the tree is
+            // walked again so folders created by the publish get cells of their own.
+            metrics.InvalidateAll();
+            RediscoverInBackground();
+            return;
+        }
+
+        metrics.Invalidate(FolderOf(normalized));
+    }
+
+    private void RediscoverInBackground()
+    {
+        // Record the request before claiming the slot, so a rediscovery already running picks it up.
+        Interlocked.Exchange(ref _rediscoverRequested, 1);
+        if (Interlocked.Exchange(ref _rediscovering, 1) == 1)
+        {
+            return;
+        }
+
+        _ = Task.Run(async () =>
+        {
+            do
+            {
+                while (Interlocked.Exchange(ref _rediscoverRequested, 0) == 1)
+                {
+                    try
+                    {
+                        await RediscoverAsync();
+                    }
+                    catch (Exception ex)
+                    {
+                        logger.LogWarning(ex, "Nav rediscovery after a whole-site invalidation failed");
+                    }
+                }
+
+                Interlocked.Exchange(ref _rediscovering, 0);
+            }
+            while (Volatile.Read(ref _rediscoverRequested) == 1 && Interlocked.Exchange(ref _rediscovering, 1) == 0);
+        });
+    }
+
+    private async Task RediscoverAsync()
+    {
+        using var activity = Observability.ActivitySource.StartMethodActivity(logger);
+
+        var reachable = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (NavChild root in await nav.GetChildrenAsync(string.Empty))
+        {
+            if (root.IsSection && root.Prefix is not null)
+            {
+                reachable.UnionWith(await metrics.DiscoverAsync(root.Prefix));
+            }
+        }
+
+        // Folders the publish deleted must not linger in the index; the root total then refolds over
+        // what is left.
+        metrics.PruneUnreachable(reachable);
+        metrics.Invalidate(string.Empty);
     }
 
     private async Task OnMetricsChangedAsync(IReadOnlyList<string> prefixes)

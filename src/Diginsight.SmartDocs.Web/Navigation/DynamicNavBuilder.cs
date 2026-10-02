@@ -30,14 +30,22 @@ namespace Diginsight.SmartDocs.Web.Navigation;
 /// the space title, ordered by configuration position, and always kept as a section — its name is a
 /// route base chosen by configuration, not an authored folder the naming rules were written for.
 /// </param>
+/// <param name="assetFolderNames">
+/// Folder names treated as asset folders in addition to <see cref="NavRules.AssetFolderNames"/>,
+/// from <c>Site:AssetFolders</c>.
+/// </param>
 public sealed class DynamicNavBuilder(
     IContentLister lister,
     FolderMetricsIndex metrics,
     IParallelService parallelService,
     Lazy<INavBuilder> levelSource,
     ILogger<DynamicNavBuilder> logger,
-    SpaceRegistry? spaces = null) : INavBuilder
+    SpaceRegistry? spaces = null,
+    IEnumerable<string>? assetFolderNames = null) : INavBuilder
 {
+    private readonly HashSet<string> assetFolders =
+        new(NavRules.AssetFolderNames.Concat(assetFolderNames ?? []), StringComparer.OrdinalIgnoreCase);
+
     public async Task<IReadOnlyList<NavChild>> GetChildrenAsync(string prefix, CancellationToken ct = default)
     {
         using var activity = Observability.ActivitySource.StartMethodActivity(logger, () => new { prefix });
@@ -116,13 +124,21 @@ public sealed class DynamicNavBuilder(
             return ScoreMount(mounted, entry);
         }
 
-        if (NavRules.IsExcludedName(entry.Name) || IsTempRoot(prefix, entry.Name))
+        if (NavRules.IsExcludedName(entry.Name) || IsInfrastructure(prefix, entry))
         {
             return null;
         }
 
         if (entry.IsFolder)
         {
+            // Asset folders hold images and media, never pages: they are not sections, not links,
+            // and not crawled. The rule used to apply only when deciding whether a parent had
+            // meaningful subfolders, so an image tree with nested folders became a menu section.
+            if (assetFolders.Contains(entry.Name))
+            {
+                return null;
+            }
+
             // One listing per folder, shared by the metadata lookup and the classification below.
             // Both used to list it independently, and the metadata read used to be a blind probe for
             // a file that exists in a handful of folders out of hundreds — so the overwhelmingly
@@ -149,18 +165,16 @@ public sealed class DynamicNavBuilder(
 
         if (NavRules.IsMarkdown(entry.Name) && !NavRules.IsIndexName(entry.Name))
         {
-            string? head = await lister.ReadHeadAsync(entry.Path, ct);
-            FrontMatterInfo fm = FrontMatter.Parse(head);
-            if (fm.Hidden)
+            ArticleHead head = await lister.ReadArticleHeadAsync(entry.Path, ct);
+            if (head.Hidden)
             {
                 return null;
             }
 
-            string label = FrontMatter.ResolveTitle(head)
-                ?? NavRules.Label(Path.GetFileNameWithoutExtension(entry.Name));
+            string label = head.Title ?? NavRules.Label(Path.GetFileNameWithoutExtension(entry.Name));
             return (NavRules.SortKey(entry.Name),
                 new NavChild(label, Route(entry.Path), null, null, false, false,
-                    Date: FrontMatter.ParseDate(fm.Date), Author: fm.Author));
+                    Date: head.Date, Author: head.Author));
         }
 
         return null;
@@ -185,7 +199,8 @@ public sealed class DynamicNavBuilder(
     {
         using var activity = Observability.ActivitySource.StartMethodActivity(logger, () => new { folder });
 
-        var subFolders = kids.Where(k => k.IsFolder && !NavRules.IsExcludedName(k.Name) && !NavRules.IsAssetFolder(k.Name)).ToList();
+        var subFolders = kids.Where(k => k.IsFolder && !NavRules.IsExcludedName(k.Name)
+                                         && !assetFolders.Contains(k.Name) && !BuildOutput.Contains(k.Name)).ToList();
         var articles = kids.Where(k => !k.IsFolder && NavRules.IsMarkdown(k.Name)
                                        && !NavRules.IsExcludedName(k.Name) && !NavRules.IsIndexName(k.Name)).ToList();
         ChildEntry? index = kids.FirstOrDefault(k => !k.IsFolder && NavRules.IsIndexName(k.Name));
@@ -210,21 +225,20 @@ public sealed class DynamicNavBuilder(
         }
 
         // Collapsed folders render as article links: no folder symbol unless metadata.yml sets one.
-        string? head = await lister.ReadHeadAsync(single.Path, ct);
-        FrontMatterInfo singleFm = FrontMatter.Parse(head);
-        if (articles.Count == 1 && singleFm.Hidden)
+        ArticleHead singleHead = await lister.ReadArticleHeadAsync(single.Path, ct);
+        if (articles.Count == 1 && singleHead.Hidden)
         {
             return index is null ? null
                 : new NavChild(meta.Label ?? NavRules.Label(folder.Name), Route(folder.Path), null, meta.Icon, false, false);
         }
 
-        string? title = FrontMatter.ResolveTitle(head);
+        string? title = singleHead.Title;
         string label = meta.Label ?? (title is not null
             ? NavRules.WithDatePrefix(folder.Name, title)
             : NavRules.Label(folder.Name));
         string route = single == index ? Route(folder.Path) : Route(single.Path);
         return new NavChild(label, route, null, meta.Icon, false, false,
-            Date: FrontMatter.ParseDate(singleFm.Date), Author: singleFm.Author);
+            Date: singleHead.Date, Author: singleHead.Author);
     }
 
     /// <summary>
@@ -254,19 +268,30 @@ public sealed class DynamicNavBuilder(
         ChildEntry? entry = kids.FirstOrDefault(
             k => !k.IsFolder && string.Equals(k.Name, "metadata.yml", StringComparison.OrdinalIgnoreCase));
 
-        return entry is null ? FolderMeta.None : FolderMeta.Parse(await lister.ReadHeadAsync(entry.Path, ct));
+        return entry is null ? FolderMeta.None : await lister.ReadFolderMetaAsync(entry.Path, ct);
     }
 
-    // Root-level folders that are project/infrastructure, not site content (only relevant when the
-    // content source is the repo filesystem; the blob container holds content only).
+    // Project and infrastructure folders at the top of a space — a space can be a repository clone,
+    // whose root holds source, scripts and build output beside the content.
     private static readonly HashSet<string> RootInfra = new(StringComparer.OrdinalIgnoreCase)
     {
         "src", "deploy", "docs", "scripts", "readme_files", "bin", "obj", "node_modules",
         "99.00-temp",
     };
 
-    private static bool IsTempRoot(string prefix, string name) =>
-        prefix.Length == 0 && RootInfra.Contains(name);
+    // Build output, excluded at any depth: a code sample's bin or obj folder is never content.
+    private static readonly HashSet<string> BuildOutput = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "bin", "obj", "node_modules",
+    };
+
+    private bool IsInfrastructure(string prefix, ChildEntry entry) =>
+        (entry.IsFolder && BuildOutput.Contains(entry.Name)) ||
+        (IsSpaceRoot(prefix) && RootInfra.Contains(entry.Name));
+
+    // The site root is the root-mounted space's top level; a mount segment is a prefixed space's.
+    private bool IsSpaceRoot(string prefix) =>
+        prefix.Length == 0 || spaces?.MountedAt(prefix) is not null;
 
     private static string Route(string path)
     {

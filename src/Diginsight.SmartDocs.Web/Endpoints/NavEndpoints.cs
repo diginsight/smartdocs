@@ -2,11 +2,13 @@ using Diginsight.Diagnostics;
 using Diginsight.SmartDocs.Web.Navigation;
 using Diginsight.SmartDocs.Web.Shared.Navigation;
 using Diginsight.SmartDocs.Web.Shared.Sites;
+using Microsoft.AspNetCore.Http.Json;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 
 namespace Diginsight.SmartDocs.Web.Endpoints;
 
@@ -53,7 +55,9 @@ public static class NavEndpoints
         return app;
     }
 
-    private static async Task<IResult> GetNavChildrenAsync(string? prefix, INavBuilder nav, CachedDynamicNavBuilder cachedNav, CancellationToken ct)
+    private static async Task<IResult> GetNavChildrenAsync(
+        string? prefix, INavBuilder nav, CachedDynamicNavBuilder cachedNav,
+        IOptions<JsonOptions> json, HttpContext http, CancellationToken ct)
     {
         using var activity = Observability.ActivitySource.StartMethodActivity(logger, () => new { prefix });
 
@@ -67,7 +71,16 @@ public static class NavEndpoints
         });
 
         activity?.SetOutput(new { count = children.Count });
-        return Results.Json(children);
+
+        // Serialized here rather than by Results.Json so the entity tag covers exactly the bytes sent:
+        // a browser holding the same level revalidates it with a 304 instead of downloading it again.
+        byte[] body = JsonSerializer.SerializeToUtf8Bytes(children, json.Value.SerializerOptions);
+        if (HttpValidators.IsNotModified(http, HttpValidators.Tag(body), HttpValidators.Revalidate))
+        {
+            return Results.StatusCode(StatusCodes.Status304NotModified);
+        }
+
+        return Results.Bytes(body, "application/json; charset=utf-8");
     }
 
     private static IResult GetNavVersion()

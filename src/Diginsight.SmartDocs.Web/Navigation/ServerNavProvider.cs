@@ -14,7 +14,7 @@ public sealed class ServerNavProvider(
     {
         using var activity = Observability.ActivitySource.StartMethodActivity(logger, () => new { prefix });
 
-        return await builder.GetChildrenAsync(prefix, ct);
+        return NavRules.WithoutEmptySections(await builder.GetChildrenAsync(prefix, ct));
     }
 
     public Task<FolderArticleStats?> GetTotalAsync(CancellationToken ct = default)
