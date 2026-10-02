@@ -152,6 +152,12 @@ jobs:
         shell: pwsh
         env:
           RID: ${{ inputs.runtime-identifier }}
+          # A package folder of this repository's own. The machine runs several runners under one
+          # service account, which share a single global package folder, and a package already in it
+          # is never downloaded again: a copy an earlier restore took from the SDK's library-packs
+          # folder fails NU1403 against this repository's lock files forever after. The runner's work
+          # directory is outside the checkout that `git clean -ffdx` wipes, so the cache survives runs.
+          NUGET_PACKAGES: ${{ runner.workspace }}\.nuget\packages
         run: |
           # Self-contained, so the App Service needs no pre-installed .NET 10 runtime. The RID must
           # match the worker bitness: an x64 payload on a 32-bit worker fails to load with

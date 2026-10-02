@@ -5,6 +5,12 @@
     <Nullable>enable</Nullable>
     <WarningAsErrors>nullable</WarningAsErrors>
     <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+    <!-- nuget.config makes nuget.org the only package source, but the SDK also adds its own
+         library-packs folder as an implicit one. Its copies of SDK packages, such as
+         Microsoft.NET.Sdk.WebAssembly.Pack, are repackaged with a different content hash, so a lock
+         file written where the package came from nuget.org fails NU1403 wherever restore took it
+         from the SDK folder instead. Disabling the folder makes every machine resolve the same bytes. -->
+    <DisableImplicitLibraryPacksFolder>true</DisableImplicitLibraryPacksFolder>
 
     <Authors>diginsight</Authors>
     <Product>Diginsight</Product>
