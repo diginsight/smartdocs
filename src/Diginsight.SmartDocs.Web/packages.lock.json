@@ -50,20 +50,21 @@
       "Azure.Storage.Blobs": {
         "type": "Direct",
         "requested": "[12.*, )",
-        "resolved": "12.29.2",
-        "contentHash": "NeZmk7bphspT2BYn8XaNCTV4/9vQG+ea79F85MBTi2o2WiXIIJNsRBtFyeBrzK2HIk476rfSqLNwPt4vXgOEkQ==",
+        "resolved": "12.30.0",
+        "contentHash": "pf6tqkzNANU5Fvfibse3fVRNWJol4jb9iA/wjHu1EHEpWpFHasHaiVNc11fncvOwnphzm4xaZwXzrg34yAI2hw==",
         "dependencies": {
-          "Azure.Core": "1.55.0",
-          "Azure.Storage.Common": "12.28.0"
+          "Apache.Arrow": "22.1.0",
+          "Azure.Core": "1.60.0",
+          "Azure.Storage.Common": "12.29.0"
         }
       },
       "Diginsight.Components": {
         "type": "Direct",
         "requested": "[1.*, )",
-        "resolved": "1.0.0.114",
-        "contentHash": "R4BQr7wqYn+Nad24Yr7SGUkpZDK3u567IiZ/MQ1R+prLv5JiVeiJ1t9xl7riwLmKpeBhTco0ZdrIY2rJ1Nx1bA==",
+        "resolved": "1.0.0.115",
+        "contentHash": "HvCD63P5hmUsVqqbL4xr5ZhV120/J3zPvf5UpzxJdKYlcrlIAAp/ZodMImpJH2hJMmj2ZHGkkfkhY3NazcqYNg==",
         "dependencies": {
-          "Diginsight.Components.Abstractions": "1.0.0.114",
+          "Diginsight.Components.Abstractions": "1.0.0.115",
           "Diginsight.Core": "3.8.0.2",
           "Diginsight.Diagnostics": "3.8.0.2",
           "Microsoft.Identity.Client": "4.88.0",
@@ -75,13 +76,13 @@
       "Diginsight.Components.Azure": {
         "type": "Direct",
         "requested": "[1.*, )",
-        "resolved": "1.0.0.114",
-        "contentHash": "/PJVI2wtFaXZkGd0MOsUeW5kQULpEMsT4mGRakSfT0bG6uABCKFtSeoZkZN2yKKCvx6C5K57Oz9JIC/YxXu9XQ==",
+        "resolved": "1.0.0.115",
+        "contentHash": "9TlFHB9etOG3tCqnzDLaGcsI7UTlGxfklnG1XA05o9fK8cn7jPAKOiOInqPZLixybpgtPsSZo0Gtd+zB1vaXkg==",
         "dependencies": {
           "Azure.Data.Tables": "12.12.0",
-          "Diginsight.Components": "1.0.0.114",
-          "Diginsight.Components.Azure.Abstractions": "1.0.0.114",
-          "Diginsight.Components.Configuration.Abstractions": "1.0.0.114",
+          "Diginsight.Components": "1.0.0.115",
+          "Diginsight.Components.Azure.Abstractions": "1.0.0.115",
+          "Diginsight.Components.Configuration.Abstractions": "1.0.0.115",
           "Diginsight.Core": "3.8.0.2",
           "Diginsight.Diagnostics": "3.8.0.2",
           "Microsoft.Azure.Cosmos": "3.62.1",
@@ -92,15 +93,15 @@
       "Diginsight.Components.Configuration": {
         "type": "Direct",
         "requested": "[1.*, )",
-        "resolved": "1.0.0.114",
-        "contentHash": "nWKwlNyFSd+sYz5gpH0P+w17GVJNQQ+TctjXdjFkJQyzdIoHLrykTYCiZWgZdQTC6umQ0vQMfyD2ZvIBvP8IQg==",
+        "resolved": "1.0.0.115",
+        "contentHash": "DRVME3OsYRSTjwYlQfUxJYQp1sXAZkNPlsVS3ZzoKxfZ067wHPqrve6Ilr2xp2x2l9EfYaRqz717XGtk2FbcLg==",
         "dependencies": {
           "Azure.Core": "1.62.0",
           "Azure.Extensions.AspNetCore.Configuration.Secrets": "1.5.2",
           "Azure.Identity": "1.21.0",
           "Azure.Monitor.OpenTelemetry.AspNetCore": "1.6.0",
-          "Diginsight.Components.Azure": "1.0.0.114",
-          "Diginsight.Components.Configuration.Abstractions": "1.0.0.114",
+          "Diginsight.Components.Azure": "1.0.0.115",
+          "Diginsight.Components.Configuration.Abstractions": "1.0.0.115",
           "Diginsight.Core": "3.8.0.2",
           "Diginsight.Diagnostics": "3.8.0.2",
           "Diginsight.Diagnostics.AspNetCore": "3.8.0.2",
@@ -207,8 +208,8 @@
       "log4net": {
         "type": "Direct",
         "requested": "[3.*, )",
-        "resolved": "3.4.0",
-        "contentHash": "IubYl1l3vs4pZ8hRJBWjfPOW8osR1gS/FAweVYpc2n7SZ0yrZ64uMGQYjjt1nna/Hpm10IHiw4D6HSh/JFbj9w==",
+        "resolved": "3.5.0",
+        "contentHash": "JJJ1L3/WJZA8OAyaz0ghG8+DNo2t9qn0nbV3HzIBVMheO62R1Zdz+mvyizpYsYDu/+k35tg324r2P/LCvAtfKw==",
         "dependencies": {
           "System.Configuration.ConfigurationManager": "4.5.0"
         }
@@ -301,6 +302,11 @@
           "OpenTelemetry.Api": "[1.19.0, 2.0.0)"
         }
       },
+      "Apache.Arrow": {
+        "type": "Transitive",
+        "resolved": "22.1.0",
+        "contentHash": "mTdHWGsNCWpKyQxqyNcSS+q4BtBTSOUfhdG+Lwo6eAOznCLSwrZQ5VKtDG2G8VrUp1ul4DwWHefoBS1umjO/VQ=="
+      },
       "Azure.Core.Amqp": {
         "type": "Transitive",
         "resolved": "1.3.1",
@@ -348,11 +354,11 @@
       },
       "Azure.Storage.Common": {
         "type": "Transitive",
-        "resolved": "12.28.0",
-        "contentHash": "5l8YhNrks38zKLGFW2BBFLwieyamH/xauABSASsdpZv79G0f+n2n22IjkRmUqCmALSupkwRHh2LOhbW3yj5Qgw==",
+        "resolved": "12.29.0",
+        "contentHash": "0VqPcAinzXFJDAELqC+VPFUL6AaU1mmIpDAHarr7DVw3zcJrlo4k3Xc3TCTVBkDgY6YUOjJ00Fd9ZB9En5H2Jg==",
         "dependencies": {
-          "Azure.Core": "1.55.0",
-          "System.IO.Hashing": "10.0.3"
+          "Azure.Core": "1.60.0",
+          "System.IO.Hashing": "10.0.9"
         }
       },
       "Diginsight.AspNetCore": {
@@ -366,24 +372,24 @@
       },
       "Diginsight.Components.Abstractions": {
         "type": "Transitive",
-        "resolved": "1.0.0.114",
-        "contentHash": "pKCCxxmr8L6ohxRLS4X0503hwXJUKWyw2LVxVgkK1U4zsWgKcG131zR5DYHmqL6DsctB5dGreiGZubqHuPU/nA==",
+        "resolved": "1.0.0.115",
+        "contentHash": "tdE/jCiDAjFbp9L6QS9krnVHppJ7p8T8TVAY1f6YciIMBFjh7vl2fnnN/Ooe3ov5I1YT7Bds4Rxoox0mjJ3LSQ==",
         "dependencies": {
           "Microsoft.Identity.Client": "4.88.0"
         }
       },
       "Diginsight.Components.Azure.Abstractions": {
         "type": "Transitive",
-        "resolved": "1.0.0.114",
-        "contentHash": "IlIlAHCq57vhtRBByeXxfCqLP1UROpPN/pMxombN4NazOHYGJVZVEHRy2DaqblSRGpSOxdZtJDi4qqoNG+uJIw==",
+        "resolved": "1.0.0.115",
+        "contentHash": "qhoKuKhAxlg9kqyVvQUqZ+7TPAL1SSa3d6JWcxDzzhuCFYPy3zk6oHzdEpLUTIGbMBNCjvluPH2oSTZipN4k3g==",
         "dependencies": {
           "Azure.Data.Tables": "12.12.0"
         }
       },
       "Diginsight.Components.Configuration.Abstractions": {
         "type": "Transitive",
-        "resolved": "1.0.0.114",
-        "contentHash": "4CJWXzsXEXgMSImnD/V8JJIhwG5dtTVPOBkXg7mAw5Wvp7hnrJqsVsq4CUneJULJoOFEh5G/9n+VXqpGRx0Hfg==",
+        "resolved": "1.0.0.115",
+        "contentHash": "kO30jNytwAAV/rpk99CZ+V6TdNP3EiIMKIy9FISyx/duBYd1KoSgfcSvjlc7uIf94uPpfGumAapNufQ6lZwz6A==",
         "dependencies": {
           "Diginsight.Core": "3.8.0.2",
           "Diginsight.Diagnostics": "3.8.0.2"
@@ -654,8 +660,8 @@
       },
       "System.IO.Hashing": {
         "type": "Transitive",
-        "resolved": "10.0.3",
-        "contentHash": "La6ICwsdTKhVX+LKN+pvFjQRR3LhLwq3uKdi2knjLzRyPYBSydF4cjXidYxIiTcDD6XVYdsBWQEI8ZxiZ/OdIg=="
+        "resolved": "10.0.9",
+        "contentHash": "vixglGnKEexAJDeIRhyayZYzxyrgK1K9GU3K/zRZVwDbaDcMkSqj4WDHoVmQMNfsdUtLALfNSJw6mBIpdxie4A=="
       },
       "System.Linq.Async": {
         "type": "Transitive",
@@ -711,6 +717,74 @@
         "type": "Project",
         "dependencies": {
           "Markdig": "[0.*, )"
+        }
+      }
+    },
+    "net10.0/win-x64": {
+      "Microsoft.Azure.Cosmos": {
+        "type": "Transitive",
+        "resolved": "3.62.1",
+        "contentHash": "1jNOGwdtwHjk40zfxPv3dhwpqX7Ilex1PUuCPYDEMBAa3Y7HZS5GxoXbzGR+uxVJc4XKwFH9ZWkSLgswCgXlYQ==",
+        "dependencies": {
+          "Azure.Core": "1.44.1",
+          "Microsoft.Bcl.AsyncInterfaces": "6.0.0",
+          "Microsoft.Bcl.HashCode": "1.1.0",
+          "System.Configuration.ConfigurationManager": "6.0.0"
+        }
+      },
+      "Microsoft.Win32.SystemEvents": {
+        "type": "Transitive",
+        "resolved": "6.0.0",
+        "contentHash": "hqTM5628jSsQiv+HGpiq3WKBl2c8v1KZfby2J6Pr7pEPlK9waPdgEO6b8A/+/xn/yZ9ulv8HuqK71ONy2tg67A=="
+      },
+      "System.Drawing.Common": {
+        "type": "Transitive",
+        "resolved": "6.0.0",
+        "contentHash": "NfuoKUiP2nUWwKZN6twGqXioIe1zVD0RIj2t976A+czLHr2nY454RwwXs6JU9Htc6mwqL6Dn/nEL3dpVf2jOhg==",
+        "dependencies": {
+          "Microsoft.Win32.SystemEvents": "6.0.0"
+        }
+      },
+      "System.Windows.Extensions": {
+        "type": "Transitive",
+        "resolved": "6.0.0",
+        "contentHash": "IXoJOXIqc39AIe+CIR7koBtRGMiCt/LPM3lI+PELtDIy9XdyeSrwXFdWV9dzJ2Awl0paLWUaknLxFQ5HpHZUog==",
+        "dependencies": {
+          "System.Drawing.Common": "6.0.0"
+        }
+      }
+    },
+    "net10.0/win-x86": {
+      "Microsoft.Azure.Cosmos": {
+        "type": "Transitive",
+        "resolved": "3.62.1",
+        "contentHash": "1jNOGwdtwHjk40zfxPv3dhwpqX7Ilex1PUuCPYDEMBAa3Y7HZS5GxoXbzGR+uxVJc4XKwFH9ZWkSLgswCgXlYQ==",
+        "dependencies": {
+          "Azure.Core": "1.44.1",
+          "Microsoft.Bcl.AsyncInterfaces": "6.0.0",
+          "Microsoft.Bcl.HashCode": "1.1.0",
+          "System.Configuration.ConfigurationManager": "6.0.0"
+        }
+      },
+      "Microsoft.Win32.SystemEvents": {
+        "type": "Transitive",
+        "resolved": "6.0.0",
+        "contentHash": "hqTM5628jSsQiv+HGpiq3WKBl2c8v1KZfby2J6Pr7pEPlK9waPdgEO6b8A/+/xn/yZ9ulv8HuqK71ONy2tg67A=="
+      },
+      "System.Drawing.Common": {
+        "type": "Transitive",
+        "resolved": "6.0.0",
+        "contentHash": "NfuoKUiP2nUWwKZN6twGqXioIe1zVD0RIj2t976A+czLHr2nY454RwwXs6JU9Htc6mwqL6Dn/nEL3dpVf2jOhg==",
+        "dependencies": {
+          "Microsoft.Win32.SystemEvents": "6.0.0"
+        }
+      },
+      "System.Windows.Extensions": {
+        "type": "Transitive",
+        "resolved": "6.0.0",
+        "contentHash": "IXoJOXIqc39AIe+CIR7koBtRGMiCt/LPM3lI+PELtDIy9XdyeSrwXFdWV9dzJ2Awl0paLWUaknLxFQ5HpHZUog==",
+        "dependencies": {
+          "System.Drawing.Common": "6.0.0"
         }
       }
     }

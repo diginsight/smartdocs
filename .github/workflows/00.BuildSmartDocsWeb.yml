@@ -22,7 +22,7 @@ on:
         required: true
         type: string
       runtime-identifier:
-        description: Self-contained publish RID. Must match the App Service worker bitness.
+        description: Self-contained publish RID. Must match the App Service worker bitness, and be one the projects declare in RuntimeIdentifiers (win-x64, win-x86), or the locked restore fails.
         required: false
         default: win-x64
         type: string
@@ -162,8 +162,12 @@ jobs:
           # Self-contained, so the App Service needs no pre-installed .NET 10 runtime. The RID must
           # match the worker bitness: an x64 payload on a 32-bit worker fails to load with
           # "HTTP 500.32 - ANCM Failed to Load dll". The deploy step below sets the bitness to match.
+          # Locked mode: restore exactly the versions the committed lock files name, and fail on any
+          # difference instead of re-resolving floating versions into a build nobody ran. The RID
+          # must therefore be one the projects declare in RuntimeIdentifiers, or restore fails NU1004.
           dotnet publish src/Diginsight.SmartDocs.Web/Diginsight.SmartDocs.Web.csproj `
             -c Release -r $env:RID --self-contained true `
+            -p:RestoreLockedMode=true `
             "-p:Version=$env:PACKAGE_VERSION" `
             -o publish_smartdocs
           if (-not (Test-Path "publish_smartdocs/Diginsight.SmartDocs.Web.exe")) {

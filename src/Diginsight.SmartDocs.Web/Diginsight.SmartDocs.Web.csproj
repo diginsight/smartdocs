@@ -5,6 +5,10 @@
     <RootNamespace>Diginsight.SmartDocs.Web</RootNamespace>
     <AssemblyName>Diginsight.SmartDocs.Web</AssemblyName>
     <UserSecretsId>diginsight-smartdocs-web</UserSecretsId>
+    <!-- The runtimes the deploy workflow can publish for (its runtime-identifier input). Declared so
+         the lock files carry their package graphs: a self-contained publish restores for its runtime,
+         and CI restores in locked mode, which fails on any target the lock files don't record. -->
+    <RuntimeIdentifiers>win-x64;win-x86</RuntimeIdentifiers>
   </PropertyGroup>
 
   <ItemGroup>

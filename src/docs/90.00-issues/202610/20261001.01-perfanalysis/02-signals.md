@@ -17,15 +17,15 @@ Activities this work item's conversation surfaced that were **never in scope** f
 
 ## 📡 Signals
 
-The table lists the six records in priority order. `SIG-5` earns this page on relevance and the next four on actionability; `SIG-3` resolves to an existing landing, so it carries no priority and is listed last. `SIG-4` and `SIG-5` were added on 2026-10-02 while wave 1 of the analysis was implemented, and `SIG-6` the same day while a deployed instance was measured.
+The table lists the six records in priority order. `SIG-5` earns this page on relevance and the next three on actionability; `SIG-6` is closed and `SIG-3` resolves to an existing landing, so neither carries a priority and both are listed last. `SIG-4` and `SIG-5` were added on 2026-10-02 while wave 1 of the analysis was implemented, and `SIG-6` the same day while a deployed instance was measured.
 
 | Order | Id | Kind | Relevance | Actionability | Target | Existing landing | State |
 |---|---|---|---|---|---|---|---|
 | 1 | `SIG-5` | `upstream-feedback` | high | ready | `diginsight/smartdocs` | partial: `SIG-2` of `20260925.02-startup-optimization` covers one of the seven statements | `pending` |
 | 2 | `SIG-1` | `divergent-commitment` | medium | ready | `diginsight/telemetry` | none found | `pending` |
-| 3 | `SIG-6` | `divergent-commitment` | medium | ready | `diginsight/smartdocs` | none found | `pending` |
-| 4 | `SIG-2` | `divergent-commitment` | low | bounded | `diginsight/smartcache` | none found | `pending` |
-| 5 | `SIG-4` | `divergent-commitment` | low | bounded | `diginsight/smartcache` | none found | `pending` |
+| 3 | `SIG-2` | `divergent-commitment` | low | bounded | `diginsight/smartcache` | none found | `pending` |
+| 4 | `SIG-4` | `divergent-commitment` | low | bounded | `diginsight/smartcache` | none found | `pending` |
+| — | `SIG-6` | `divergent-commitment` | — | — | `diginsight/smartdocs` | none found | `closed: done on 2026-10-02` |
 | — | `SIG-3` | `upstream-feedback` | — | — | `diginsight/smartdocs` | `SIG-2` of `20260925.02-startup-optimization` | `routed → SIG-2 of 20260925.02-startup-optimization` |
 
 No record is `low` and `open`, so there's no `other-signals` page. `SIG-2` stays here on actionability although its relevance dropped to `low` on 2026-10-01: see its record.
@@ -34,21 +34,22 @@ No record is `low` and `open`, so there's no `other-signals` page. `SIG-2` stays
 
 - **Kind** — `upstream-feedback`.
 - **Goal** — the generated architecture, use-case, and reference pages describe navigation exclusions, HTTP caching, configuration keys, and cache entries as the code has them after wave 1 of `src/docs/90.00-issues/202610/20261001.01-perfanalysis/01-startup-and-navigation-optimization.analysis.md`.
-- **Scope** — seven statements on six generated pages, each carrying a `verification_stamp`, so the documentation stream regenerates them rather than anyone editing them by hand:
+- **Scope** — eight statements on six generated pages, each carrying a `verification_stamp`, so the documentation stream regenerates them rather than anyone editing them by hand:
   1. `src/docs/06.00-reference/index.md` says `99.00-temp` is excluded "at the root only". The infrastructure names — `src`, `deploy`, `docs`, `scripts`, `readme_files`, `bin`, `obj`, `node_modules`, `99.00-temp` — are now excluded at the top of every space, build output at any depth, and asset folders at any depth.
   2. `src/docs/06.00-reference/06-navigation-rules.md` has a "Root level only" row for `99.00-temp` and lists `IsAssetFolder` as `images`, `img`, `assets`, `media`, `attachments`, `files`. The list now includes `asset`, `Site:AssetFolders` adds names, an asset folder is never an entry at all, and menus hide a section whose complete count is zero.
   3. `src/docs/03.00-architecture/04-shared-library.md` gives the same asset-folder list, and doesn't know `FrontMatter.ParseHead`, `ArticleHead`, or `NavRules.WithoutEmptySections`.
   4. `src/docs/06.00-reference/02-http-endpoints.md` describes `/_content` and `/_nav/children` without validators. `/_page`, `/_content`, and `/_nav/children` now send an `ETag` and `Cache-Control` and answer `If-None-Match` with `304`; JSON, Markdown, plain-text, and SVG responses are compressed; and a page route naming a file the content doesn't hold is answered `404` before prerendering.
   5. `src/docs/04.00-use-cases/01-reading-a-document.md` describes the `/_content` flow without its validators, and without the `max-age` assets now carry.
   6. `src/docs/06.00-reference/01-configuration-settings.md` doesn't list `Site:AssetFolders`, an overlay-only array, or `Diginsight:SmartCache:SizeLimit`, 64,000,000 in the base settings.
-  7. `src/docs/03.00-architecture/05-caching-and-invalidation.md` predates parsed-header entries (`article-head`, `folder-meta`), the size cap, the body-size floor, the browser tier's validators, and the rediscovery an empty-path invalidation now starts.
+  7. `02-http-endpoints.md` and `01-reading-a-document.md` also don't know that, since `C32`, a page route naming nothing in the content answers `404` before prerendering, with a self-contained page, or that the site serves a `robots.txt`; `06-navigation-rules.md` doesn't know that every link the application writes is rooted.
+  8. `src/docs/03.00-architecture/05-caching-and-invalidation.md` predates parsed-header entries (`article-head`, `folder-meta`), the size cap, the body-size floor, the browser tier's validators, and the rediscovery an empty-path invalidation now starts.
 - **Why it matters** — these pages are the reference readers and agents use to reason about the system, and their stamps still mark them current. After wave 1 they misstate which folders reach the menus, what the endpoints send, and which settings exist.
 - **Target** — `diginsight/smartdocs`, the documentation stream: the change-driven mode of `@ad-documentation-manager`, entered through `/01.04-ad-docs-update-from-changes`.
-- **Existing landing** — partial. `SIG-2` in `src/docs/90.00-issues/202609/20260925.02-startup-optimization/01-signals.md`, `pending`, asks for the caching chapter of statement 7, and this page's `SIG-3` is routed to it. None found for statements 1–6.
+- **Existing landing** — partial. `SIG-2` in `src/docs/90.00-issues/202609/20260925.02-startup-optimization/01-signals.md`, `pending`, asks for the caching chapter of statement 8, and this page's `SIG-3` is routed to it. None found for statements 1–7.
 - **State** — `pending`.
 - **Relevance** — `high`. The pages now contradict the code.
 - **Actionability** — `ready`. The change set, the pages, and the stream are known, and the work list follows from the change set without judgement.
-- **Actionability strategy** — lands as one change-driven documentation run whose change set is wave 1's diff. The caching chapter joins the same run, which lets whoever runs it close `SIG-2` of the earlier work item and update `SIG-3` here.
+- **Actionability strategy** — lands as one change-driven documentation run whose change set runs from wave 1 through `C32` — commits `35901a7` to `5f58c29`. The caching chapter joins the same run, which lets whoever runs it close `SIG-2` of the earlier work item and update `SIG-3` here.
 
 ### `SIG-1` — Diginsight.Core sizes a byte array one boxed element at a time
 
@@ -62,19 +63,6 @@ No record is `low` and `open`, so there's no `other-signals` page. `SIG-2` stays
 - **Relevance** — `medium`. It improves a library in use; consumers can work around it meanwhile by implementing `ISizeableHeuristically` on their cache envelopes.
 - **Actionability** — `ready`. The file, the branch, and the fix are known, and the work list follows without judgement.
 - **Actionability strategy** — lands as a small change to `SizeCalculator.Get` with unit tests over `byte[]`, `char[]`, and `int[]` asserting the expected byte count, plus a micro-benchmark asserting that sizing a 64 KB array allocates nothing per element. SmartDocs keeps `ISizeableHeuristically` on its envelopes either way, because it also avoids the reflection walk.
-
-### `SIG-6` — the deploy's runtime-specific publish re-resolves every floating version
-
-- **Kind** — `divergent-commitment`.
-- **Goal** — a deployed build uses exactly the package versions the committed lock files name.
-- **Scope** — the lock files of `Diginsight.SmartDocs.Web` and `Diginsight.SmartDocs.Web.Shared` record only the `net10.0` target. The deploy workflow publishes with a runtime identifier (`win-x64` or `win-x86`), which adds a target the lock files don't carry, so NuGet treats them as out of date, re-resolves the graph, and moves every floating reference — `10.0.*`, `1.*`, `12.*`, `3.*`, `0.*` — to its newest match. On an export of commit `35901a7`, that moved 19 resolved versions in the shared project and 10 in the host, among them Diginsight.Components 1.0.0.114 → 1.0.0.115, Azure.Storage.Blobs 12.29.2 → 12.30.0, log4net 3.4.0 → 3.5.0, and the ASP.NET Core packages 10.0.11 → 10.0.12. The client project builds for `browser-wasm` and keeps its lock file. Out of scope: which versions the references should float to.
-- **Why it matters** — a deploy ships a package graph no developer built or ran, so a regression in any floating dependency reaches production untested, and two deploys of one commit can differ. The lock files exist to prevent exactly that: the convergence plan that introduced them, `src/docs/90.00-issues/202608/20260815.01-smartdocs-firstimpl/01-smartdocs-web-convergence.plan.md`, made them part of every restore.
-- **Target** — `diginsight/smartdocs`: the host project's runtime identifiers, its lock files, and the restore performed by `.github/workflows/00.BuildSmartDocsWeb.yml`.
-- **Existing landing** — none found. The convergence plan is done, and covers generating the lock files, not their runtime targets or a locked-mode restore.
-- **State** — `pending`.
-- **Relevance** — `medium`. Nothing has failed from it yet, and every deploy carries the risk.
-- **Actionability** — `ready`. The mechanism is known, and the work list follows without judgement.
-- **Actionability strategy** — lands as a build change: declare on the host project the runtime identifiers the deploys use, so the lock files carry those targets; regenerate the lock files; and restore in locked mode in CI, so drift fails the build instead of shipping. The acceptance check is a CI publish that leaves every lock file byte-identical.
 
 ### `SIG-2` — SmartCache emits two nested activities and per-lookup `Debug` records on every lookup
 
@@ -101,6 +89,19 @@ No record is `low` and `open`, so there's no `other-signals` page. `SIG-2` stays
 - **Relevance** — `low`. SmartDocs works around it with the size floor and a cap configured per deployment (`Diginsight:SmartCache:SizeLimit`, 64,000,000 by default), which holds the Learning Hub's whole working set; nothing degrades while this waits except how many bodies fit.
 - **Actionability** — `bounded`. The code is known; whether the priority travels with the call, the value, or both needs a decision with the library's owners.
 - **Actionability strategy** — lands as an additive option with unit tests asserting that an entry's priority follows the option when it's set and the size rule otherwise. SmartDocs then drops the floor in `CachedContentSource.CachedContent` and reports bodies at their real size.
+
+### `SIG-6` — the deploy's runtime-specific publish re-resolves every floating version
+
+- **Kind** — `divergent-commitment`.
+- **Goal** — a deployed build uses exactly the package versions the committed lock files name.
+- **Scope** — the lock files of `Diginsight.SmartDocs.Web` and `Diginsight.SmartDocs.Web.Shared` record only the `net10.0` target. The deploy workflow publishes with a runtime identifier (`win-x64` or `win-x86`), which adds a target the lock files don't carry, so NuGet treats them as out of date, re-resolves the graph, and moves every floating reference — `10.0.*`, `1.*`, `12.*`, `3.*`, `0.*` — to its newest match. On an export of commit `35901a7`, that moved 19 resolved versions in the shared project and 10 in the host, among them Diginsight.Components 1.0.0.114 → 1.0.0.115, Azure.Storage.Blobs 12.29.2 → 12.30.0, log4net 3.4.0 → 3.5.0, and the ASP.NET Core packages 10.0.11 → 10.0.12. The client project builds for `browser-wasm` and keeps its lock file. Out of scope: which versions the references should float to.
+- **Why it matters** — a deploy ships a package graph no developer built or ran, so a regression in any floating dependency reaches production untested, and two deploys of one commit can differ. The lock files exist to prevent exactly that: the convergence plan that introduced them, `src/docs/90.00-issues/202608/20260815.01-smartdocs-firstimpl/01-smartdocs-web-convergence.plan.md`, made them part of every restore.
+- **Target** — `diginsight/smartdocs`: the host project's runtime identifiers, its lock files, and the restore performed by `.github/workflows/00.BuildSmartDocsWeb.yml`.
+- **Existing landing** — none found. The convergence plan is done, and covers generating the lock files, not their runtime targets or a locked-mode restore.
+- **State** — `closed: done on 2026-10-02`, at the owner's request, in this repository: the host and the shared library declare `win-x64` and `win-x86` in `RuntimeIdentifiers`, their lock files were regenerated with those targets, and the deploy's publish restores with `RestoreLockedMode=true`. Validated in `src/docs/90.00-issues/202610/20261001.01-perfanalysis/_validation/20261002.03-validation-sequence.md`.
+- **Relevance** — `medium`. Nothing has failed from it yet, and every deploy carries the risk.
+- **Actionability** — `ready`. The mechanism is known, and the work list follows without judgement.
+- **Actionability strategy** — lands as a build change: declare on the host project the runtime identifiers the deploys use, so the lock files carry those targets; regenerate the lock files; and restore in locked mode in CI, so drift fails the build instead of shipping. The acceptance check is a CI publish that leaves every lock file byte-identical.
 
 ### `SIG-3` — the caching chapter describes a cache key the mounted namespace removed
 
