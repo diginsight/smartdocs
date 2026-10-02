@@ -8,13 +8,13 @@
         @if (node.Route is not null)
         {
             <li>
-                <a class="dropdown-link" href="@node.Route">@node.Text</a>
+                <a class="dropdown-link" href="@NavRules.Href(node.Route)">@node.Text</a>
             </li>
         }
         else if (node.Prefix is not null)
         {
             <li>
-                <a class="dropdown-link" href="@(node.Prefix.TrimEnd('/'))">@node.Text</a>
+                <a class="dropdown-link" href="@NavRules.Href(node.Prefix)">@node.Text</a>
             </li>
         }
         else

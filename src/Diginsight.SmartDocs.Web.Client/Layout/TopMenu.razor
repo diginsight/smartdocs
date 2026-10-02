@@ -28,7 +28,7 @@
             }
             else if (node.Route is not null)
             {
-                <a class="topmenu-link" href="@node.Route">
+                <a class="topmenu-link" href="@NavRules.Href(node.Route)">
                     @if (!string.IsNullOrEmpty(node.Icon))
                     {
                         <i class="bi bi-@node.Icon"></i>

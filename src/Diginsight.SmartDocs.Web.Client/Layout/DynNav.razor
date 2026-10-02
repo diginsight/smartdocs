@@ -83,7 +83,7 @@
                     @foreach (NavLeaf m in matches)
                     {
                         <li>
-                            <NavLink class="nav-link" href="@m.Route" Match="NavLinkMatch.All">
+                            <NavLink class="nav-link" href="@NavRules.Href(m.Route)" Match="NavLinkMatch.All">
                                 <span class="nav-search-text">@Highlight(m.Text, _applied)</span>
                                 @if (!string.IsNullOrEmpty(m.Path))
                                 {

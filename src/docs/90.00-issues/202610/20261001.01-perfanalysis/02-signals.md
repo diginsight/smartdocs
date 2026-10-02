@@ -17,14 +17,15 @@ Activities this work item's conversation surfaced that were **never in scope** f
 
 ## 📡 Signals
 
-The table lists the five records in priority order. `SIG-5` earns this page on relevance and the next three on actionability; `SIG-3` resolves to an existing landing, so it carries no priority and is listed last. `SIG-4` and `SIG-5` were added on 2026-10-02, while wave 1 of the analysis was implemented.
+The table lists the six records in priority order. `SIG-5` earns this page on relevance and the next four on actionability; `SIG-3` resolves to an existing landing, so it carries no priority and is listed last. `SIG-4` and `SIG-5` were added on 2026-10-02 while wave 1 of the analysis was implemented, and `SIG-6` the same day while a deployed instance was measured.
 
 | Order | Id | Kind | Relevance | Actionability | Target | Existing landing | State |
 |---|---|---|---|---|---|---|---|
 | 1 | `SIG-5` | `upstream-feedback` | high | ready | `diginsight/smartdocs` | partial: `SIG-2` of `20260925.02-startup-optimization` covers one of the seven statements | `pending` |
 | 2 | `SIG-1` | `divergent-commitment` | medium | ready | `diginsight/telemetry` | none found | `pending` |
-| 3 | `SIG-2` | `divergent-commitment` | low | bounded | `diginsight/smartcache` | none found | `pending` |
-| 4 | `SIG-4` | `divergent-commitment` | low | bounded | `diginsight/smartcache` | none found | `pending` |
+| 3 | `SIG-6` | `divergent-commitment` | medium | ready | `diginsight/smartdocs` | none found | `pending` |
+| 4 | `SIG-2` | `divergent-commitment` | low | bounded | `diginsight/smartcache` | none found | `pending` |
+| 5 | `SIG-4` | `divergent-commitment` | low | bounded | `diginsight/smartcache` | none found | `pending` |
 | — | `SIG-3` | `upstream-feedback` | — | — | `diginsight/smartdocs` | `SIG-2` of `20260925.02-startup-optimization` | `routed → SIG-2 of 20260925.02-startup-optimization` |
 
 No record is `low` and `open`, so there's no `other-signals` page. `SIG-2` stays here on actionability although its relevance dropped to `low` on 2026-10-01: see its record.
@@ -61,6 +62,19 @@ No record is `low` and `open`, so there's no `other-signals` page. `SIG-2` stays
 - **Relevance** — `medium`. It improves a library in use; consumers can work around it meanwhile by implementing `ISizeableHeuristically` on their cache envelopes.
 - **Actionability** — `ready`. The file, the branch, and the fix are known, and the work list follows without judgement.
 - **Actionability strategy** — lands as a small change to `SizeCalculator.Get` with unit tests over `byte[]`, `char[]`, and `int[]` asserting the expected byte count, plus a micro-benchmark asserting that sizing a 64 KB array allocates nothing per element. SmartDocs keeps `ISizeableHeuristically` on its envelopes either way, because it also avoids the reflection walk.
+
+### `SIG-6` — the deploy's runtime-specific publish re-resolves every floating version
+
+- **Kind** — `divergent-commitment`.
+- **Goal** — a deployed build uses exactly the package versions the committed lock files name.
+- **Scope** — the lock files of `Diginsight.SmartDocs.Web` and `Diginsight.SmartDocs.Web.Shared` record only the `net10.0` target. The deploy workflow publishes with a runtime identifier (`win-x64` or `win-x86`), which adds a target the lock files don't carry, so NuGet treats them as out of date, re-resolves the graph, and moves every floating reference — `10.0.*`, `1.*`, `12.*`, `3.*`, `0.*` — to its newest match. On an export of commit `35901a7`, that moved 19 resolved versions in the shared project and 10 in the host, among them Diginsight.Components 1.0.0.114 → 1.0.0.115, Azure.Storage.Blobs 12.29.2 → 12.30.0, log4net 3.4.0 → 3.5.0, and the ASP.NET Core packages 10.0.11 → 10.0.12. The client project builds for `browser-wasm` and keeps its lock file. Out of scope: which versions the references should float to.
+- **Why it matters** — a deploy ships a package graph no developer built or ran, so a regression in any floating dependency reaches production untested, and two deploys of one commit can differ. The lock files exist to prevent exactly that: the convergence plan that introduced them, `src/docs/90.00-issues/202608/20260815.01-smartdocs-firstimpl/01-smartdocs-web-convergence.plan.md`, made them part of every restore.
+- **Target** — `diginsight/smartdocs`: the host project's runtime identifiers, its lock files, and the restore performed by `.github/workflows/00.BuildSmartDocsWeb.yml`.
+- **Existing landing** — none found. The convergence plan is done, and covers generating the lock files, not their runtime targets or a locked-mode restore.
+- **State** — `pending`.
+- **Relevance** — `medium`. Nothing has failed from it yet, and every deploy carries the risk.
+- **Actionability** — `ready`. The mechanism is known, and the work list follows without judgement.
+- **Actionability strategy** — lands as a build change: declare on the host project the runtime identifiers the deploys use, so the lock files carry those targets; regenerate the lock files; and restore in locked mode in CI, so drift fails the build instead of shipping. The acceptance check is a CI publish that leaves every lock file byte-identical.
 
 ### `SIG-2` — SmartCache emits two nested activities and per-lookup `Debug` records on every lookup
 

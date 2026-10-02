@@ -252,9 +252,10 @@ public class Program
 
             app.UseResponseCompression();
 
-            // A request for a file name the page router would otherwise prerender as an article — the
-            // browser's /favicon.ico, a mistyped image URL — is answered with a plain 404 here.
-            app.UseFileRequestGuard();
+            // A route that names nothing in the content — the browser's /favicon.ico, a mistyped link,
+            // or a crawler's misresolved relative link — is answered with a 404 here, before the page
+            // router would prerender a "Not found" page for it with status 200.
+            app.UsePageRouteGuard();
 
             app.UseAntiforgery();
 

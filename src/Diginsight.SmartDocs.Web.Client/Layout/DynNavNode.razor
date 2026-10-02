@@ -47,7 +47,7 @@ else if (Node.Route is not null)
 {
     <li role="treeitem" @onmouseover="OnPointerEnter" @onmouseover:stopPropagation="true" @onmouseleave="OnPointerLeave"
         @onfocusin="OnPointerEnter" @onfocusout="OnPointerLeave">
-        <NavLink class="nav-link" href="@Node.Route" Match="NavLinkMatch.All" tabindex="0">
+        <NavLink class="nav-link" href="@NavRules.Href(Node.Route)" Match="NavLinkMatch.All" tabindex="0">
             @* The icon slot is emitted even when this node has no icon: .nav-ico reserves a fixed
                width, and that reservation is what keeps an icon-less article aligned with the
                folders it sits beside. Wrapping the span itself in the @if collapsed the slot and

@@ -9,11 +9,12 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <base href="/" />
-    @* Declared so browsers never fall back to /favicon.ico, which the page router would otherwise
-       claim as an article route. *@
-    <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+    @* Every URL below is rooted: a crawler that ignores <base> resolves a relative one against the
+       page's own URL and invents a nested route for it. The icon is declared so browsers never fall
+       back to /favicon.ico. *@
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
-    <link rel="stylesheet" href="app.css" />
+    <link rel="stylesheet" href="/app.css" />
     @* This deployment's palettes, written out by the host rather than shipped in app.css. Emitted
        during prerender and after app.css, so the selected theme is painted on the first frame —
        applying it from the client would show the default palette until hydration. *@
@@ -23,8 +24,8 @@
 
 <body>
     <Routes @rendermode="InteractiveWebAssembly" />
-    <script src="js/app-ui.js"></script>
-    <script src="_framework/blazor.web.js"></script>
+    <script src="/js/app-ui.js"></script>
+    <script src="/_framework/blazor.web.js"></script>
 </body>
 
 </html>

@@ -10,9 +10,9 @@ publish: false
 # Startup and navigation at any scale: run review, caching model, and target design
 
 **Date:** 2026-10-01
-**Revised:** 2026-10-02, version 1.2 — wave 1 is implemented and validated against the previous build. Version 1.1, of 2026-10-01, parked the instrumentation finding until a deployed instance is measured, generalized folder metadata from counts to one complete record per folder, added a cache-sizing finding, and re-ranked the strategy by what a runtime environment pays for
+**Revised:** 2026-10-02, version 1.3 — `M1` measured the deployed Learning Hub, read-only: a crawler trap, not navigation, takes almost all of its CPU (`N20`), and `C32` ends it. Version 1.2, earlier the same day, recorded wave 1 as implemented and validated against the previous build. Version 1.1, of 2026-10-01, parked the instrumentation finding until a deployed instance is measured, generalized folder metadata from counts to one complete record per folder, added a cache-sizing finding, and re-ranked the strategy by what a runtime environment pays for
 **Author:** Dario Airoldi
-**Status:** Wave 1 implemented and validated on 2026-10-02 — see [🔧 Wave 1 implementation record](#-wave-1-implementation-record); `M1` and waves 2–4 open. The analysis was measured on three local runs in a debug profile and re-verified against the working tree of 2026-10-01
+**Status:** Wave 1 deployed on 2026-10-02 — see [🔧 Wave 1 implementation record](#-wave-1-implementation-record); `M1` measured in part and `C32` implemented and validated — see [📏 Deployed baseline](#-deployed-baseline); waves 2–4 open. The analysis was measured on three local runs in a debug profile and re-verified against the working tree of 2026-10-01
 **Component:** `Diginsight.SmartDocs.Web` (host, navigation, caching), `Diginsight.SmartDocs.Web.Client` (menus, hydration), `Diginsight.SmartDocs.Web.Shared` (page loading, rendering)
 **Framework:** .NET 10 / ASP.NET Core / Blazor Web App (server prerender + global interactive WebAssembly), Diginsight.SmartCache 3.8.0.2, Diginsight.Core 3.8.0.2
 **Builds on:** [`20260925.02-startup-optimization`](../../202609/20260925.02-startup-optimization/overview.md) — the analysis of 2026-09-29 this page reviews and extends
@@ -53,12 +53,19 @@ publish: false
   - [Wave 2 — one folder record, nothing waits](#wave-2--one-folder-record-nothing-waits)
   - [Wave 3 — render once, cache one way](#wave-3--render-once-cache-one-way)
   - [Wave 4 — any size](#wave-4--any-size)
+  - [Measured first — the crawler trap](#measured-first--the-crawler-trap)
   - [Changes outside the waves](#changes-outside-the-waves)
 - [🔧 Wave 1 implementation record](#-wave-1-implementation-record)
   - [What changed](#what-changed)
   - [Decisions the plan left open](#decisions-the-plan-left-open)
   - [What the validation showed](#what-the-validation-showed)
   - [What wave 1 didn't change](#what-wave-1-didnt-change)
+- [📏 Deployed baseline](#-deployed-baseline)
+  - [How it was measured](#how-it-was-measured)
+  - [What the deployed instance pays for](#what-the-deployed-instance-pays-for)
+  - [`C32-end-the-crawler-trap` — what changed](#c32-end-the-crawler-trap--what-changed)
+  - [What it changes in the plan](#what-it-changes-in-the-plan)
+  - [What M1 didn't measure](#what-m1-didnt-measure)
 - [🧊 Parked items](#-parked-items)
 - [🧪 Verification](#-verification)
 - [💡 Conclusion](#-conclusion)
@@ -93,7 +100,9 @@ The following table compares the primary run with the target. The target column 
 
 [🧭 Best strategy](#-best-strategy) ranks the levers by what a runtime environment pays for, and [✅ Recommended sequence](#-recommended-sequence) turns them into steps: measure a deployed instance, remove accidental work in hours, make the folder record the one unit of folder metadata in days, render once, and — over weeks — persist records per folder and react to change events.
 
-**Wave 1 is implemented.** On 2026-10-02 its eight changes landed and were validated in a visible browser against the previous build serving the same content. A request for `/favicon.ico` now costs a `404` in 23 ms instead of a 680 ms prerender. A reload of an article page sends 3.6 KB instead of 22.8 KB. Counts follow a whole-site invalidation, where they used to stay stale. A restart no longer folds folders the crawl hasn't reached, and asset folders, build output, and empty sections leave the menus. [🔧 Wave 1 implementation record](#-wave-1-implementation-record) records how each change was resolved; measuring a deployed instance (`M1`) comes next.
+**Wave 1 is implemented.** On 2026-10-02 its eight changes landed and were validated in a visible browser against the previous build serving the same content. A request for `/favicon.ico` now costs a `404` in 23 ms instead of a 680 ms prerender. A reload of an article page sends 3.6 KB instead of 22.8 KB. Counts follow a whole-site invalidation, where they used to stay stale. A restart no longer folds folders the crawl hasn't reached, and asset folders, build output, and empty sections leave the menus. [🔧 Wave 1 implementation record](#-wave-1-implementation-record) records how each change was resolved.
+
+**A deployed instance pays for something else first.** `M1` measured the deployed Learning Hub on 2026-10-02 from its platform metrics, its web-server log, and requests from outside. For at least three days it had spent 77–88% of its single core, at about 2 s per response, on one crawler requesting routes that don't exist: 5,852 of the 5,854 paths it asked for in three hours. The application answers an unknown route with status 200 and a full page of relative links, and the crawler resolves those links against the page's own URL, so every answer breeds new unknown routes ([`N20`](#n20-crawler-trap--unknown-routes-answer-200-and-breed-more)). Wave 1 doesn't touch that cost. `C32` ends it — a 404 before prerendering, rooted links, and a `robots.txt` — and is validated; deploying it comes before waves 2–4, which [📏 Deployed baseline](#-deployed-baseline) re-ranks.
 
 ## 🔁 Review of the 2026-09-29 analysis
 
@@ -286,7 +295,7 @@ Seven inconsistencies make caching harder to reason about than it needs to be:
 
 ## 🔬 New findings
 
-Each finding continues the numbering of the earlier analysis, so `N1`–`N9` keep their meaning and the recommended changes can cite both. This revision moved the first version's `N16-smartcache-overhead` to the parked items as [`PL-1`](#pl-1-runtime-instrumentation-cost--what-instrumentation-costs-in-a-deployed-instance), and added `N19`.
+Each finding continues the numbering of the earlier analysis, so `N1`–`N9` keep their meaning and the recommended changes can cite both. This revision moved the first version's `N16-smartcache-overhead` to the parked items as [`PL-1`](#pl-1-runtime-instrumentation-cost--what-instrumentation-costs-in-a-deployed-instance), and added `N19`. Version 1.3 added `N20`, the one finding measured on a deployed instance.
 
 ### `N10-favicon-renders-a-page` — the browser's icon request renders a whole page
 
@@ -360,6 +369,20 @@ SmartCache's memory cache holds 10,000,000 units of estimated size by default, a
 After a warm-up, every listing, every level, and every cached article share what's left: for the Learning Hub, 1.16 M units, or room for about a hundred articles of average size. Past the cap, the memory cache stores nothing new and compacts by priority. Entries of 20,000 units or more go first — the larger articles — and entries of 10,000–20,000 next, which include 487 of the Learning Hub's headers; a later level build then reads those headers from the origin again.
 
 None of this depends on logging or instrumentation, and it grows with the corpus while the cap doesn't. The totals assume a file system source; a Blob source reads its header through a network stream that can return less than 8 KB at a time, so they're the upper bound there. SmartCache records its total size and its evictions by reason as metrics, so a deployed instance can confirm the effect directly.
+
+### `N20-crawler-trap` — unknown routes answer 200 and breed more
+
+On the deployed Learning Hub, almost all of the work is one crawler walking routes that don't exist. Its web-server log for 08:38–11:40 UTC on 2026-10-02 holds 6,103 requests: 6,085 from OpenAI's GPTBot and 5 from browsers. GPTBot asked for 5,854 distinct paths, 5,852 of which name nothing in the content, each of them once, at a median of 34 requests a minute. The paths are real segments recombined — an article's folder, then `_framework`, `js`, and other sections' folder names — eight to twelve segments deep.
+
+Three behaviors combine into the trap:
+
+- **An unknown route is a full page with status 200.** The page router's catch-all route claims every path and renders "Not found" inside the application shell, with status 200, so a crawler can't tell it from an article.
+- **The page's links are relative.** Menu links, breadcrumbs, prev/next, and the `_framework` and `js` script sources were written relative to `<base href="/">`. A browser resolves them against the base; this crawler resolves them against the page's own URL, so every link on an unknown page names a new, deeper unknown route.
+- **Each answer costs a prerender** — the menus, the Markdown probes, and the layout: a median of 1.3 s and a p95 of 3.3 s of server time in the log.
+
+The platform's metrics put a price on it. Every six-hour period from 2026-09-29 to 2026-10-02 consumed 16,500–19,000 CPU-seconds of the 21,600 that one core supplies, for 8,500–12,000 requests averaging about 2 s each. The plan is a single Basic B1 instance shared with other apps, so the docs site pays too: idle most of the time and with Always On off, its rare visits cold-start on a busy core and averaged 12–29 s, and the first request measured on 2026-10-02 got a `504` after 110.7 s.
+
+No local run can show this, because it lives in traffic rather than in a code path. And unlike every other finding on this page, it doesn't depend on the content's size: ten articles trap the crawler as surely as a million.
 
 ## 📈 Designing for an unlimited number of documents
 
@@ -597,7 +620,7 @@ The table ranks seven levers by their effect on a runtime environment. *Holds at
 
 ## ✅ Recommended sequence
 
-The changes are grouped into a measurement step and four waves; each wave stands on its own and makes the next one cheaper to measure. Identifiers continue the earlier analysis: `C1`–`C16` keep their meaning, and `C17`–`C31` are this page's. Version 1.1 added `C29`–`C31`, which take over the folder-metadata, memory-cache, and header-parsing parts of `C23`, and renamed `C24-folder-summaries` to `C24-persisted-folder-records`. *Addresses* names the findings each change answers.
+The changes are grouped into a measurement step and four waves; each wave stands on its own and makes the next one cheaper to measure. Identifiers continue the earlier analysis: `C1`–`C16` keep their meaning, and `C17`–`C31` are this page's. Version 1.1 added `C29`–`C31`, which take over the folder-metadata, memory-cache, and header-parsing parts of `C23`, and renamed `C24-folder-summaries` to `C24-persisted-folder-records`. Version 1.3 added `C32` and `C33`, from the deployed measurement. *Addresses* names the findings each change answers.
 
 ### Step 0 — measure a deployed instance
 
@@ -605,7 +628,7 @@ The local runs measured a debug profile. One deployed baseline ranks the waves b
 
 | # | Id | Change | Addresses | Effort | Risk | Status |
 |---|---|---|---|---|---|---|
-| 0 | `M1-deployed-baseline` | On one deployed instance, before and after wave 1, record: time to listening and to the first page after a restart; p50 and p95 of `/_page` and `/_nav/children`, warm and after the five-minute tolerance lapses; bytes per navigation, images included; SmartCache's total size and evictions by reason; how long counts stay stale after a publish; and CPU and activities per request with the `Diginsight.SmartCache` and `Diginsight.Components` sources listened to and gated off | `PL-1`, `N19` | hours | none | 🟡 todo |
+| 0 | `M1-deployed-baseline` | On one deployed instance, before and after wave 1, record: time to listening and to the first page after a restart; p50 and p95 of `/_page` and `/_nav/children`, warm and after the five-minute tolerance lapses; bytes per navigation, images included; SmartCache's total size and evictions by reason; how long counts stay stale after a publish; and CPU and activities per request with the `Diginsight.SmartCache` and `Diginsight.Components` sources listened to and gated off. Measured in part, read-only, on 2026-10-02 — see [📏 Deployed baseline](#-deployed-baseline) | `PL-1`, `N19` | hours | none | 🟡 todo |
 
 ### Wave 1 — remove accidental work
 
@@ -621,6 +644,15 @@ The first wave is small fixes, from minutes to a day each, with no change to the
 | 6 | `C19-no-startup-refold` | Load the snapshot as last-known values, refold only folders whose level changed, and never fold a space before discovering it. Refolding only changed levels moved to `C24`, which brings a version per level | `N11` | hours | low | ✅ done |
 | 7 | `C6-refold-on-publish` | Interim fix until `C25`: treat an empty-path invalidation as a rediscovery rather than a root-only refold | `N8` | hours | low | ✅ done |
 | 8 | `C30-remove-redundant-memory-cache` | Delete `services.AddMemoryCache()` from `Program.cs`; SmartCache's builder registers its own, and nothing resolves either | — | minutes | none | ✅ done |
+
+### Measured first — the crawler trap
+
+`M1` found the deployed instance's cost in the shape of its traffic rather than in navigation. The changes it adds come before wave 2.
+
+| # | Id | Change | Addresses | Effort | Risk | Status |
+|---|---|---|---|---|---|---|
+| 8a | `C32-end-the-crawler-trap` | Answer a route that names nothing in the content with a 404 before prerendering, root every link the application writes, and serve a `robots.txt` for the application's own endpoints | `N20` | hours | low | ✅ done |
+| 8b | `C33-always-on` | Decide, per deployed app, whether to turn Always On on, so that an idle app isn't unloaded and its next visitor doesn't wait for a full start | `N20` | minutes | none | 🟡 todo |
 
 ### Wave 2 — one folder record, nothing waits
 
@@ -722,6 +754,53 @@ Wave 1 leaves these in place. The first three showed in the run and behave the s
 - **The generated reference pages still describe the previous behavior.** Navigation rules, HTTP endpoints, configuration settings, and the caching chapter carry verification stamps and are regenerated by the documentation stream, not edited here; `SIG-5` on [this work item's signals page](02-signals.md) asks for that run.
 - **No deployed instance was measured.** `M1` still ranks waves 2–4 and settles `PL-1`.
 
+## 📏 Deployed baseline
+
+`M1` asked for a baseline measured on a deployed instance. It was taken on 2026-10-02 without acting on the instance: from its platform metrics, its web-server log, and requests from outside. The parts that need a restart, a configuration change, or a publish are left for the owner — see [What M1 didn't measure](#what-m1-didnt-measure).
+
+### How it was measured
+
+- **Platform metrics** — CPU time, requests, and average response time per minute, per five minutes, and per six hours, for both apps on the plan, over three days.
+- **Web-server log** — the deployed Learning Hub's HTTP log for 08:38–11:40 UTC, grouped by endpoint, status, time taken, and crawler family. It was read through the platform's management API and deleted after grouping; no address or user agent was kept.
+- **Requests from outside** — timings, sizes, and caching headers of the pages and endpoints wave 1 changed, before and after wave 1 was deployed.
+
+Deploys had failed since 2026-10-01 on a restore error unrelated to this work: the build agent took the WebAssembly pack from the SDK's own package folder, whose copy doesn't match the lock file (`NU1403`). Commit `4ef81dc` fixed it, and wave 1 reached the Learning Hub at 12:15 UTC.
+
+### What the deployed instance pays for
+
+| Measure | Before wave 1 | After wave 1 |
+|---|---|---|
+| CPU, Learning Hub | 77–88% of one core in every six-hour period for three days; about 50 CPU-seconds a minute on 2026-10-02 | unchanged: 220–250 CPU-seconds per five minutes, the whole core |
+| Requests and response time | 8,500–12,000 per six hours at about 2 s; 99.8% from one crawler, 99.96% of its paths unknown | the same crawler; 4–12 s on average while the restart's warm-up ran |
+| An unknown route | `200`, a prerendered page | `200`, 29.9 KB, 7.8 s — unchanged, the trap is `C32`'s |
+| `/favicon.ico` | `200`, a prerendered page | `404` with no body |
+| `/_nav/children` and `/_page` | no validator, uncompressed | `ETag` and `304`; the root level Brotli-compressed from 4,133 to 744 bytes |
+| An article page | a median of 1.3 s of server time | 22.7 s to the first byte during the post-deploy warm-up |
+| Docs site, first request when idle | — | `504` after 110.7 s, the app cold-starting on a busy core |
+
+Two conclusions follow. Wave 1 does what it set out to do on the deployed instance — the icon, the validators, and compression behave as in the local run — but the instance's cost was never in its scope: the crawler trap takes the core whatever navigation does. And every startup measure on the plan is dominated by that contention, so the startup figures `M1` asks for can only be read once the trap is gone.
+
+### `C32-end-the-crawler-trap` — what changed
+
+`C32` was implemented and validated on 2026-10-02, in [a validation sequence of its own](_validation/20261002.02-validation-sequence.md):
+
+- **A 404 before prerendering for any route that names nothing.** `PageRouteGuard` replaces wave 1's file-name guard. It walks the route through the folder listings navigation already caches, and answers an unknown route with a 455-byte page whose only link is the home page — in 46–109 ms on the validation host, against 0.8–1.7 s for a prerender. A route passes when every segment but the last is a folder and the last names a folder, an article, or a Markdown file, compared without regard to case, so the guard never refuses a route the page loader could render.
+- **Rooted links.** Every link the application writes — menus, breadcrumbs, prev/next, section landing pages, the about menu, the icon, the style sheet, and both scripts — now starts with `/`, so it names the same page wherever it appears. Links inside articles already did.
+- **A `robots.txt`** that keeps crawlers off `/_framework/`, `/_nav/`, `/_page/`, and `/_blazor/`.
+
+Whether GPTBot may crawl the Learning Hub at all is the owner's decision, and `C32` doesn't make it: OpenAI's crawlers honour `robots.txt` rules for the `GPTBot` token. `C32` makes crawling cheap instead, whoever does it.
+
+### What it changes in the plan
+
+- **`C32` comes first.** It's the one change with a measured effect on a deployed instance, and it frees the core every other measurement needs.
+- **Startup matters more than this page assumed.** With Always On off, an idle app is unloaded and its next visitor waits for a full start, so `C4-start-after-listen` and `C24-persisted-folder-records` gain priority. So does a platform decision this page didn't consider, `C33-always-on`, which a B1 plan supports and which belongs to the owner.
+- **Prerender cost per page matters for crawlers too.** Crawlers that request real pages pay a prerender for each, which `C21-cache-rendered-pages` turns into a cache hit.
+- **Paging and server-side search can wait.** Nothing measured on either deployed site needs `C26` or `C27` yet.
+
+### What M1 didn't measure
+
+The parts that act on the instance were left for the owner: the time to listening after a deliberate restart, CPU with the instrumentation sources gated off — which is what settles `PL-1` — SmartCache's size and evictions, and how long counts stay stale after a publish. They can only be read once `C32` has freed the core. (📌 next steps)
+
 ## 🧊 Parked items
 
 These items are in this work item's domain and deliberately left out of the active sequence. Each one names what would bring it back.
@@ -753,10 +832,12 @@ The following checks were run for this page and its revision:
 - The deployed configuration was read: neither deployed overlay sets an instrumentation or logging section, the build workflow sets only environment selection, the snapshot path, and the invalidation key, and Diginsight.Components' sampling default was read in its source. (✅ done)
 - The header cache was estimated by reproducing `FrontMatter.ReadHeadAsync` over the measured content and over a local clone of the Learning Hub's content. (✅ done)
 - CPU wasn't profiled this time; the CPU attribution of `N1` comes from the earlier analysis. (🟡 todo)
-- No Blob-backed, Release, or multi-instance deployment was measured: the cross-instance gap of `N15` is established from code, `N19` from the read pattern over local files, and `PL-1` is open. (🟡 todo)
+- No multi-instance deployment was measured, and the deployed instance wasn't profiled: the cross-instance gap of `N15` is established from code, `N19` from the read pattern over local files, and `PL-1` is open. (🟡 todo)
 - The cause of the hub reconnects in `N18` isn't established. (🟡 todo)
 - Wave 1 was implemented and validated in a visible browser against the previous build serving the same content, in 13 scenarios recorded in [the wave-1 validation sequence](_validation/20261002.01-validation-sequence.md). (✅ done)
-- Waves 2–4 aren't implemented, their target figures are estimates, and no deployed instance was measured before or after wave 1. (🟡 todo)
+- Waves 2–4 aren't implemented, and their target figures are estimates. (🟡 todo)
+- `M1` was measured in part on 2026-10-02 on the deployed Learning Hub and docs site, without acting on them: three days of platform metrics, three hours of web-server log, and requests from outside before and after wave 1 was deployed. (✅ done)
+- `C32` was validated in a visible browser in seven steps, recorded in [the validation sequence for the route guard](_validation/20261002.02-validation-sequence.md). Its effect on the deployed instance is measured once it's deployed. (🟡 todo)
 
 ### How to reproduce
 
@@ -799,7 +880,9 @@ The four questions have short answers:
 Next steps:
 
 - Implement and validate wave 1. (✅ done — 2026-10-02, [validation sequence](_validation/20261002.01-validation-sequence.md))
-- Measure a deployed instance (`M1`) before wave 1 is deployed and again after; it ranks waves 2–4 and settles `PL-1`. (📌 next steps)
+- Measure the deployed instance before and after wave 1 (`M1`). (✅ done in part — 2026-10-02, [📏 Deployed baseline](#-deployed-baseline))
+- Deploy `C32`, then read the deployed instance's CPU and response times again: the trap's share should fall to almost nothing. (📌 next steps)
+- Complete `M1` on the freed instance — a deliberate restart, the instrumentation sources gated off, SmartCache's size and evictions, and counts after a publish — and decide `C33`. (📌 next steps)
 - Prototype `C24-persisted-folder-records` against a generated tree of 100,000 articles before fixing its storage layout. (📌 next steps)
 
 ## 🎓 Lessons learned
@@ -810,11 +893,13 @@ Next steps:
 
 **Compare with the previous build, not with expectations.** Two behaviors that looked like regressions during the wave-1 validation — a footer total below the snapshot's at first paint, and a deleted section lingering in an open menu — reproduced exactly on the previous build serving the same content. Running both builds side by side turned every observation into an attributable difference, and kept wave 1 from absorbing work that belongs to `C10` and `C29`.
 
+**Measure where it runs before ranking what to fix.** Every local run ranked navigation and caching costs, and the deployed instance spent its core on a crawler trap that no local run could produce, because it lives in traffic, not in a code path. One read of the platform's metrics and web-server log re-ordered the plan.
+
 **Cache the answer, not the raw material.** Caching a file's first 8 KB to read five fields filled most of the cache with text nothing reads. A cache that stores parsed records holds an order of magnitude more of what navigation needs in the same space.
 
 ## 📡 Signal sweep
 
-The conversation behind this page, including the review that produced version 1.1, was checked against the eight sweep questions of the signal-capture procedure. Five signals are recorded on [02-signals.md](02-signals.md): four primary, and one routed to an existing landing. `SIG-4` and `SIG-5` come from the implementation of wave 1, swept separately below the table.
+The conversation behind this page, including the review that produced version 1.1, was checked against the eight sweep questions of the signal-capture procedure. Six signals are recorded on [02-signals.md](02-signals.md): five primary, and one routed to an existing landing. `SIG-4` and `SIG-5` come from the implementation of wave 1, and `SIG-6` from the deployed measurement, each swept separately below the table.
 
 | Sweep question | Result |
 |---|---|
@@ -828,6 +913,8 @@ The conversation behind this page, including the review that produced version 1.
 | Which governing artifact underperformed? | None showed an execution shortfall: the corrections concerned this page's analysis, not an instruction, prompt, or skill. |
 
 The implementation of wave 1, on 2026-10-02, was swept with the same questions. It added two signals. `SIG-5`: wave 1 changes facts that six generated reference and architecture pages state, and those pages are regenerated by the documentation stream rather than edited here. `SIG-4`: SmartCache derives an entry's eviction priority from its size alone, so `C31` keeps bodies at low priority by overstating their size. The behaviors the run surfaced but wave 1 doesn't change — the prerendered lower bound, counts-only pushes, and the settle time after a whole-site invalidation — belong to this work item and are owned by `C10`, `C29`, and `C25`, so they aren't signals. Nothing was decided outside a file, and no governing artifact fell short: the validation rules bind a port and a build the developer's own instance was using, and the run recorded its deviation rather than working around the rules.
+
+The deployed measurement and `C32`, also on 2026-10-02, were swept with the same questions. They added `SIG-6`: the lock files carry no runtime graph, so the deploy's runtime-specific publish re-resolves every floating version and ships packages no developer built. The deploy failure that blocked `M1` was fixed in the same session, so it isn't a signal. Whether to let GPTBot crawl the Learning Hub is a decision `C32` leaves to the owner, recorded on this page rather than as a signal. One execution error, not an artifact defect: a reproduction of the deploy's restore ran in the developer's working tree and rewrote three lock files, which broke the local build until they were restored; later reproductions ran in an export of the commit.
 
 ## 📚 References
 
@@ -867,15 +954,25 @@ Documents flat and hierarchical listing and the default page of 5,000 results �
 **[FileSystemWatcher class](https://learn.microsoft.com/en-us/dotnet/api/system.io.filesystemwatcher)** 📘 [Official]  
 Reference for the change notifications that would implement the `WatchForChanges` setting for local FileSystem spaces.
 
+**[Overview of OpenAI crawlers](https://developers.openai.com/api/docs/bots)** 📘 [Official]  
+Names the `GPTBot` and `OAI-SearchBot` user agents and how each one honours `robots.txt` — the crawler behind `N20` and the owner's choice `C32` leaves open.
+
+**[How HTTP status codes affect Google's crawlers](https://developers.google.com/crawling/docs/troubleshooting/http-status-codes)** 📘 [Official]  
+States that content served with a `2xx` status may be considered for indexing, which is why an unknown route must answer `404` rather than a "Not found" page with status `200`.
+
+**[`<base>`: the document base URL element](https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/base)** 📗 [Verified Community]  
+Explains how relative URLs resolve against the document's base — the resolution a crawler that ignores `<base>` gets wrong, and the reason `C32` roots every link.
+
 Related pages in this repository:
 
 - [Startup and navigation analysis of 2026-09-29](../../202609/20260925.02-startup-optimization/overview.md) — the analysis this page reviews; the reference for the startup sequence, `N1`–`N9`, and `C1`–`C16`.
 - [Signals of the earlier work item](../../202609/20260925.02-startup-optimization/01-signals.md) — `SIG-1`, the upstream options-caching fix, and `SIG-2`, the architecture chapter refresh.
 - [Caching and invalidation](../../../03.00-architecture/05-caching-and-invalidation.md) — the architecture chapter `SIG-3` extends.
-- [Signals for this work item](02-signals.md) — the five records the sweeps produced.
+- [Signals for this work item](02-signals.md) — the six records the sweeps produced.
 - [Wave 1 validation sequence](_validation/20261002.01-validation-sequence.md) — the visible-browser run that validated wave 1 against the previous build.
+- [Route guard validation sequence](_validation/20261002.02-validation-sequence.md) — the visible-browser run that validated `C32`.
 
-Internal companion: `src/docs/90.00-issues/202610/20261001.01-perfanalysis/01-startup-and-navigation-optimization.analysis.internal.md` in the internal peer adds the identities of the profile and its spaces, the local paths, the per-space sizes on disk, the run and trace identifiers, the deployed overlays as read, and the commands, probes, and header-cache estimate as executed; for version 1.2, the infrastructure-name check against every configured space and the validation environment as run.
+Internal companion: `src/docs/90.00-issues/202610/20261001.01-perfanalysis/01-startup-and-navigation-optimization.analysis.internal.md` in the internal peer adds the identities of the profile and its spaces, the local paths, the per-space sizes on disk, the run and trace identifiers, the deployed overlays as read, and the commands, probes, and header-cache estimate as executed; for version 1.2, the infrastructure-name check against every configured space and the validation environment as run; for version 1.3, the deployed apps, plan, and settings as read, the measurement commands, and the build agent's restore failure as diagnosed.
 
 <!--
 validations:
@@ -888,6 +985,6 @@ article_metadata:
   filename: "01-startup-and-navigation-optimization.analysis.md"
   created: "2026-10-01"
   last_updated: "2026-10-02"
-  version: "1.2"
+  version: "1.3"
 -->
 

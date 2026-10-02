@@ -116,6 +116,15 @@ public static class NavRules
         name.EndsWith(".qmd", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
+    /// The <c>href</c> of an in-app route: rooted, so it names the same page whatever page it appears
+    /// on. A browser resolves a relative <c>href</c> against the document base, <c>/</c>, but a crawler
+    /// that ignores the base resolves it against the page's own URL — and every menu link then invents
+    /// a nested route that doesn't exist.
+    /// </summary>
+    public static string Href(string? route) =>
+        "/" + (route ?? string.Empty).Replace('\\', '/').Trim('/');
+
+    /// <summary>
     /// A section known to hold no navigable article anywhere below it: a folder of empty folders, or of
     /// unpublished articles. Menus don't show it, but it stays in its level, so the metrics walk keeps
     /// tracking it and it reappears the moment an article is published inside it.

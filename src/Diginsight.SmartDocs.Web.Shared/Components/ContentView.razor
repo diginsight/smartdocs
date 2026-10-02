@@ -25,7 +25,7 @@ else if (_page is null && _sectionChildren is not null)
             {
                 @if (child.Route is not null)
                 {
-                    <li><a href="@child.Route">@child.Text</a></li>
+                    <li><a href="@NavRules.Href(child.Route)">@child.Text</a></li>
                 }
                 else
                 {
@@ -56,7 +56,7 @@ else
                     }
                     @if (!last && crumb.Route is not null)
                     {
-                        <a class="breadcrumb-link" href="@crumb.Route">@crumb.Text</a>
+                        <a class="breadcrumb-link" href="@NavRules.Href(crumb.Route)">@crumb.Text</a>
                     }
                     else if (!last)
                     {
@@ -73,7 +73,7 @@ else
                 <div class="breadcrumb-nav">
                     @if (_prev is not null)
                     {
-                        <a class="crumb-navbtn" href="@_prev.Route" title="@_prev.Text" aria-label="Previous article">Previous</a>
+                        <a class="crumb-navbtn" href="@NavRules.Href(_prev.Route)" title="@_prev.Text" aria-label="Previous article">Previous</a>
                     }
                     else
                     {
@@ -81,7 +81,7 @@ else
                     }
                     @if (_next is not null)
                     {
-                        <a class="crumb-navbtn" href="@_next.Route" title="@_next.Text" aria-label="Next article">Next</a>
+                        <a class="crumb-navbtn" href="@NavRules.Href(_next.Route)" title="@_next.Text" aria-label="Next article">Next</a>
                     }
                     else
                     {
