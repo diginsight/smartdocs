@@ -13,7 +13,8 @@ var builder = WebAssemblyHostBuilder.CreateDefault(args);
 // Talk back to the origin that served the app (the Diginsight.SmartDocs.Web host).
 builder.Services.AddScoped(_ => new HttpClient { BaseAddress = new Uri(builder.HostEnvironment.BaseAddress) });
 
-// In WASM, content is fetched over HTTP; rendering runs in-browser with the same Markdig engine.
+// In WASM, content and rendered pages are fetched over HTTP; since C21 the server renders
+// Markdown once, so no renderer is registered here.
 builder.Services.AddScoped<HttpContentSource>();
 builder.Services.AddScoped<IContentSource>(sp => sp.GetRequiredService<HttpContentSource>());
 builder.Services.AddScoped<IRenderedPageResolver>(sp => sp.GetRequiredService<HttpContentSource>());

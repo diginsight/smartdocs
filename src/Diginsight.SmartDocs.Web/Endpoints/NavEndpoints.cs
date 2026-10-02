@@ -91,8 +91,23 @@ public static class NavEndpoints
     private static async Task<IResult> GetFolderAsync(
         string? prefix,
         FolderRecordProvider folders,
-        CancellationToken cancellationToken) =>
-        Results.Json(await folders.GetAsync(prefix ?? string.Empty, cancellationToken));
+        IOptions<JsonOptions> json, HttpContext http,
+        CancellationToken cancellationToken)
+    {
+        using var activity = Observability.ActivitySource.StartMethodActivity(logger, () => new { prefix });
+
+        FolderRecord record = await folders.GetAsync(prefix ?? string.Empty, cancellationToken);
+
+        // Tagged like /_nav/children, over the exact bytes sent: a folder record is the unit the
+        // browser keeps and re-reads, so a repeat read of an unchanged record must cost a 304.
+        byte[] body = JsonSerializer.SerializeToUtf8Bytes(record, json.Value.SerializerOptions);
+        if (HttpValidators.IsNotModified(http, HttpValidators.Tag(body), HttpValidators.Revalidate))
+        {
+            return Results.StatusCode(StatusCodes.Status304NotModified);
+        }
+
+        return Results.Bytes(body, "application/json; charset=utf-8");
+    }
 
     private static IResult GetNavVersion()
     {

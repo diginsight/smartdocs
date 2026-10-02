@@ -10,9 +10,9 @@ publish: false
 # Startup and navigation at any scale: run review, caching model, and target design
 
 **Date:** 2026-10-01
-**Revised:** 2026-10-02, version 1.4 — platform metrics confirmed `C32`'s effect over matched windows, and `C4` moved navigation warm-up after listening into one foreground-gated queue. Version 1.3 measured the deployed Learning Hub, read-only: a crawler trap, not navigation, took almost all of its CPU (`N20`), and `C32` ended it. Version 1.2, earlier the same day, recorded wave 1 as implemented and validated against the previous build. Version 1.1, of 2026-10-01, parked the instrumentation finding until a deployed instance is measured, generalized folder metadata from counts to one complete record per folder, added a cache-sizing finding, and re-ranked the strategy by what a runtime environment pays for
+**Revised:** 2026-10-02, version 1.6 — `PL-1` was measured on the deployed instance and resolved against the premise it was parked on: instrumentation takes about 90% of the CPU of every request, so `C1` and `C2` return as wave 0 and the strategy gains a rank above all five of its cost classes. The same revision turned Always On on for both apps (`C33`), confirmed waves 2 and 3 deployed, and added `C34`, the validator `C29` had left off `/_nav/folder`. Version 1.5 closed waves 2 and 3 — `C29`, `C4`, `C22`, `C11`, `C12`, `C21`, `C10`, and `C23`, each with its own implementation record and visible-browser validation sequence — and added `M2`, the scale harness, with two points measured across a ten-fold step in corpus size. Version 1.4 confirmed `C32`'s effect over matched platform-metric windows, and moved navigation warm-up after listening into one foreground-gated queue (`C4`). Version 1.3 measured the deployed Learning Hub, read-only: a crawler trap, not navigation, took almost all of its CPU (`N20`), and `C32` ended it. Version 1.2, earlier the same day, recorded wave 1 as implemented and validated against the previous build. Version 1.1, of 2026-10-01, parked the instrumentation finding until a deployed instance is measured, generalized folder metadata from counts to one complete record per folder, added a cache-sizing finding, and re-ranked the strategy by what a runtime environment pays for
 **Author:** Dario Airoldi
-**Status:** Wave 1 and `C32` deployed on 2026-10-02; `C4` is implemented and locally validated. See [🔧 Wave 1 implementation record](#-wave-1-implementation-record) and [📏 Deployed baseline](#-deployed-baseline), where `M1` is measured in part. The rest of waves 2–4 remains open
+**Status:** Waves 1, 2, and 3 are implemented, validated, and deployed, and `C32`, `C33`, and `C34` with them, all on 2026-10-02 — see [🔧 Wave 1 implementation record](#-wave-1-implementation-record) and the per-change records from [🚦 C4](#-c4-implementation-record) to [🧩 C23](#-c23-implementation-record). `M1` and `M2` are measured; `M1` settled `PL-1`, which opened [wave 0](#wave-0--stop-paying-for-instrumentation-on-the-hot-path) — now the highest-value work still open, ahead of wave 4 (`C24`–`C28`, `C16`). See [⚡ What instrumentation costs a deployed instance](#-what-instrumentation-costs-a-deployed-instance)
 **Component:** `Diginsight.SmartDocs.Web` (host, navigation, caching), `Diginsight.SmartDocs.Web.Client` (menus, hydration), `Diginsight.SmartDocs.Web.Shared` (page loading, rendering)
 **Framework:** .NET 10 / ASP.NET Core / Blazor Web App (server prerender + global interactive WebAssembly), Diginsight.SmartCache 3.8.0.2, Diginsight.Core 3.8.0.2
 **Builds on:** [`20260925.02-startup-optimization`](../../202609/20260925.02-startup-optimization/overview.md) — the analysis of 2026-09-29 this page reviews and extends
@@ -49,6 +49,7 @@ publish: false
   - [Why this order](#why-this-order)
 - [✅ Recommended sequence](#-recommended-sequence)
   - [Step 0 — measure a deployed instance](#step-0--measure-a-deployed-instance)
+  - [Wave 0 — stop paying for instrumentation on the hot path](#wave-0--stop-paying-for-instrumentation-on-the-hot-path)
   - [Wave 1 — remove accidental work](#wave-1--remove-accidental-work)
   - [Wave 2 — one folder record, nothing waits](#wave-2--one-folder-record-nothing-waits)
   - [Wave 3 — render once, cache one way](#wave-3--render-once-cache-one-way)
@@ -66,6 +67,10 @@ publish: false
   - [`C32-end-the-crawler-trap` — what changed](#c32-end-the-crawler-trap--what-changed)
   - [What it changes in the plan](#what-it-changes-in-the-plan)
   - [What M1 didn't measure](#what-m1-didnt-measure)
+- [📐 Scale baseline](#-scale-baseline)
+  - [The harness](#the-harness)
+  - [What ten times the corpus changes](#what-ten-times-the-corpus-changes)
+  - [What it settles for wave 4](#what-it-settles-for-wave-4)
 - [🚦 C4 implementation record](#-c4-implementation-record)
 - [🗂️ C29 implementation record](#-c29-implementation-record)
 - [♻️ C22 implementation record](#-c22-implementation-record)
@@ -73,6 +78,10 @@ publish: false
 - [🖨️ C21 and C10 implementation record](#-c21-and-c10-implementation-record)
 - [🧩 C23 implementation record](#-c23-implementation-record)
 - [🧊 Parked items](#-parked-items)
+- [⚡ What instrumentation costs a deployed instance](#-what-instrumentation-costs-a-deployed-instance)
+  - [How it was measured](#how-it-was-measured-1)
+  - [What it costs](#what-it-costs)
+  - [What it means](#what-it-means)
 - [🧪 Verification](#-verification)
 - [💡 Conclusion](#-conclusion)
 - [🎓 Lessons learned](#-lessons-learned)
@@ -83,12 +92,14 @@ publish: false
 
 This page answers four questions. Does the startup analysis of 2026-09-29 still describe the code? What do the runs of 2026-10-01 show? How does SmartDocs cache rendered documents and folder metadata? And what should startup, navigation, and metadata updates look like when the number of documents has no upper bound?
 
+The five findings below are stated as they were measured, on commit `71171ed` of 2026-10-01. Waves 1 to 3 have since answered all five; what each change did, and how it was validated, is in the implementation records from [🔧 Wave 1](#-wave-1-implementation-record) to [🧩 C23](#-c23-implementation-record).
+
 - **The earlier analysis still holds, and none of its 16 changes has landed.** The `spaces support` commit of 2026-10-01 commits the multi-space work that analysis had measured as uncommitted changes. A second content set — three spaces, 88 sections, and 913 articles served from local clones — reproduces every mechanism it described. The warm-up finished at 134 s and 153 s in the two runs that completed it, and hadn't finished after 580 s in the third. Every menu level was built about twice, and requests made during the warm-up were between 10 and several hundred times slower than the same requests afterward. The runs used a debug profile that instruments every call, so their wall-clock figures are inflated; the counts of reads, builds, and requests are what carries over to a deployed instance.
 - **Three new defects are cheap to fix and expensive to keep.** The browser's request for `/favicon.ico` falls into the catch-all content route: it prerenders a full page, probes five Markdown files, and starts the whole-tree index walk. The answer is 13 KB of HTML marked `no-store`, so the browser asks again — once, three times, and six times in the three runs. The warm-up's first drain folds every snapshot cell, building the other spaces' menus before discovering them, for 32–154 s, only to confirm values the snapshot already held. And image folders become menu sections: 10 of the 88 sections are image folders without a single article.
 - **The cache is mostly full of text nothing reads.** Every front-matter read caches the first 8 KB of the file as text, though navigation uses a few hundred characters of it. For the Learning Hub's content that's an estimated 8.84 million of the 10 million units SmartCache holds by default, which leaves every listing, every level, and every cached article to share the rest — room for about a hundred average articles at most. This is runtime behavior, independent of logging and instrumentation.
 - **Rendered documents aren't cached at any layer.** SmartCache holds Markdown bytes. Every prerender runs Markdig, every browser navigation downloads Markdown again and renders it in WebAssembly, and no response carries a validator — so a repeat view of an unchanged page costs a full round trip and a full render. Images bypass every cache: a 144 KB image is sent in full on every view.
 - **Folder metadata has no record of its own, and the client sees only part of it.** A folder's authored metadata — its `metadata.yml` — is cached as raw text and parsed at every level build, and every key the parser doesn't know is dropped. Its derived metadata — the article count, newest date, and coverage — lives outside SmartCache, in a private dictionary saved to a JSON snapshot. Both are copied into the parent's cached level, so any count change flushes every level, and the browser sees only what a level carries: never a folder's description, and never the newest article's author, although two contracts already have a field for it.
-- **The instrumentation question is parked.** In the debug profile, SmartCache's own activities and log records dominated the trace. A deployed instance logs at `Warning` and samples traces at 10%, and instrumentation at the debug level is enabled on purpose, for debugging. Whether a deployed instance pays anything for it is parked as [`PL-1-runtime-instrumentation-cost`](#pl-1-runtime-instrumentation-cost--what-instrumentation-costs-in-a-deployed-instance) until one is measured.
+- **The instrumentation question was parked, and has since been answered.** In the debug profile, SmartCache's own activities and log records dominated the trace. A deployed instance logs at `Warning` and samples traces at 10%, and instrumentation at the debug level is enabled on purpose, for debugging, so whether a deployed instance paid anything for it was parked as [`PL-1-runtime-instrumentation-cost`](#pl-1-runtime-instrumentation-cost--what-instrumentation-costs-in-a-deployed-instance) until one was measured. One was, on 2026-10-02: it pays about 90% of the CPU of every request, which makes it the largest remaining cost on the deployed instance.
 - **An unlimited document set overturns three of the earlier conclusions.** One manifest per space, preloading every article body, and a whole-tree index for search and prev/next all grow with the corpus — and so does a cache warmed with every header. The target keeps the earlier principles — load instead of crawl, approximate first, foreground first, render once — and adds one: **no request, startup step, or change may cost work proportional to the size of the corpus.** Three records carry everything a reader sees — a folder record holding all of a folder's metadata, a level, and a rendered page — each cached in SmartCache, versioned for the browser, and updated by change events instead of by crawling.
 
 The following table compares the primary run with the target. The target column is an estimate; it holds at any corpus size by construction, not by measurement.
@@ -108,7 +119,11 @@ The following table compares the primary run with the target. The target column 
 
 **Wave 1 is implemented.** On 2026-10-02 its eight changes landed and were validated in a visible browser against the previous build serving the same content. A request for `/favicon.ico` now costs a `404` in 23 ms instead of a 680 ms prerender. A reload of an article page sends 3.6 KB instead of 22.8 KB. Counts follow a whole-site invalidation, where they used to stay stale. A restart no longer folds folders the crawl hasn't reached, and asset folders, build output, and empty sections leave the menus. [🔧 Wave 1 implementation record](#-wave-1-implementation-record) records how each change was resolved.
 
+**Waves 2 and 3 are implemented too.** The same day, eight more changes landed, each with its own validation sequence. The folder record is now the one unit of folder metadata (`C29`), the warm-up runs after listening behind a foreground gate (`C4`), a reader is served a stale value while one background worker revalidates it (`C22`), the top bar loads a dropdown on first open (`C11`), the hub connects after the first idle period (`C12`), a page is rendered once on the server and served as JSON (`C21`), the prerendered state carries the levels, records, and page the browser already shows (`C10`), and one key type, one path-set rule, and one configuration source address every cached kind (`C23`). The per-change records run from [🚦 C4](#-c4-implementation-record) to [🧩 C23](#-c23-implementation-record).
+
 **A deployed instance pays for something else first.** `M1` measured the deployed Learning Hub on 2026-10-02 from its platform metrics, its web-server log, and requests from outside. For at least three days it had spent 77–88% of its single core, at about 2 s per response, on one crawler requesting routes that don't exist: 5,852 of the 5,854 paths it asked for in three hours. The application answers an unknown route with status 200 and a full page of relative links, and the crawler resolves those links against the page's own URL, so every answer breeds new unknown routes ([`N20`](#n20-crawler-trap--unknown-routes-answer-200-and-breed-more)). Wave 1 doesn't touch that cost. `C32` ends it — a 404 before prerendering, rooted links, and a `robots.txt`. Deployed the same day, it cut the Learning Hub's CPU from 160–228 to 4 CPU-seconds per five minutes, and [📏 Deployed baseline](#-deployed-baseline) re-ranks waves 2–4 around it.
+
+**And then it pays for instrumentation.** With the trap gone and waves 1 to 3 deployed, the same instance was put under a steady load with the `Diginsight.*` activity sources listened to — its base configuration — and again with them gated off. The cost per request was **0.248 s against 0.019–0.025 s**: about 90% of the CPU of every request is instrumentation, on a deployed instance logging at `Warning` and sampling 10% of traces. This page had parked that question as [`PL-1`](#pl-1-runtime-instrumentation-cost--what-instrumentation-costs-in-a-deployed-instance) on the premise that it was a debug-profile cost, and left instrumentation off its ranking of what a runtime environment pays for. The premise was wrong. `C1-gate-hot-activities` and `C2-trim-hot-path-activities` return as [wave 0](#wave-0--stop-paying-for-instrumentation-on-the-hot-path), ahead of everything else still open, and [⚡ What instrumentation costs a deployed instance](#-what-instrumentation-costs-a-deployed-instance) records the measurement.
 
 ## 🔁 Review of the 2026-09-29 analysis
 
@@ -600,16 +615,17 @@ The runs measured a debug profile; a deployed instance runs a different one. The
 4. **Work repeated on every change.** Level flushes for count changes, and whole-site invalidations for a publish.
 5. **Work at startup that grows with the corpus.** The crawl, the refold of an unchanged snapshot, and the rebuild of every level.
 
-Instrumentation isn't on the list. It's a debug-profile cost until [`PL-1`](#pl-1-runtime-instrumentation-cost--what-instrumentation-costs-in-a-deployed-instance) shows otherwise.
+**This list was written without instrumentation on it, and that was wrong.** It said instrumentation was a debug-profile cost "until [`PL-1`](#pl-1-runtime-instrumentation-cost--what-instrumentation-costs-in-a-deployed-instance) shows otherwise". On 2026-10-02 `PL-1` showed otherwise: on the deployed instance, on its base settings, instrumentation takes about 90% of the CPU of every request — 0.248 s against 0.019–0.025 s with the `Diginsight.*` sources gated off. See [⚡ What instrumentation costs a deployed instance](#-what-instrumentation-costs-a-deployed-instance). It now ranks above all five, because it is paid on every instrumented call on every request, whatever the corpus holds and whatever the request does.
 
 ### The levers, ranked
 
-The table ranks seven levers by their effect on a runtime environment. *Holds at any size* says whether a lever keeps its effect as the corpus grows.
+The table ranks eight levers by their effect on a runtime environment. *Holds at any size* says whether a lever keeps its effect as the corpus grows. Rank 0 was added on 2026-10-02, when `PL-1` was measured; the ranks below it are unchanged.
 
 | Rank | Lever | What it removes in a runtime environment | Holds at any size | Effort | Changes |
 |---|---|---|---|---|---|
+| 0 | Stop paying for instrumentation on the hot path | about 90% of the CPU of every request, measured on the deployed instance: the emitter resolving its options at every activity start and stop, and SmartCache's two nested activities and per-lookup records | yes — it's per call, not per document | hours each, plus two library changes | `C1`, `C2`, with `C3`/`SIG-1` and `SIG-2` upstream |
 | 1 | Stop accidental work | the whole-tree walk triggered by the first page and by every unknown file; the 228–394 KB index downloaded on every session's first page; image folders crawled and shown as sections; the refold of an unchanged snapshot | yes | hours each | `C17`, `C7`, `C18`, `C19` |
-| 2 | Make every repeat free | full re-downloads of unchanged pages, levels, and images; uncompressed JSON; two round trips per blob | yes | a day | `C20` |
+| 2 | Make every repeat free | full re-downloads of unchanged pages, levels, and images; uncompressed JSON; two round trips per blob | yes | a day | `C20`, `C34` |
 | 3 | Fit the cache to its purpose | origin re-reads caused by a cap filled with header text; a redundant registration | yes | hours | `C31`, `C30` |
 | 4 | One record per folder, correct everywhere | level flushes on every count change; folder metadata that reaches the browser only in part; counts stale after a publish or different between instances | yes | days | `C29`, `C23`, `C6` |
 | 5 | Nothing waits on the request path | the crawl competing with readers; rebuilds a reader waits for; top-bar levels in the prerender; the total polled at hydration | yes, once rank 7 retires the crawl | days | `C4`, `C22`, `C11`, `C12` |
@@ -618,7 +634,8 @@ The table ranks seven levers by their effect on a runtime environment. *Holds at
 
 ### Why this order
 
-- **Measure first.** The local runs used a debug profile on a shared machine. `M1-deployed-baseline` takes hours, changes nothing, ranks the levers by their effect on a deployed instance, and settles `PL-1`.
+- **Measure first, and keep measuring.** The local runs used a debug profile on a shared machine. `M1-deployed-baseline` changed nothing and re-ranked the plan twice: once when it found the crawler trap, and again when it settled `PL-1`. Neither cost was visible in any local run.
+- **Rank 0 before everything that remains.** It's the largest measured cost on the deployed instance, it's independent of the corpus, and it's hours of work in this repository plus two library changes already recorded as signals.
 - **Levers 1–3 next, as wave 1.** Each change takes minutes to a day, is independent of the others, removes a cost every visitor pays today, and survives into the target unchanged.
 - **The folder record before rendering once.** `C29` changes the contract the browser receives and persists, so `C10` should persist the new shape once rather than the old one first.
 - **`C21` together with `C10`.** Both rework how `ContentView` loads a page.
@@ -626,15 +643,28 @@ The table ranks seven levers by their effect on a runtime environment. *Holds at
 
 ## ✅ Recommended sequence
 
-The changes are grouped into a measurement step and four waves; each wave stands on its own and makes the next one cheaper to measure. Identifiers continue the earlier analysis: `C1`–`C16` keep their meaning, and `C17`–`C31` are this page's. Version 1.1 added `C29`–`C31`, which take over the folder-metadata, memory-cache, and header-parsing parts of `C23`, and renamed `C24-folder-summaries` to `C24-persisted-folder-records`. Version 1.3 added `C32` and `C33`, from the deployed measurement. *Addresses* names the findings each change answers.
+The changes are grouped into measurement steps and five waves; each wave stands on its own and makes the next one cheaper to measure. Identifiers continue the earlier analysis: `C1`–`C16` keep their meaning, and `C17`–`C34` are this page's. Version 1.1 added `C29`–`C31`, which take over the folder-metadata, memory-cache, and header-parsing parts of `C23`, and renamed `C24-folder-summaries` to `C24-persisted-folder-records`. Version 1.3 added `C32` and `C33`, from the deployed measurement. Version 1.5 added `M2`, the scale harness wave 4 is measured against. Version 1.6 added wave 0, which `PL-1`'s measurement put ahead of everything still open, and `C34`, a validator `C29` left off. *Addresses* names the findings each change answers.
 
 ### Step 0 — measure a deployed instance
 
-The local runs measured a debug profile. One deployed baseline ranks the waves by their real effect, and it settles the parked instrumentation question.
+The local runs measured a debug profile. One deployed baseline ranks the waves by their real effect, and it settles the parked instrumentation question. A second measurement step builds the apparatus that wave 4 is judged by, because its acceptance criterion is a comparison across corpus sizes rather than a figure.
 
 | # | Id | Change | Addresses | Effort | Risk | Status |
 |---|---|---|---|---|---|---|
-| 0 | `M1-deployed-baseline` | On one deployed instance, before and after wave 1, record: time to listening and to the first page after a restart; p50 and p95 of `/_page` and `/_nav/children`, warm and after the five-minute tolerance lapses; bytes per navigation, images included; SmartCache's total size and evictions by reason; how long counts stay stale after a publish; and CPU and activities per request with the `Diginsight.SmartCache` and `Diginsight.Components` sources listened to and gated off. Measured in part, read-only, on 2026-10-02 — see [📏 Deployed baseline](#-deployed-baseline) | `PL-1`, `N19` | hours | none | 🟡 todo |
+| 0 | `M1-deployed-baseline` | On one deployed instance, before and after wave 1, record: time to listening and to the first page after a restart; p50 and p95 of `/_page` and `/_nav/children`, warm and after the five-minute tolerance lapses; bytes per navigation, images included; SmartCache's total size and evictions by reason; how long counts stay stale after a publish; and CPU and activities per request with the `Diginsight.SmartCache` and `Diginsight.Components` sources listened to and gated off. Measured read-only on 2026-10-02, then completed the same day on the instance itself — see [📏 Deployed baseline](#-deployed-baseline) and [⚡ What instrumentation costs a deployed instance](#-what-instrumentation-costs-a-deployed-instance). SmartCache's size and evictions, and counts after a publish, stay unmeasured: neither is readable from outside | `PL-1`, `N19` | hours | none | ✅ done in part |
+| 0a | `M2-scale-baseline` | A generator for a synthetic tree of any fan-out, an overlay that serves it outside the debug profile, and a measurement script for time to listening, first page, first-page bytes, warm p50 and p95, and working set — so wave 4 is judged by a comparison across sizes. Harness built and two points measured on 2026-10-02 — see [📐 Scale baseline](#-scale-baseline) | `N17` | hours | none | ✅ done |
+
+### Wave 0 — stop paying for instrumentation on the hot path
+
+`PL-1`'s measurement put this wave ahead of everything still open: on the deployed instance it is the largest cost per request, it doesn't depend on the corpus, and it is hours of work here plus two library changes already recorded as signals. It was added on 2026-10-02 and isn't started.
+
+| # | Id | Change | Addresses | Effort | Risk | Status |
+|---|---|---|---|---|---|---|
+| 0b | `C1-gate-hot-activities` | Gate the activities started on the hot path — per-lookup cache activities, per-file reads — behind a check that costs nothing when the source isn't listened to, so the diagnostics stay available without being paid for on every call | `PL-1`, `N1` | hours | low | 🟡 todo |
+| 0c | `C2-trim-hot-path-activities` | Remove the activities whose only consumer is a developer reading a local trace, and keep one per request rather than one per lookup | `PL-1`, `N1` | hours | low | 🟡 todo |
+| 0d | `C9-local-log-defaults` | Keep the debug profile's levels for local runs and leave deployed instances on `Warning`, so a measurement can't be taken against the wrong profile by accident | `PL-1` | hours | low | 🟡 todo |
+
+The two library halves stay upstream: `C3-fix-options-cache-upstream` is `SIG-1` on the [earlier work item's signals page](../../202609/20260925.02-startup-optimization/01-signals.md), and SmartCache's per-lookup activities and records are `SIG-2` on [this work item's signals page](02-signals.md). Until they land, this wave can only mitigate what SmartDocs itself starts.
 
 ### Wave 1 — remove accidental work
 
@@ -658,11 +688,13 @@ The first wave is small fixes, from minutes to a day each, with no change to the
 | # | Id | Change | Addresses | Effort | Risk | Status |
 |---|---|---|---|---|---|---|
 | 8a | `C32-end-the-crawler-trap` | Answer a route that names nothing in the content with a 404 before prerendering, root every link the application writes, and serve a `robots.txt` for the application's own endpoints | `N20` | hours | low | ✅ done |
-| 8b | `C33-always-on` | Decide, per deployed app, whether to turn Always On on, so that an idle app isn't unloaded and its next visitor doesn't wait for a full start | `N20` | minutes | none | 🟡 todo |
+| 8b | `C33-always-on` | Decide, per deployed app, whether to turn Always On on, so that an idle app isn't unloaded and its next visitor doesn't wait for a full start | `N20` | minutes | none | ✅ done |
+
+The owner decided on 2026-10-02 to turn Always On on for both SmartDocs apps, and it was applied the same day. The three unrelated apps sharing the plan were left as they were. The effect is the one the decision was about: the docs site, which `M1` had recorded answering `504` after 110.7 s when idle, answered its first request in **422 ms** and its second in 250 ms. On the Learning Hub, a deliberate restart no longer exposes a cold start at all — the platform recycles with an overlap, so no request waited for the new worker.
 
 ### Wave 2 — one folder record, nothing waits
 
-The second wave makes the folder record the one unit of folder metadata and takes every wait off the request path, days in total.
+The second wave makes the folder record the one unit of folder metadata and takes every wait off the request path, days in total. All five were implemented and validated on 2026-10-02; the records run from [🚦 C4](#-c4-implementation-record) to [🧭 C11 and C12](#-c11-and-c12-implementation-record).
 
 | # | Id | Change | Addresses | Effort | Risk | Status |
 |---|---|---|---|---|---|---|
@@ -671,10 +703,11 @@ The second wave makes the folder record the one unit of folder metadata and take
 | 11 | `C22-revalidate-in-background` | Serve cached levels, records, and pages past their interval and revalidate them in the background, so no reader pays a rebuild | `N7` | a day | low | ✅ done |
 | 12 | `C11-lazy-topbar` | Load dropdown children on first open, never during prerender | `N6` | hours | low | ✅ done |
 | 13 | `C12-hub-after-idle` | Connect the hub after the first idle period and delete `ConvergeTotalAsync` | `N5` | hours | low | ✅ done |
+| 13a | `C34-folder-record-validator` | Give `/_nav/folder` the entity tag, `Cache-Control`, and `If-None-Match` handling `C20` gave the other endpoints, and the method activity every other nav handler starts. Found by measuring the deployed instance on 2026-10-02: `C29` added the endpoint after `C20` tagged the rest, so the one record the browser re-reads most was the one response it couldn't revalidate | `N14`, `N15` | minutes | low | ✅ done |
 
 ### Wave 3 — render once, cache one way
 
-The third wave makes rendering a per-change cost and puts every derived value behind one cache model.
+The third wave makes rendering a per-change cost and puts every derived value behind one cache model. All three were implemented and validated on 2026-10-02; see [🖨️ C21 and C10](#-c21-and-c10-implementation-record) and [🧩 C23](#-c23-implementation-record).
 
 | # | Id | Change | Addresses | Effort | Risk | Status |
 |---|---|---|---|---|---|---|
@@ -684,7 +717,7 @@ The third wave makes rendering a per-change cost and puts every derived value be
 
 ### Wave 4 — any size
 
-The fourth wave replaces every whole-site path with per-folder work. It's weeks of work, worth starting with a prototype over a generated tree.
+The fourth wave replaces every whole-site path with per-folder work. It's weeks of work, worth starting with a prototype over a generated tree. It is the only wave still open, and [📏 Deployed baseline](#-deployed-baseline) re-ordered it: `C24` and `C25` carry the measured cost, while `C26` and `C27` wait until a measurement needs them.
 
 | # | Id | Change | Addresses | Effort | Risk | Status |
 |---|---|---|---|---|---|---|
@@ -701,8 +734,8 @@ The table says where each remaining change of the earlier analysis went.
 
 | Id | Where it went |
 |---|---|
-| `C1-gate-hot-activities`, `C2-trim-hot-path-activities`, `C9-local-log-defaults` | Parked with [`PL-1`](#pl-1-runtime-instrumentation-cost--what-instrumentation-costs-in-a-deployed-instance). The debug profile keeps its instrumentation on purpose; these return to wave 1 only if a deployed instance shows a real cost. (📌 next steps) |
-| `C3-fix-options-cache-upstream` | Parked with `PL-1`, and tracked upstream as `SIG-1` on the earlier work item's signals page. (📌 next steps) |
+| `C1-gate-hot-activities`, `C2-trim-hot-path-activities`, `C9-local-log-defaults` | **Returned to the active sequence as wave 0** on 2026-10-02, when `PL-1`'s measurement showed instrumentation taking about 90% of the CPU of every request on the deployed instance. They were parked on the premise that this was a debug-profile cost; the premise was tested and failed. (🟡 todo) |
+| `C3-fix-options-cache-upstream` | Stays upstream, tracked as `SIG-1` on the earlier work item's signals page. `PL-1`'s measurement confirms its production rationale, which that record had argued from configuration alone. (🟡 todo) |
 | `C5-overlay-counts` | Superseded by `C29-folder-records`, which takes every piece of folder metadata out of levels, not only counts. |
 | `C8-exclusions-any-depth` | Folded into `C18`. |
 | `C13-content-index`, `C14-manifest` | Superseded by `C24`. |
@@ -752,13 +785,13 @@ The run compared wave 1 with the previous build, both serving one copy of this r
 
 ### What wave 1 didn't change
 
-Wave 1 leaves these in place. The first three showed in the run and behave the same in the previous build; each item belongs to a later change or to another stream:
+Wave 1 left these in place. The first three showed in the run and behaved the same in the previous build; each belonged to a later change or to another stream, and waves 2 and 3 have since closed three of the five:
 
-- **A prerendered footer shows a lower bound.** Until the browser hydrates, the total is the sum of the space's root sections — "≥ 54" where the site holds 61 — because the server's own site total is read only in the browser. `C10` carries it in the persisted prerender state.
-- **An open menu keeps a deleted section until reload.** Pushes carry counts, not membership, so a section a publish removed stays in an open sidebar with its last count. `C29`'s pushed folder records carry membership.
-- **Counts settle about 8 s after a whole-site invalidation** in the debug profile, because the invalidation drops every level and each refold waits for its level to be rebuilt. `C25` replaces whole-site invalidations with change sets.
-- **The generated reference pages still describe the previous behavior.** Navigation rules, HTTP endpoints, configuration settings, and the caching chapter carry verification stamps and are regenerated by the documentation stream, not edited here; `SIG-5` on [this work item's signals page](02-signals.md) asks for that run.
-- **No deployed instance was measured.** `M1` still ranks waves 2–4 and settles `PL-1`.
+- **A prerendered footer showed a lower bound.** Until the browser hydrated, the total was the sum of the space's root sections — "≥ 54" where the site holds 61 — because the server's own site total was read only in the browser. (✅ done — `C10` carries it in the persisted prerender state)
+- **An open menu kept a deleted section until reload.** Pushes carried counts, not membership, so a section a publish removed stayed in an open sidebar with its last count. (✅ done — `C29`'s pushed folder records carry membership)
+- **Counts settle about 8 s after a whole-site invalidation** in the debug profile, because the invalidation drops every level and each refold waits for its level to be rebuilt. (🟡 todo — `C25` replaces whole-site invalidations with change sets)
+- **The generated reference pages still describe the previous behavior.** Navigation rules, HTTP endpoints, configuration settings, and the caching chapter carry verification stamps and are regenerated by the documentation stream, not edited here; `SIG-5` on [this work item's signals page](02-signals.md) asks for that run, and its change set now runs through wave 3. (🟡 todo)
+- **No deployed instance was measured.** (✅ done in part — `M1` measured one on 2026-10-02 without acting on it, and re-ranked waves 2–4 around the crawler trap; the half that settles `PL-1` needs the instance acted on)
 
 ## 📏 Deployed baseline
 
@@ -774,17 +807,20 @@ Deploys had failed since 2026-10-01 on a restore error unrelated to this work: t
 
 ### What the deployed instance pays for
 
-| Measure | Before wave 1 | After wave 1 | After `C32` |
-|---|---|---|---|
-| CPU, Learning Hub | 77–88% of one core in every six-hour period for three days; about 50 CPU-seconds a minute on 2026-10-02 | unchanged: 220–250 CPU-seconds per five minutes, the whole core | 4 CPU-seconds in the first full five minutes |
-| Requests and response time | 8,500–12,000 per six hours at about 2 s; 99.8% from one crawler, 99.96% of its paths unknown | the same crawler; 4–12 s on average while the restart's warm-up ran | 24 per five minutes, all answered `404`, at 0.25 s on average |
-| An unknown route | `200`, a prerendered page | `200`, 29.9 KB, 7.8 s — unchanged, the trap is `C32`'s | `404`, the 455-byte page |
-| `/favicon.ico` | `200`, a prerendered page | `404` with no body | unchanged |
-| `/_nav/children` and `/_page` | no validator, uncompressed | `ETag` and `304`; the root level Brotli-compressed from 4,133 to 744 bytes | unchanged |
-| An article page | a median of 1.3 s of server time | 22.7 s to the first byte during the post-deploy warm-up | no relative URL left in the page |
-| Docs site, first request when idle | — | `504` after 110.7 s, the app cold-starting on a busy core | not measured yet |
+| Measure | Before wave 1 | After wave 1 | After `C32` | After waves 2–3 and `C33` |
+|---|---|---|---|---|
+| CPU, Learning Hub | 77–88% of one core in every six-hour period for three days; about 50 CPU-seconds a minute on 2026-10-02 | unchanged: 220–250 CPU-seconds per five minutes, the whole core | 4 CPU-seconds in the first full five minutes | 3.4–4.7 CPU-seconds per 15 minutes, sustained |
+| Requests and response time | 8,500–12,000 per six hours at about 2 s; 99.8% from one crawler, 99.96% of its paths unknown | the same crawler; 4–12 s on average while the restart's warm-up ran | 24 per five minutes, all answered `404`, at 0.25 s on average | 46–47 per 15 minutes at 0.076–0.096 s on average |
+| An unknown route | `200`, a prerendered page | `200`, 29.9 KB, 7.8 s — unchanged, the trap is `C32`'s | `404`, the 455-byte page | unchanged |
+| `/favicon.ico` | `200`, a prerendered page | `404` with no body | unchanged | unchanged |
+| `/_nav/children` and `/_page` | no validator, uncompressed | `ETag` and `304`; the root level Brotli-compressed from 4,133 to 744 bytes | unchanged | `/_nav/children` 4,381 B at a p50 of 380 ms; `/_page` 31,820 B at a p50 of 60 ms, both revalidating |
+| `/_nav/folder` | — | — | — | added by `C29`, 293 B at a p50 of 70 ms, **no validator** until `C34` |
+| An article page | a median of 1.3 s of server time | 22.7 s to the first byte during the post-deploy warm-up | no relative URL left in the page | 80,445 B prerendered at a p50 of 170 ms |
+| Docs site, first request when idle | — | `504` after 110.7 s, the app cold-starting on a busy core | not measured yet | **422 ms**; Always On keeps it loaded |
 
-Two conclusions follow. Wave 1 does what it set out to do on the deployed instance — the icon, the validators, and compression behave as in the local run — but the instance's cost was never in its scope: the crawler trap takes the core whatever navigation does. And every startup measure on the plan is dominated by that contention, so the startup figures `M1` asks for can only be read once the trap is gone.
+Two conclusions followed at the time. Wave 1 does what it set out to do on the deployed instance — the icon, the validators, and compression behave as in the local run — but the instance's cost was never in its scope: the crawler trap takes the core whatever navigation does. And every startup measure on the plan is dominated by that contention, so the startup figures `M1` asks for can only be read once the trap is gone.
+
+A third followed once the trap was gone and the figures could be read: **the cost that remained wasn't navigation either.** At 46 requests per 15 minutes the instance was spending about 4 CPU-seconds, which looks settled — until the same instance is put under a steady load and the cost per request turns out to be nine-tenths instrumentation. [⚡ What instrumentation costs a deployed instance](#-what-instrumentation-costs-a-deployed-instance) records that measurement; it is the reason this page now has a wave 0.
 
 ### `C32-end-the-crawler-trap` — what changed
 
@@ -809,7 +845,56 @@ The owner decided that GPTBot may crawl the Learning Hub's public content, with 
 
 ### What M1 didn't measure
 
-The parts that act on the instance were left for the owner: the time to listening after a deliberate restart, CPU with the instrumentation sources gated off — which is what settles `PL-1` — SmartCache's size and evictions, and how long counts stay stale after a publish. They can only be read once `C32` has freed the core. (📌 next steps)
+The parts that act on the instance were left for the owner at first: the time to listening after a deliberate restart, CPU with the instrumentation sources gated off — which is what settles `PL-1` — SmartCache's size and evictions, and how long counts stay stale after a publish.
+
+**Three of the four were done later the same day**, once `C33` had freed the instance and the owner authorized acting on it:
+
+- **The restart.** With Always On on, the platform recycles with an overlap: a deliberate restart of the Learning Hub never exposed a cold start, and the first request after it answered in 1.9 s. The figure `M1` wanted — a visitor waiting for a full start — no longer exists on these apps, which is what `C33` was for. The docs site, which this page had recorded answering `504` after 110.7 s when idle, answered in 422 ms.
+- **Steady state after waves 1 to 3.** 3.4–4.7 CPU-seconds per 15 minutes at 46–47 requests, with an average response time of 0.076–0.096 s. Before `C32` the same instance spent 160–228 CPU-seconds per *five* minutes at about 2 s per response.
+- **The instrumentation comparison.** Done, and it settles `PL-1` against the premise the item was parked on — see [⚡ What instrumentation costs a deployed instance](#-what-instrumentation-costs-a-deployed-instance).
+
+Two remain unmeasured, and neither is readable from outside: **SmartCache's total size and evictions by reason**, which need either a diagnostic endpoint or a profiler on the instance, and **how long counts stay stale after a publish**, which needs a publish against the deployed content set. (🟡 todo)
+
+## 📐 Scale baseline
+
+The acceptance criteria state the target as a comparison across corpus sizes: a tree ten times larger must leave startup time, first-page reads, and server memory unchanged within 10%. `M2-scale-baseline` builds the apparatus that comparison needs and takes its first two points, on 2026-10-02, against waves 1 to 3.
+
+### The harness
+
+Two scripts and one overlay, all re-runnable:
+
+- `scripts\Smartdocs.ContentTree.Generate.ps1` writes a synthetic tree of the shape navigation expects — area, year-month group, dated leaf section, articles — with a `metadata.yml` at every folder and renderer frontmatter on every article. Its fan-out is parameterized, so a measurement can hold one dimension fixed while another grows. The defaults produce the criterion's tree: 10,000 sections and 100,000 articles.
+- `appsettings.scale.json` declares the space that serves it, selected with `AppsettingsEnvironmentName=scale`. It logs at `Warning`, not at the debug profile's level, because this page's own rule is that a figure can't be compared across profiles.
+- `scripts\Smartdocs.Startup.Measure.ps1` runs the host in a visible console, then records time to listening, time to the first page, first-page bytes, the p50 and p95 of `/_nav/children` and `/_page`, and the working set once the run has settled.
+
+The tree is written beside the repository, never inside it: it's apparatus, regenerated on demand and never committed.
+
+### What ten times the corpus changes
+
+The two points hold the root level identical — four areas of five groups each — and grow only what lies below it, so the figures separate growth with the corpus from growth of the level on screen. An earlier pair that grew the root fan-out as well attributed 39% more first-page bytes to the corpus; they belonged to the root level, and the controlled pair shows the difference is zero. Both points ran in Release, on the same host, with the same settle.
+
+| Measure | 100 sections, 1,000 articles | 1,000 sections, 10,000 articles | Change |
+|---|---|---|---|
+| Time to listening | 3,778 ms | 4,906 ms | +30%, inside the run-to-run spread of 3,778–6,562 ms |
+| First page | 2,852 ms | 3,406 ms | +19% |
+| First-page bytes | 18,847 | 18,847 | none |
+| Working set, 20 s after the first page | 200.8 MB | 201.3 MB | +0.2% |
+| Working set, 150 s after the first page | 210.1 MB | 222.3 MB | +5.8% |
+| `/_nav/children` p50 | 31.0 ms | 68.8 ms | +122% |
+| `/_page` p50 | 41.6 ms | 66.3 ms | +59% |
+
+Three readings follow:
+
+- **What a reader is sent doesn't grow.** The first page is byte-identical at both sizes. The prerendered state carries the active branch's levels, folder records, and rendered page and nothing else, which is what `C10`, `C29`, and `C21` were for, and the measurement holds it exactly.
+- **What the host holds grows with time, not with the first request.** Memory is flat at 20 seconds and apart at 150: the background warm-up is still walking the ten-times tree and still filling the cache in proportion to it. That is the crawl `C24` retires, measured rather than reasoned.
+- **Warm latency grows while the crawl runs.** The p50 figures are taken during that walk, so they measure contention with it, not the cost of a level. At the smaller size the crawl is long finished by 150 seconds; at the larger it isn't. The same cause, and the same fix.
+
+### What it settles for wave 4
+
+- **`C24` keeps its place at the head of the wave, for a measured reason.** The only cost that grew with the corpus is the one it removes. Nothing in the request path grew once the level on screen was held constant.
+- **`C26` and `C27` stay where [📏 Deployed baseline](#-deployed-baseline) put them.** A level of 50 children cost no more than a level of 5, so neither paging nor server-side search has a measurement asking for it yet.
+- **The criterion's own tree is one command away but wasn't run.** The two points establish the trend across a ten-fold step; the 100,000-article point, and the memory ceiling it would find, stay open. `Smartdocs.ContentTree.Generate.ps1` with its defaults produces it. (📌 next steps)
+- **Time to listening isn't established either way.** It varied from 3,778 to 6,562 ms with no monotonic relation to size, and at these magnitudes it's dominated by process start. Separating the two needs a host already warm, which `M1`'s deliberate restart on a deployed instance gives. (📌 next steps)
 
 ## 🚦 C4 implementation record
 
@@ -882,12 +967,13 @@ The visible publish probe moved Architecture from 5 to 6 and the site from 48 to
 
 ## 🧊 Parked items
 
-These items are in this work item's domain and deliberately left out of the active sequence. Each one names what would bring it back.
+These items are in this work item's domain and deliberately left out of the active sequence. Each one names what would bring it back. One of them, `PL-1`, was unparked on 2026-10-02 when the measurement it waited for was taken; it stays here with its reasoning intact, because what it assumed and what it found are both part of the record.
 
 ### `PL-1-runtime-instrumentation-cost` — what instrumentation costs in a deployed instance
 
+- **State** — resolved on 2026-10-02. The sections below record why it was parked and what it waited for; [⚡ What instrumentation costs a deployed instance](#-what-instrumentation-costs-a-deployed-instance) records what the measurement found.
 - **Absorbs** finding `N16-smartcache-overhead` of this page's first version, the production share of [`N1-activity-options-rebind`](../../202609/20260925.02-startup-optimization/overview.md#n1-activity-options-rebind--every-instrumented-call-re-binds-its-logging-options), and the changes that answer them: `C1-gate-hot-activities`, `C2-trim-hot-path-activities`, `C3-fix-options-cache-upstream`, and `C9-local-log-defaults`.
-- **Why it's parked.** Every measurement of instrumentation so far was local: this page's runs used the debug profile, and the earlier analysis's runs a Development host whose emitter listened to `Diginsight.*` unless a run gated it off. Instrumentation at that level is enabled on purpose, for debugging, and a deployed instance doesn't run the debug profile. What it costs there is an open question, not a finding.
+- **Why it was parked.** Every measurement of instrumentation up to that point was local: this page's runs used the debug profile, and the earlier analysis's runs a Development host whose emitter listened to `Diginsight.*` unless a run gated it off. Instrumentation at that level is enabled on purpose, for debugging, and a deployed instance doesn't run the debug profile. What it cost there was an open question, not a finding.
 - **What's known about deployed instances.** Neither deployed overlay sets a `Diginsight:Activities`, `Logging`, or `OpenTelemetry` section, and the build workflow sets only the environment name, the snapshot path, and the invalidation key. A deployed instance therefore runs the base settings: logs at `Warning`, the activity sources `Diginsight.*` listened to, and traces sampled at 10%, which is the default Diginsight.Components applies outside Development. Settings added on an App Service by hand aren't covered by this reading.
 - **What argues for measuring rather than assuming.** In the earlier analysis's Release runs, lowering the log level to `Warning` didn't remove the cost while the emitter listened to `Diginsight.*` (runs B and C); only gating those sources off did (runs D, F, and G). Those runs differed from a deployed instance in their environment — Development, so traces sampled at 100% — and in their hardware.
 - **What the investigation must establish.** Three possible costs, none measured on a deployed instance:
@@ -895,7 +981,36 @@ These items are in this work item's domain and deliberately left out of the acti
   2. OpenTelemetry tracing, which listens to `Diginsight.*` and samples 10% of traces: what an unsampled lookup costs, and the export volume when a monitoring connection string is configured;
   3. the per-lookup `Debug` records, which a `Warning` level should reduce to one level check each.
 - **How it's resolved.** As part of `M1-deployed-baseline`: on one deployed instance, compare CPU and activities per request with the `Diginsight.SmartCache` and `Diginsight.Components` sources listened to and gated off. A difference within measurement noise closes the item. A larger one returns `C1` and `C2` to wave 1, restores the relevance of `SIG-2` on [this work item's signals page](02-signals.md), and confirms the production rationale of `SIG-1` on the [earlier work item's signals page](../../202609/20260925.02-startup-optimization/01-signals.md).
-- **Disposition** → defer: revisit with `M1-deployed-baseline`.
+- **Disposition** → **unparked on 2026-10-02.** The measurement was taken and the difference is an order of magnitude, not noise. See [⚡ What instrumentation costs a deployed instance](#-what-instrumentation-costs-a-deployed-instance). `C1` and `C2` return to the active sequence as `W0`, `SIG-2` regains its relevance, and `SIG-1`'s production rationale is confirmed.
+
+## ⚡ What instrumentation costs a deployed instance
+
+`PL-1` asked what a deployed instance pays for instrumentation, and parked the question until one was measured. It was measured on 2026-10-02 on the deployed Learning Hub, running waves 1 to 3 and `C32`, with Always On on.
+
+### How it was measured
+
+Four load runs of four minutes each, at an offered rate of four requests per second over a fixed mix — `/_nav/children`, `/_nav/folder`, `/_page`, and a prerendered article page. Between runs, one app setting was added or removed: `Diginsight__Activities__ActivitySources__Diginsight.*`, absent by default and therefore `true` from the base settings. Changing it restarts the app, so every run was preceded by the same 80-second warm. CPU came from the platform's per-minute `CpuTime`, divided by the per-minute request count over the same window. The setting was removed at the end; the instance is back on its base configuration.
+
+The load generator is `scripts\Smartdocs.Deployed.Load.ps1`, which reports the UTC window it covered so metrics can be read for exactly that window.
+
+### What it costs
+
+| Run | `Diginsight.*` | Requests in 4 min | p50 | p95 | CPU per request |
+|---|---|---|---|---|---|
+| A′ | listened to | 580 | 203.6 ms | 1,050.1 ms | 0.248 s |
+| B | gated off | 900 | 50.7 ms | 150.1 ms | 0.025 s |
+| B′ | gated off | 871 | 54.0 ms | 225.5 ms | 0.019 s |
+
+The client is closed-loop — it waits for each response before pacing the next — so a slower instance completes fewer requests in the same wall time. The throughput column is therefore a second reading of the same effect, not an independent one.
+
+An earlier run with the sources listened to, taken 16 minutes after a restart rather than 80 seconds, was worse still: 155 requests, a p50 of 871.3 ms, and about 0.86 s of CPU per request. It isn't in the table because its warm-up was still competing; it's recorded because it shows the cost compounds with whatever else the host is doing.
+
+### What it means
+
+- **Instrumentation costs about 90% of the CPU per request.** 0.248 s against 0.019–0.025 s, a factor of ten, reproduced twice in each configuration. This is a deployed instance on its base settings — logging at `Warning`, traces sampled at 10% — not the debug profile, so `PL-1`'s own closing rule applies: the difference is not noise.
+- **`N1-activity-options-rebind` holds in production.** The earlier analysis inferred its production share from configuration; it's now measured. The emitter resolving its options at every activity start and stop is paid on every instrumented call, before any log level is checked.
+- **The strategy's ranking was wrong on this point, and says so.** [What a runtime environment pays for](#what-a-runtime-environment-pays-for) excluded instrumentation as a debug-profile cost "until `PL-1` shows otherwise". It has.
+- **Gating the whole source off is a mitigation, not the fix.** It removes the diagnostics along with the cost, and the owner enables them on purpose. `C1-gate-hot-activities` and `C2-trim-hot-path-activities` keep the diagnostics and remove the hot-path cost; `SIG-1` and `SIG-2` are the library-side halves. The deployed instance was returned to its base configuration rather than left gated, because that choice belongs to the owner — one app setting, `Diginsight__Activities__ActivitySources__Diginsight.*=false`, applies it at any time.
 
 ## 🧪 Verification
 
@@ -910,12 +1025,21 @@ The following checks were run for this page and its revision:
 - The three content sets were counted on disk, and the metrics snapshot was read for sections, articles, and zero-count cells. (✅ done)
 - The deployed configuration was read: neither deployed overlay sets an instrumentation or logging section, the build workflow sets only environment selection, the snapshot path, and the invalidation key, and Diginsight.Components' sampling default was read in its source. (✅ done)
 - The header cache was estimated by reproducing `FrontMatter.ReadHeadAsync` over the measured content and over a local clone of the Learning Hub's content. (✅ done)
-- CPU wasn't profiled this time; the CPU attribution of `N1` comes from the earlier analysis. (🟡 todo)
-- No multi-instance deployment was measured, and the deployed instance wasn't profiled: the cross-instance gap of `N15` is established from code, `N19` from the read pattern over local files, and `PL-1` is open. (🟡 todo)
+- CPU wasn't profiled on a local run; the CPU attribution of `N1` came from the earlier analysis until `PL-1` was measured on a deployed instance. (✅ done — on the deployed instance, by comparing CPU per request with the sources listened to and gated off)
+- No multi-instance deployment was measured: the cross-instance gap of `N15` is established from code, and `N19` from the read pattern over local files. (🟡 todo)
 - The cause of the hub reconnects in `N18` isn't established. (🟡 todo)
 - Wave 1 was implemented and validated in a visible browser against the previous build serving the same content, in 13 scenarios recorded in [the wave-1 validation sequence](_validation/20261002.01-validation-sequence.md). (✅ done)
-- Waves 2 and 3 are implemented and validated in visible-browser runs; wave 4 remains open. (🟡 todo)
+- Waves 2 and 3 were implemented and validated in nine visible-browser runs, recorded in validation sequences `04` and `06`–`12`, one per change. (✅ done)
+- Waves 1 to 3 are deployed: commit `7408cfc` reached both apps on 2026-10-02 at 16:24 UTC, and `/_nav/children` was confirmed on the live Learning Hub returning folder references beside a record map, the shape `C29` introduced. (✅ done)
+- Wave 0 — `C1`, `C2`, `C9` — was opened by `PL-1`'s measurement and hasn't been started. (🟡 todo)
+- Wave 4 — `C24`, `C25`, `C26`, `C27`, `C28`, and `C16` — hasn't been started. (🟡 todo)
+- The scale harness was built and two points measured against waves 1 to 3, over generated trees of 1,000 and 10,000 articles with the root level held constant. (✅ done — see [📐 Scale baseline](#-scale-baseline))
+- The criterion's own tree, 10,000 sections and 100,000 articles, hasn't been run, so no memory ceiling is established. (🟡 todo)
 - `M1` was measured in part on 2026-10-02 on the deployed Learning Hub and docs site, without acting on them: three days of platform metrics, three hours of web-server log, and requests from outside before and after wave 1 was deployed. (✅ done)
+- `M1` was then completed on the instance itself, with the owner's authorization: Always On turned on, a deliberate restart, steady-state CPU and response time after waves 1 to 3, and four load runs comparing instrumentation listened to and gated off. (✅ done — see [⚡ What instrumentation costs a deployed instance](#-what-instrumentation-costs-a-deployed-instance))
+- SmartCache's total size and evictions by reason, and how long counts stay stale after a publish, stay unmeasured: neither is readable from outside the instance. (🟡 todo)
+- The deployed instance was returned to its base configuration after the instrumentation runs; no `Diginsight` app setting remains on it. (✅ done)
+- `C34`'s entity tag and `304` on `/_nav/folder` were verified on a local Release build before and after the change: `200` with no `ETag` before, `200` with a strong tag and `Cache-Control: no-cache` after, and `304` with an empty body on a conditional request. (✅ done)
 - `C32` was validated in a visible browser in seven steps, recorded in [the validation sequence for the route guard](_validation/20261002.02-validation-sequence.md), and its behavior confirmed on the deployed Learning Hub. (✅ done)
 - `C32`'s effect on the deployed Learning Hub was read from its platform metrics: 4 CPU-seconds in the first full five minutes after the warm-up, against 160–228 before. (✅ done)
 - The deploy restores in locked mode, against lock files that carry its runtimes, validated with the deploy's exact publish on an export in [the locked-restore validation sequence](_validation/20261002.03-validation-sequence.md). (✅ done)
@@ -936,39 +1060,87 @@ curl.exe -s -o NUL -D - -w "STATUS=%{http_code} SIZE=%{size_download} TIME=%{tim
 curl.exe -s -o NUL -D - -w "STATUS=%{http_code} SIZE=%{size_download} TIME=%{time_total}s`n" "http://<host>/favicon.ico"
 ```
 
+The scale baseline needs the two harness scripts and nothing else. Each point is a generate-then-measure pair; hold one fan-out fixed and grow another, or the figures mix corpus growth with the size of the level on screen:
+
+```powershell
+# One point: 100 sections, 1,000 articles, root level of four areas
+.\scripts\Smartdocs.ContentTree.Generate.ps1 -Areas 4 -GroupsPerArea 5 -SectionsPerGroup 5 -ArticlesPerSection 10 -Force
+.\scripts\Smartdocs.Startup.Measure.ps1 -EnvironmentName scale -Url "http://localhost:5290" -Samples 10 -SettleSeconds 150
+
+# Ten times the corpus, same root level: 1,000 sections, 10,000 articles
+.\scripts\Smartdocs.ContentTree.Generate.ps1 -Areas 4 -GroupsPerArea 5 -SectionsPerGroup 50 -ArticlesPerSection 10 -Force
+.\scripts\Smartdocs.Startup.Measure.ps1 -EnvironmentName scale -Url "http://localhost:5290" -Samples 10 -SettleSeconds 150 -SkipBuild
+
+# The acceptance criterion's own tree: 10,000 sections, 100,000 articles
+.\scripts\Smartdocs.ContentTree.Generate.ps1 -Force
+```
+
+Discard the first measurement after a build: it carries the host's cold start, and in this page's runs it reported a time to listening more than twice the warm figure. Measure on a port no other instance holds, and take the working set twice — shortly after the first page, and again once the background walk has had time to run — because the two answer different questions.
+
+The instrumentation comparison needs a deployed instance, two app-setting changes, and the platform's per-minute metrics. Each phase must be preceded by the same warm, because changing an app setting restarts the app and a run taken closer to a restart measures the warm-up as well:
+
+```powershell
+# Phase with the sources listened to — the base configuration, nothing set
+az webapp config appsettings delete --name <app> --resource-group <rg> `
+  --setting-names 'Diginsight__Activities__ActivitySources__Diginsight.*'
+# ... wait ~45 s for the restart, warm for ~35 s, then:
+.\scripts\Smartdocs.Deployed.Load.ps1 -BaseUrl 'https://<host>' -DurationMinutes 4 -RequestsPerSecond 4 -Label 'listened to'
+
+# Phase with the sources gated off
+az webapp config appsettings set --name <app> --resource-group <rg> `
+  --settings 'Diginsight__Activities__ActivitySources__Diginsight.*=false'
+# ... same wait and warm, then the same load run
+
+# CPU and requests per minute for the windows the load runs reported
+az monitor metrics list --resource <resource-id> --metric CpuTime Requests `
+  --interval PT1M --start-time <startUtc> --end-time <endUtc> --aggregation Total
+```
+
+Divide each window's `CpuTime` by its `Requests` to get CPU per request, and use the request counts rather than the client's clock to locate the window: the platform's counters lag the client by a minute or two. Remove the setting when done, so the instance is left on the configuration it was found in.
+
 ### Acceptance criteria for the target
 
 The target is done when these hold:
 
-- A start with records present reads no content before listening, and its first page reads at most *D* levels and folder records plus one page. (🟡 todo)
-- `/favicon.ico` and any non-Markdown file path return without a prerender. (✅ done in wave 1, for the 382 extensions the content-type map knows; a path whose extension the map doesn't know still prerenders)
-- A repeat view of an unchanged page, level, or image is a `304` or no request at all, and after hydration no request asks for data already on screen. (🟡 todo — the first half holds since wave 1; the second needs `C10`)
-- SmartCache stores no raw header text, and records no capacity evictions of folder records or levels. (🟡 todo — no raw header text since wave 1; evictions stay unmeasured until `M1`)
-- Every key of a folder's `metadata.yml`, and its newest article, reach the browser, and a changed record reaches every browser showing it within one coalescing window. (🟡 todo)
-- No reader waits for a revalidation: at any time after start, the p95 of `/_page` and `/_nav/children` stays within 20% of the cached figure. (🟡 todo)
-- After any publish, the counts on screen are exact on every instance within one coalescing window plus the event latency. (🟡 todo — since wave 1 they're exact on one instance about 8 s after a whole-site invalidation; every instance needs `C23` and `C28`)
-- A generated tree ten times larger — about 10,000 sections and 100,000 articles — leaves startup time, first-page reads, and server memory unchanged within 10%. (🟡 todo)
+- A start with records present reads no content before listening, and its first page reads at most *D* levels and folder records plus one page. (🟡 todo — `C4` moved the warm-up after `ApplicationStarted`, and `C33` means no visitor waits for a start at all on these apps, but `BrandingAssetResolver.Resolve` still reads one asset per space before `app.Run()`, and "records present" needs `C24`)
+- `/favicon.ico` and any non-Markdown file path return without a prerender. (✅ done — wave 1 covered the 382 extensions the content-type map knows, and `C32` widened it to any route that names nothing in the content)
+- A repeat view of an unchanged page, level, or image is a `304` or no request at all, and after hydration no request asks for data already on screen. (✅ done — the first half since wave 1 and, for folder records, since `C34`; the second with `C10`: the accepted hydration made zero `_site`, `/_page`, `/_nav/children`, and `/_nav/folder` requests)
+- SmartCache stores no raw header text, and records no capacity evictions of folder records or levels. (🟡 todo — no raw header text since wave 1; evictions are not readable from outside the instance and stay unmeasured)
+- Every key of a folder's `metadata.yml`, and its newest article, reach the browser, and a changed record reaches every browser showing it within one coalescing window. (🟡 todo — `C29` carries every key and the newest article, and pushes a changed record to connected browsers; the coalescing window and the groups that scope a push to the readers of a prefix need `C28`)
+- No reader waits for a revalidation: at any time after start, the p95 of `/_page` and `/_nav/children` stays within 20% of the cached figure. (🟡 todo — `C22` serves stale and revalidates in the background and `C4` keeps the warm-up off the request path; on the deployed instance under load the p95 is dominated by instrumentation, so this can only be judged after wave 0)
+- After any publish, the counts on screen are exact on every instance within one coalescing window plus the event latency. (🟡 todo — exact on one instance since wave 1, and `C23` gives a folder key an invalidation callback that refolds wherever the broadcast lands; no multi-instance deployment has been measured, and the coalescing window needs `C28`)
+- A generated tree ten times larger — about 10,000 sections and 100,000 articles — leaves startup time, first-page reads, and server memory unchanged within 10%. (🟡 todo — a controlled ten-fold step holds first-page bytes identical and memory within 0.2% at 20 s, but memory diverges 5.8% once the background crawl runs on; see [📐 Scale baseline](#-scale-baseline). The criterion's own tree hasn't been run, and the divergence needs `C24`)
+- A request costs the deployed instance no more CPU with its diagnostics available than with them gated off. (🟡 todo — added on 2026-10-02, when the difference was measured at 0.248 s against 0.019–0.025 s. It is what wave 0 is for)
 
 ## 💡 Conclusion
 
-The four questions have short answers:
+The four questions have short answers, and a fifth answer the page didn't set out to find:
 
-- **The analysis of 2026-09-29 is still the right map.** Nothing it proposed has landed, and a second content set reproduces every mechanism it described — in a debug profile, so its counts carry over and its timings don't.
+- **The analysis of 2026-09-29 was still the right map.** A second content set reproduced every mechanism it described — in a debug profile, so its counts carried over and its timings didn't. Of the sixteen changes it proposed, waves 1 to 3 have landed or superseded all but `C16`, and `C1`, `C2`, and `C9` — parked as debug-profile concerns — are back in the plan as wave 0.
 - **The cheapest wins are new.** A static icon, prev/next from the level, validators on every response, a cache that stores parsed records instead of raw text, and the asset-folder rule each take hours — and all of them landed in wave 1.
 - **Caching should be one model.** SmartCache in the host for every derived value — rendered pages and complete folder records included — and HTTP validators in the browser, carrying the same versions.
 - **At any size, the folder is the unit.** One record and one level per folder, read when shown, rewritten when changed, never loaded all at once — and the record carries all of the folder's metadata, so anything a publisher adds to `metadata.yml` reaches the reader.
+- **The largest cost was never navigation.** Twice over. The deployed instance's core went to a crawler trap, which `C32` ended; what remained of its CPU per request is about nine-tenths instrumentation, which wave 0 is for. Both were invisible in every local run, and both were found by measuring the instance that actually serves readers.
 
 Next steps:
 
 - Implement and validate wave 1. (✅ done — 2026-10-02, [validation sequence](_validation/20261002.01-validation-sequence.md))
-- Measure the deployed instance before and after wave 1 (`M1`). (✅ done in part — 2026-10-02, [📏 Deployed baseline](#-deployed-baseline))
+- Measure the deployed instance before and after wave 1 (`M1`). (✅ done — 2026-10-02, [📏 Deployed baseline](#-deployed-baseline))
 - Deploy `C32`, then read the deployed instance's CPU and response times again. (✅ done — 4 CPU-seconds per five minutes, from 160–228)
-- Complete `M1` on the freed instance — a deliberate restart, the instrumentation sources gated off, SmartCache's size and evictions, and counts after a publish — and decide `C33`. (📌 next steps)
-- Prototype `C24-persisted-folder-records` against a generated tree of 100,000 articles before fixing its storage layout. (📌 next steps)
+- Implement and validate wave 2 — `C29`, `C4`, `C22`, `C11`, and `C12`. (✅ done — 2026-10-02, validation sequences `04` and `06`–`09`)
+- Implement and validate wave 3 — `C21`, `C10`, and `C23`. (✅ done — 2026-10-02, validation sequences `10`–`12`)
+- Deploy waves 2 and 3. (✅ done — commit `7408cfc` reached both apps at 16:24 UTC on 2026-10-02, and the live `/_nav/children` returns the folder-reference shape `C29` introduced)
+- Build the scale harness and measure waves 1 to 3 across a ten-fold step in corpus size (`M2`). (✅ done — 2026-10-02, [📐 Scale baseline](#-scale-baseline))
+- Turn Always On on, per deployed app (`C33`). (✅ done — 2026-10-02, both SmartDocs apps; the docs site's first request when idle went from `504` after 110.7 s to 422 ms)
+- Complete `M1` on the instance — a deliberate restart, steady-state CPU and response time, and the instrumentation comparison that settles `PL-1`. (✅ done — 2026-10-02, [⚡ What instrumentation costs a deployed instance](#-what-instrumentation-costs-a-deployed-instance))
+- Give `/_nav/folder` the validator `C20` gave the other endpoints (`C34`). (✅ done — 2026-10-02, verified locally before and after)
+- Implement wave 0 — `C1`, `C2`, and `C9` — and re-run the instrumentation comparison to confirm the cost is gone with the diagnostics kept. It is now the highest-value work open. (📌 next steps)
+- Read SmartCache's size and evictions, and how long counts stay stale after a publish, which need a diagnostic endpoint and a publish rather than an outside probe. (📌 next steps)
+- Prototype `C24-persisted-folder-records` against a generated tree of 100,000 articles before fixing its storage layout. The harness and the trend are in place; the criterion's own tree, and the storage layout the prototype decides, are not. (📌 next steps)
 
 ## 🎓 Lessons learned
 
-**A measurement inherits its profile.** The debug profile instruments every call and logs every cache lookup, which is what makes it useful for debugging, and also why its trace can't rank costs for a deployed instance. Every figure on this page now names the profile it came from, and the strategy ranks changes by counts that don't depend on one.
+**A measurement inherits its profile — and a parked question inherits its premise.** The debug profile instruments every call, which is why its trace can't rank costs for a deployed instance; every figure on this page names the profile it came from. But the page then parked instrumentation on the *assumption* that a deployed instance, logging at `Warning` and sampling 10% of traces, wouldn't pay for it. That assumption held the item for two revisions and kept instrumentation off the ranking of what a runtime environment pays for. One four-minute load run on the deployed instance refuted it: nine-tenths of the CPU of every request. A parked item should name the measurement that settles it — this one did — and the measurement should be taken as soon as the instance allows, because until it is, the park is a guess wearing a disposition.
 
 **Split what changes often from what changes rarely.** Counts change with every publish below a folder; a level changes only when its own children do. Storing the count inside the level made every publish a flush. A folder record beside the level keeps each change as small as what it touched — and gives the client all of the folder's metadata instead of the fields a level happened to carry.
 
@@ -978,9 +1150,13 @@ Next steps:
 
 **Cache the answer, not the raw material.** Caching a file's first 8 KB to read five fields filled most of the cache with text nothing reads. A cache that stores parsed records holds an order of magnitude more of what navigation needs in the same space.
 
+**Idle traffic hides a per-request cost.** After `C32` the deployed instance sat at about 4 CPU-seconds per 15 minutes, which reads as settled — and it is, for 46 requests. The cost that matters is per request, and at 46 requests in 15 minutes there aren't enough of them for it to show. Four minutes of steady load made the same instance spend 0.248 s of CPU on each one. A low total is not a low unit cost; it can just be a low count.
+
+**Hold one dimension still, or the measurement answers a different question.** The first scale pair grew the corpus ten-fold and the root level from four areas to ten at the same time, and attributed 39% more first-page bytes to the corpus. Growing only what lies below an identical root level put the difference at zero: the bytes belonged to the level on screen, which is bounded by the menu, not by the corpus. A comparison across sizes is only evidence when one size is the only thing that changed.
+
 ## 📡 Signal sweep
 
-The conversation behind this page, including the review that produced version 1.1, was checked against the eight sweep questions of the signal-capture procedure. Six signals are recorded on [02-signals.md](02-signals.md): four pending on the primary list, one routed to an existing landing, and one closed. `SIG-4` and `SIG-5` come from the implementation of wave 1, and `SIG-6` from the deployed measurement, each swept separately below the table.
+The conversation behind this page, including the review that produced version 1.1, was checked against the eight sweep questions of the signal-capture procedure. Six signals are recorded on [02-signals.md](02-signals.md): four pending on the primary list, one routed to an existing landing, and one closed. `SIG-4` and `SIG-5` come from the implementation of wave 1, and `SIG-6` from the deployed measurement; waves 2 and 3 added no record and widened `SIG-5`. Each batch is swept separately below the table.
 
 | Sweep question | Result |
 |---|---|
@@ -996,6 +1172,12 @@ The conversation behind this page, including the review that produced version 1.
 The implementation of wave 1, on 2026-10-02, was swept with the same questions. It added two signals. `SIG-5`: wave 1 changes facts that six generated reference and architecture pages state, and those pages are regenerated by the documentation stream rather than edited here. `SIG-4`: SmartCache derives an entry's eviction priority from its size alone, so `C31` keeps bodies at low priority by overstating their size. The behaviors the run surfaced but wave 1 doesn't change — the prerendered lower bound, counts-only pushes, and the settle time after a whole-site invalidation — belong to this work item and are owned by `C10`, `C29`, and `C25`, so they aren't signals. Nothing was decided outside a file, and no governing artifact fell short: the validation rules bind a port and a build the developer's own instance was using, and the run recorded its deviation rather than working around the rules.
 
 The deployed measurement and `C32`, also on 2026-10-02, were swept with the same questions. They added `SIG-6`: the lock files carry no runtime graph, so the deploy's runtime-specific publish re-resolves every floating version and ships packages no developer built. It was closed the same day: the host and the shared library declare the deploy runtimes, their lock files carry them, and the deploy restores in locked mode. The deploy failure that blocked `M1` was fixed in the same session, so it isn't a signal. Whether to let GPTBot crawl the Learning Hub is a decision `C32` leaves to the owner, recorded on this page rather than as a signal. One execution error, not an artifact defect: a reproduction of the deploy's restore ran in the developer's working tree and rewrote three lock files, which broke the local build until they were restored; later reproductions ran in an export of the commit.
+
+Waves 2 and 3, also on 2026-10-02, were swept with the same questions. They added no record and widened one. `SIG-5` grows rather than multiplying: the same six generated pages now also misstate that `/_page` returns Markdown rather than rendered JSON, that `/_nav/folder` doesn't exist, that freshness is configured under `ContentFreshness` rather than `Diginsight:SmartCache:SmartDocs`, and that the browser renders Markdown — so its change set runs from `35901a7` through `7408cfc` instead of stopping at `C32`. Two subjects were opened and not developed, both in this work item's domain rather than signals: the hosted page's two interactive roots didn't emit the standard .NET 10 persistent-service payload, which `C10` answers with a deterministic middleware fallback rather than a diagnosis, and `C22`'s first implementation left folder records indefinitely fresh, which the structural tolerance fixed without establishing why the aggregate had no interval of its own. Nothing was decided outside a file, no governing artifact fell short, and no changed artifact has a path-parallel peer in another repository.
+
+`M2` was swept last. It added no record: a generator, an overlay, and a measurement script are apparatus for this work item's own acceptance criterion, they reference no path outside this workspace beyond the tree they write beside it, and they carry no storage identity. The confound its first pair hit — growing the corpus and the root level together — changed this page's own method, so it is a lesson here rather than a signal elsewhere.
+
+`C33`, the completion of `M1`, and `C34`, all on 2026-10-02, were swept together. They changed the standing of two existing records rather than adding one. `SIG-2` — SmartCache's two nested activities and per-lookup `Debug` records on every lookup — had its relevance lowered to `low` on the grounds that its cost was a debug-profile concern pending `PL-1`; `PL-1` now measures that concern at about 90% of the CPU of every request on a deployed instance, so its relevance is raised. `SIG-1` — the options rebind per activity — had argued its production rationale from configuration; that rationale is now measured, and the record says so. Nothing new belongs elsewhere: `C34` is a validator this work item's own `C20` established and its own `C29` omitted, and wave 0 is this work item's to implement. Two decisions were made with the owner and written here rather than to another file: Always On on for both SmartDocs apps and for neither of the three unrelated apps sharing their plan, and the deployed instance returned to its base configuration rather than left with instrumentation gated off, because gating the whole source off trades diagnostics for CPU and that trade is the owner's. One governing-artifact note, not a shortfall: the measurement acted on a deployed instance, which this repository's validation rules don't cover — they bind a visible browser and a local build — so the run recorded its window, its commands, and its restoration instead.
 
 ## 📚 References
 
@@ -1076,5 +1258,5 @@ article_metadata:
   filename: "01-startup-and-navigation-optimization.analysis.md"
   created: "2026-10-01"
   last_updated: "2026-10-02"
-  version: "1.4"
+  version: "1.6"
 -->
