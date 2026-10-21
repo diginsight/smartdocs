@@ -1,0 +1,20 @@
+@using Diginsight.SmartDocs.Web.Shared.Sites
+@inject SiteShellState Site
+
+@if (MountSpace is { IconUrl.Length: > 0 } space)
+{
+    <SpaceIcon Space="space" />
+}
+else if (!string.IsNullOrEmpty(Node.Icon))
+{
+    <i class="bi bi-@Node.Icon"></i>
+}
+
+@code {
+    [Parameter, EditorRequired] public NavChild Node { get; set; } = default!;
+
+    private SpaceShellInfo? MountSpace => Node.IsSection && Node.Prefix is { } prefix
+        ? Site.Spaces.FirstOrDefault(s => !s.IsRootMounted
+            && string.Equals(s.Segment, prefix.Trim('/'), StringComparison.OrdinalIgnoreCase))
+        : null;
+}

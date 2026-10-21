@@ -13,10 +13,7 @@
             <summary tabindex="0" @onclick:preventDefault="true" @onclick="OnSummaryActivate" @onmouseover="OnPointerEnter"
                      @onmouseleave="OnPointerLeave" @onfocusin="OnPointerEnter" @onfocusout="OnPointerLeave">
                 <span class="nav-ico">
-                    @if (!string.IsNullOrEmpty(Node.Icon))
-                    {
-                        <i class="bi bi-@Node.Icon"></i>
-                    }
+                    <NavigationIcon Node="Node" />
                 </span>
                 <span class="nav-label">@Node.Text</span>
                 <span class="nav-twisty" role="button" aria-label="Expand or collapse" @onclick:stopPropagation="true"
@@ -54,13 +51,9 @@ else if (Node.Route is not null)
                pulled the article LEFT of its own parent. Only the <i> is conditional — the same
                shape the section branch above uses. *@
             <span class="nav-ico">
-                @if (!string.IsNullOrEmpty(Node.Icon))
-                {
-                    <i class="bi bi-@Node.Icon"></i>
-                }
+                <NavigationIcon Node="Node" />
             </span>
             <span>@Node.Text</span>
         </NavLink>
     </li>
 }
-

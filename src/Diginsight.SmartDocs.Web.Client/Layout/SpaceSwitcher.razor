@@ -31,7 +31,7 @@
                     {
                         <li>
                             <a class="dropdown-link space-switcher-item @(IsCurrent(space) ? "active" : null)" href="@space.HomeRoute">
-                                <span class="space-switcher-icon">@space.Icon</span>@space.Title
+                                <span class="space-switcher-icon"><SpaceIcon Space="space" /></span>@space.Title
                             </a>
                         </li>
                     }

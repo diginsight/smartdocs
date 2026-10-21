@@ -11,9 +11,9 @@
         {
             <li class="space-card">
                 <a class="space-card-title" href="@space.HomeRoute">
-                    @if (!string.IsNullOrWhiteSpace(space.Icon))
+                    @if (!string.IsNullOrWhiteSpace(space.IconUrl) || !string.IsNullOrWhiteSpace(space.Icon))
                     {
-                        <span class="space-card-icon" aria-hidden="true">@space.Icon</span>
+                        <span class="space-card-icon" aria-hidden="true"><SpaceIcon Space="space" /></span>
                     }
                     @space.Title
                 </a>

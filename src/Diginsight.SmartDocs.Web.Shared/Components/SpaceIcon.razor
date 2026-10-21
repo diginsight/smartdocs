@@ -1,0 +1,14 @@
+@using Diginsight.SmartDocs.Web.Shared.Sites
+
+@if (!string.IsNullOrWhiteSpace(Space.IconUrl))
+{
+    <img class="space-icon-image" src="@Space.IconUrl" alt="" aria-hidden="true" />
+}
+else if (!string.IsNullOrWhiteSpace(Space.Icon))
+{
+    <span aria-hidden="true">@Space.Icon</span>
+}
+
+@code {
+    [Parameter, EditorRequired] public SpaceShellInfo Space { get; set; } = default!;
+}

@@ -1405,6 +1405,25 @@ body {
     flex: 0 0 auto;
 }
 
+.space-icon-image,
+.markdown-body img.space-icon-image {
+    display: inline-block;
+    width: 1.25rem;
+    height: 1.25rem;
+    object-fit: contain;
+    vertical-align: middle;
+    flex: 0 0 auto;
+    margin: 0;
+}
+
+.topmenu-btn > .space-icon-image,
+.topmenu-link > .space-icon-image {
+    background: #ffffff;
+    border-radius: 2px;
+    box-sizing: border-box;
+    padding: 2px;
+}
+
 @media (max-width: 860px) {
     .space-switcher-label {
         display: none;

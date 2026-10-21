@@ -22,7 +22,7 @@
                 @if (!string.IsNullOrEmpty(n.Icon))
                 {
                     <button class="rail-btn @(IsActiveRail(n) ? "active" : null)" title="@n.Text" @onclick="() => OnRailClick(n)">
-                        <i class="bi bi-@n.Icon"></i>
+                        <NavigationIcon Node="n" />
                     </button>
                 }
             }

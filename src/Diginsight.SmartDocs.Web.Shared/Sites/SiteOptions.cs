@@ -109,6 +109,8 @@ public sealed class SpaceShellInfo
     public string RouteBase { get; set; } = "/";
     public string Title { get; set; } = string.Empty;
     public string Icon { get; set; } = string.Empty;
+    /// <summary>Mounted content URL of the configured image, or empty to render Icon.</summary>
+    public string IconUrl { get; set; } = string.Empty;
     public string Description { get; set; } = string.Empty;
     public string RepositoryUrl { get; set; } = string.Empty;
 
@@ -118,6 +120,9 @@ public sealed class SpaceShellInfo
         RouteBase = space.RouteBase,
         Title = string.IsNullOrWhiteSpace(space.Title) ? space.Id : space.Title,
         Icon = space.Icon,
+        IconUrl = string.IsNullOrWhiteSpace(space.IconPath) ? string.Empty
+            : "/_content/" + string.Join("/", SpaceRegistry.ToRoute(space,
+                space.IconPath.Trim().Replace('\\', '/')).TrimStart('/').Split('/').Select(Uri.EscapeDataString)),
         Description = space.Description,
         RepositoryUrl = space.RepositoryUrl,
     };
@@ -232,6 +237,9 @@ public sealed class SpaceOptions
 
     /// <summary>Emoji or icon shown beside the title.</summary>
     public string Icon { get; set; } = string.Empty;
+
+    /// <summary>Image path relative to this space's content root; takes precedence over Icon.</summary>
+    public string IconPath { get; set; } = string.Empty;
 
     /// <summary>Optional one-line summary shown on the space's card in the generated index.</summary>
     public string Description { get; set; } = string.Empty;
