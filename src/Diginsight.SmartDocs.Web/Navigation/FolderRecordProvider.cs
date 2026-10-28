@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using Diginsight.SmartCache;
 using Diginsight.SmartDocs.Web.Caching;
 using Diginsight.SmartDocs.Web.Shared.Navigation;
@@ -13,14 +14,20 @@ public sealed class FolderRecordProvider(
     ISmartCache smartCache,
     BackgroundRevalidationCache revalidation,
     ContentFreshnessOptions freshness,
-    SiteOptions site)
+    SiteOptions site,
+    ILogger<FolderRecordProvider> logger)
 {
+    /// <summary>The folder metadata key that would carry a folder requirement once folder requirements exist.</summary>
+    private const string AccessKey = "access";
+
+    private readonly ConcurrentDictionary<string, byte> warnedAccessFolders = new(StringComparer.OrdinalIgnoreCase);
+
     public Task<FolderRecord> GetAsync(string prefix, CancellationToken cancellationToken = default)
     {
         string normalized = Normalize(prefix);
         FolderInvalidationCallbacks.Register(normalized, () =>
         {
-            metrics.Invalidate(normalized);
+            metrics.InvalidateIfTracked(normalized);
             return Task.CompletedTask;
         });
         var key = new ContentPathCacheKey("folder", normalized);
@@ -86,6 +93,19 @@ public sealed class FolderRecordProvider(
 
         FolderMeta meta = await content.ReadFolderMetaAsync($"{prefix}/metadata.yml", cancellationToken);
         FolderMetrics aggregate = metrics.TryGet(prefix) ?? default;
+        return Compose(prefix, node, meta, aggregate);
+    }
+
+    /// <summary>
+    /// The record of a folder prefix that has no navigation node, no <c>metadata.yml</c> and no
+    /// metrics: what <see cref="GetAsync"/> answers for a folder that doesn't exist. A folder the
+    /// reader can't see is answered with it, so it can't be told apart from a missing one.
+    /// </summary>
+    public FolderRecord Unknown(string prefix) =>
+        Compose(Normalize(prefix), null, FolderMeta.None, default);
+
+    private FolderRecord Compose(string prefix, NavChild? node, FolderMeta meta, FolderMetrics aggregate)
+    {
         string name = prefix[(prefix.LastIndexOf('/') + 1)..];
         string label = node?.Text ?? meta.Label ?? NavRules.Label(name);
         string classification = meta.Hidden ? "hidden"
@@ -108,7 +128,37 @@ public sealed class FolderRecordProvider(
             aggregate.Count,
             aggregate.Latest,
             aggregate.Coverage,
-            meta.Values ?? new Dictionary<string, string>());
+            WithoutAccess(prefix, meta.Values));
+    }
+
+    /// <summary>
+    /// Removes an <c>access</c> line from the metadata sent to browsers. Version 1 restricts whole
+    /// spaces only, so the line restricts nothing; sending it would advertise a restriction that
+    /// isn't enforced. Logged once per folder so the author learns it has no effect yet.
+    /// </summary>
+    private IReadOnlyDictionary<string, string> WithoutAccess(string prefix, IReadOnlyDictionary<string, string>? values)
+    {
+        if (values is null)
+        {
+            return new Dictionary<string, string>();
+        }
+
+        if (!values.Keys.Any(static k => string.Equals(k, AccessKey, StringComparison.OrdinalIgnoreCase)))
+        {
+            return values;
+        }
+
+        if (warnedAccessFolders.TryAdd(prefix, 0))
+        {
+            logger.LogWarning(
+                "Folder '{Prefix}' declares '{Key}' in metadata.yml. Version 1 restricts whole spaces only, so the line restricts nothing; it is left out of the folder record.",
+                prefix,
+                AccessKey);
+        }
+
+        return values
+            .Where(static pair => !string.Equals(pair.Key, AccessKey, StringComparison.OrdinalIgnoreCase))
+            .ToDictionary(static pair => pair.Key, static pair => pair.Value, StringComparer.OrdinalIgnoreCase);
     }
 
     private static string Normalize(string prefix) =>

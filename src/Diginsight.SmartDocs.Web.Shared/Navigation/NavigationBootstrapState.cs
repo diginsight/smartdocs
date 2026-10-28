@@ -23,6 +23,14 @@ public sealed class NavigationBootstrapState
     public Dictionary<string, FolderRecord> FolderRecords { get; set; } =
         new(StringComparer.OrdinalIgnoreCase);
 
+    /// <summary>
+    /// The signed-in reader as the shell shows them, or null for an anonymous reader. Only the
+    /// display name and the sign-out form's antiforgery token travel: the server alone decides what
+    /// a reader may see, so the browser needs neither roles nor identity tokens.
+    /// </summary>
+    [PersistentState]
+    public BootstrapReader? Reader { get; set; }
+
     public bool TryGetLevel(string prefix, out IReadOnlyList<NavChild> level)
     {
         if (Levels.TryGetValue(Normalize(prefix), out NavChild[]? stored))
@@ -48,4 +56,19 @@ public sealed class NavigationBootstrapState
 
     private static string Normalize(string prefix) =>
         (prefix ?? string.Empty).Replace('\\', '/').Trim('/');
+}
+
+/// <summary>
+/// The signed-in reader in the bootstrap record: a display name, and the antiforgery field the
+/// sign-out form posts. The page that carries them is the reader's own and is never cached.
+/// </summary>
+public sealed class BootstrapReader
+{
+    public string Name { get; set; } = string.Empty;
+
+    /// <summary>The form field name the host's antiforgery validation reads.</summary>
+    public string SignOutFormField { get; set; } = string.Empty;
+
+    /// <summary>The antiforgery request token for this reader's sign-out form.</summary>
+    public string SignOutToken { get; set; } = string.Empty;
 }

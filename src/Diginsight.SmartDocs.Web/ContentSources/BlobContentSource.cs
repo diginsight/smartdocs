@@ -34,9 +34,13 @@ public sealed class BlobContentSource : IContentSource, IContentLister
     {
         using var activity = Observability.HotPathActivitySource.StartMethodActivity(_logger, () => new { contentKey });
 
+        if (!TryGetBlob(contentKey, out BlobClient? blob))
+        {
+            return null;
+        }
+
         // One round trip: a download that answers 404 is the "not found" an existence check would
         // have reported, without paying for the check on every blob that does exist.
-        BlobClient blob = _container.GetBlobClient(contentKey);
         Response<BlobDownloadResult> response;
         try
         {
@@ -61,6 +65,11 @@ public sealed class BlobContentSource : IContentSource, IContentLister
         using var activity = Observability.HotPathActivitySource.StartMethodActivity(_logger, () => new { prefix });
 
         string p = (prefix ?? string.Empty).Replace('\\', '/').TrimStart('/');
+        if (!ContentKeyGuard.IsSafe(p))
+        {
+            return [];
+        }
+
         if (p.Length > 0 && !p.EndsWith('/'))
         {
             p += "/";
@@ -92,7 +101,11 @@ public sealed class BlobContentSource : IContentSource, IContentLister
     {
         using var activity = Observability.HotPathActivitySource.StartMethodActivity(_logger, () => new { key });
 
-        BlobClient blob = _container.GetBlobClient(key);
+        if (!TryGetBlob(key, out BlobClient? blob))
+        {
+            return null;
+        }
+
         try
         {
             // Ranged read: pull only the head of the blob, enough for the frontmatter block.
@@ -107,5 +120,30 @@ public sealed class BlobContentSource : IContentSource, IContentLister
         {
             return null;
         }
+    }
+
+    /// <summary>
+    /// The blob a key names in this container, or false for a key the SDK could resolve elsewhere:
+    /// it collapses dot segments when it builds the blob URI, so <c>../other/x.md</c> would address
+    /// the container <c>other</c>. Keys are refused by <see cref="ContentKeyGuard"/> first, and the
+    /// resulting client must still name this container.
+    /// </summary>
+    private bool TryGetBlob(string key, [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out BlobClient? blob)
+    {
+        blob = null;
+        if (!ContentKeyGuard.IsSafe(key))
+        {
+            return false;
+        }
+
+        BlobClient candidate = _container.GetBlobClient(key);
+        if (!string.Equals(candidate.BlobContainerName, _container.Name, StringComparison.Ordinal))
+        {
+            _logger.LogWarning("Refused content key '{Key}': it resolves outside container '{Container}'.", key, _container.Name);
+            return false;
+        }
+
+        blob = candidate;
+        return true;
     }
 }

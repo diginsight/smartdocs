@@ -21,13 +21,29 @@ public interface IRenderedPageResolver
         CancellationToken cancellationToken = default);
 }
 
-public sealed record RenderedPageResolution(bool Handled, RenderedPage? Page)
+/// <summary>
+/// The outcome of resolving a route to a rendered page.
+/// </summary>
+/// <param name="ContentKey">
+/// The content key of the file that was rendered, when the server rendered it. A route can be backed
+/// by several candidate files, so authorization checks this key — the file actually rendered —
+/// rather than re-deriving one from the route. Null in the browser, which never sees content keys.
+/// </param>
+/// <param name="IsHidden">
+/// True when the route resolved to a file the reader may not see. Handled and without a page, like
+/// <see cref="Nothing"/>, so every caller answers it exactly as a missing page — but distinct from it,
+/// because the server must not fall through to another candidate file for a hidden one.
+/// </param>
+public sealed record RenderedPageResolution(bool Handled, RenderedPage? Page, string? ContentKey = null, bool IsHidden = false)
 {
     public static RenderedPageResolution Unhandled { get; } = new(false, null);
 
     public static RenderedPageResolution Nothing { get; } = new(true, null);
 
-    public static RenderedPageResolution Found(RenderedPage page) => new(true, page);
+    /// <summary>The route renders a page the reader may not see: answered as <see cref="Nothing"/> is.</summary>
+    public static RenderedPageResolution Hidden { get; } = new(true, null, null, true);
+
+    public static RenderedPageResolution Found(RenderedPage page, string? contentKey = null) => new(true, page, contentKey);
 }
 
 /// <summary>A single heading in the on-page table of contents.</summary>

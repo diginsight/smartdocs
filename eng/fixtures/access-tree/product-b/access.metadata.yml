@@ -1,0 +1,9 @@
+schema: 1
+permissions:
+  ProductB.Read: Read the product B documentation
+  ProductA.Read: A name that only looks like product A's
+requires: [ProductB.Read]
+roles:
+  ProductB.Reader: [ProductB.Read, ProductA.Read]
+  Contributor: [ProductB.Read]
+  Admin: [ProductB.Read]

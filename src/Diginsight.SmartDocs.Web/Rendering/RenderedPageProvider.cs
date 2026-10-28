@@ -39,7 +39,7 @@ public sealed class RenderedPageProvider(
             cancellationToken);
 
         return envelope.Page is { } page
-            ? RenderedPageResolution.Found(page)
+            ? RenderedPageResolution.Found(page, envelope.ContentKey)
             : RenderedPageResolution.Nothing;
 
         async Task<RenderedPageEnvelope> BuildAsync(CancellationToken ct)
@@ -56,14 +56,15 @@ public sealed class RenderedPageProvider(
                 string contentDir = contentKey.Contains('/')
                     ? contentKey[..contentKey.LastIndexOf('/')]
                     : string.Empty;
-                return new RenderedPageEnvelope(renderer.Render(markdown, contentDir));
+                return new RenderedPageEnvelope(renderer.Render(markdown, contentDir), contentKey);
             }
 
             return new RenderedPageEnvelope(null);
         }
     }
 
-    private sealed record RenderedPageEnvelope(RenderedPage? Page) : ISizeableHeuristically
+    /// <param name="ContentKey">The candidate key that was rendered, so the page is checked through the exact file shown.</param>
+    private sealed record RenderedPageEnvelope(RenderedPage? Page, string? ContentKey = null) : ISizeableHeuristically
     {
         public HeuristicSizeResult GetSizeHeuristically(HeuristicSizeGetter innerGet) =>
             new(Page is null
@@ -71,6 +72,7 @@ public sealed class RenderedPageProvider(
                 : 128L + 2L * (
                     Page.Html.Length +
                     Page.Title.Length +
+                    (ContentKey?.Length ?? 0) +
                     Page.Toc.Sum(static item => item.Text.Length + item.Id.Length)));
     }
 }

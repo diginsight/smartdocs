@@ -45,6 +45,53 @@ public sealed class SiteOptions
     public IList<string> AssetFolders { get; set; } = new List<string>();
 
     public IList<SpaceOptions> Spaces { get; set; } = new List<SpaceOptions>();
+
+    /// <summary>Site-wide reader authorization: the default requirement and the session lifetime.</summary>
+    public SiteAuthorizationOptions Authorization { get; set; } = new();
+}
+
+/// <summary>
+/// Site-wide authorization settings, bound from <c>Site:Authorization</c>. Roles aren't configured
+/// here: each space's repository maps them in its own <c>access.metadata.yml</c>, and no setting
+/// grants every space, because a permission that opens every space would belong to no repository.
+/// </summary>
+public sealed class SiteAuthorizationOptions
+{
+    /// <summary>The permission every signed-in reader holds, and the only value a floor or the default accepts.</summary>
+    public const string Authenticated = "authenticated";
+
+    /// <summary>
+    /// The requirement every node carries in addition to its space's: empty, or <c>authenticated</c>
+    /// to make the whole site private to signed-in readers.
+    /// </summary>
+    public string DefaultRequirement { get; set; } = string.Empty;
+
+    /// <summary>
+    /// How long a sign-in lasts, without sliding. Roles refresh only at sign-in, so this bounds how
+    /// long a removed grant keeps working.
+    /// </summary>
+    public TimeSpan SessionLifetime { get; set; } = TimeSpan.FromHours(8);
+
+    /// <summary>True for the values a deployment floor or the site default accepts: empty or <c>authenticated</c>.</summary>
+    public static bool IsAcceptedRequirement(string? value) =>
+        string.IsNullOrWhiteSpace(value) ||
+        string.Equals(value.Trim(), Authenticated, StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>Stops the host on a setting it can't enforce, naming the setting.</summary>
+    public void Validate()
+    {
+        if (!IsAcceptedRequirement(DefaultRequirement))
+        {
+            throw new InvalidOperationException(
+                $"Site:Authorization:DefaultRequirement is '{DefaultRequirement}'. Expected an empty value or '{Authenticated}'.");
+        }
+
+        if (SessionLifetime <= TimeSpan.Zero)
+        {
+            throw new InvalidOperationException(
+                $"Site:Authorization:SessionLifetime is '{SessionLifetime}'. It must be a positive duration, such as '08:00:00'.");
+        }
+    }
 }
 
 /// <summary>Publisher identity. Branding is per deployment, never per space.</summary>
@@ -91,7 +138,14 @@ public sealed class SiteShellOptions
     /// </summary>
     public List<ThemeOption> Themes { get; set; } = new();
 
-    public static SiteShellOptions From(SiteOptions site, string logoUrl = "") => new()
+    /// <summary>
+    /// True when the host signs readers in, so the shell offers <b>Sign in</b> and <b>Sign out</b>.
+    /// Written only when true, so a host without sign-in sends the same <c>/_site</c> body as before.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public bool SignInEnabled { get; set; }
+
+    public static SiteShellOptions From(SiteOptions site, string logoUrl = "", bool signInEnabled = false) => new()
     {
         Title = site.Title,
         Branding = site.Branding,
@@ -99,6 +153,7 @@ public sealed class SiteShellOptions
         Spaces = site.Spaces.Select(SpaceShellInfo.From).ToList(),
         LogoUrl = logoUrl,
         Themes = ThemeCatalog.Resolve(site.Themes).ToList(),
+        SignInEnabled = signInEnabled,
     };
 }
 
@@ -153,6 +208,9 @@ public sealed class SiteShellState
     /// <summary>The palettes this deployment offers, in menu order.</summary>
     public IReadOnlyList<ThemeOption> Themes { get; private set; } = ThemeCatalog.BuiltIn;
 
+    /// <summary>True when the host signs readers in.</summary>
+    public bool SignInEnabled { get; private set; }
+
     /// <summary>True when this deployment has a brand mark to render in place of the icon.</summary>
     public bool HasLogo => !string.IsNullOrWhiteSpace(LogoUrl);
 
@@ -181,6 +239,7 @@ public sealed class SiteShellState
         Spaces = site.Spaces ?? new List<SpaceShellInfo>();
         LogoUrl = site.LogoUrl ?? string.Empty;
         Themes = ThemeCatalog.Resolve(site.Themes);
+        SignInEnabled = site.SignInEnabled;
         IsConfigured = true;
         Changed?.Invoke();
     }
@@ -249,6 +308,23 @@ public sealed class SpaceOptions
 
     /// <summary>Whether GPTBot may crawl this space's published content. Denied by default.</summary>
     public bool AllowGptBot { get; set; }
+
+    /// <summary>
+    /// The deployment's floor for this space: empty, or <c>authenticated</c> to admit only signed-in
+    /// readers whatever the space's repository declares. It adds to the space's access file and the
+    /// site default, and never lifts either. Any other value stops the host at startup, because a
+    /// floor naming a repository's permission could be satisfied by that repository's own mappings.
+    /// Set only by an environment overlay.
+    /// </summary>
+    public string Access { get; set; } = string.Empty;
+
+    /// <summary>
+    /// When true, the space is hidden while its <c>access.metadata.yml</c> is missing, and the host
+    /// logs an error. It closes the window in which a first publish uploads pages before the access
+    /// file, and the one in which deleting the file from the repository would turn the space public.
+    /// Off by default, so a space without an access file stays public. Set only by an environment overlay.
+    /// </summary>
+    public bool AccessFileRequired { get; set; }
 
     /// <summary>Active content source for this space: <c>Blob</c> or <c>FileSystem</c>.</summary>
     public string Source { get; set; } = "Blob";

@@ -7,6 +7,7 @@ using Diginsight.SmartCache;
 using Diginsight.SmartCache.Externalization.Http;
 using Diginsight.SmartCache.Externalization.Redis;
 using Diginsight.SmartCache.Externalization.ServiceBus;
+using Diginsight.SmartDocs.Web.Authorization;
 using Diginsight.SmartDocs.Web.Caching;
 using Diginsight.SmartDocs.Web.Components;
 using Diginsight.SmartDocs.Web.ContentSources;
@@ -72,6 +73,9 @@ public class Program
             services.AddRazorComponents()
                 .AddInteractiveWebAssemblyComponents()
                 .RegisterPersistentService<NavigationBootstrapState>(RenderMode.InteractiveWebAssembly);
+            // The prerendered sign-in component reads the request's reader; the browser restores the
+            // same state from the bootstrap record NavigationBootstrapMiddleware writes.
+            services.AddCascadingAuthenticationState();
 
             // Dynamic responses worth compressing: navigation JSON and Markdown source. HTML is left
             // out on purpose — a prerendered page carries an antiforgery token next to reflected input,
@@ -91,6 +95,17 @@ public class Program
             SiteOptions siteOptions = configuration.GetSection("Site").Get<SiteOptions>()
                 ?? throw new InvalidOperationException("Missing 'Site' configuration section.");
 
+            // A site default or session lifetime the host can't enforce stops it here, like a
+            // misconfigured space; space floors are checked by SpaceRegistry below.
+            siteOptions.Authorization.Validate();
+
+            // Entra sign-in, wired only when AzureAd:ClientId is set; otherwise the host stays
+            // anonymous-only and registers no authentication service at all.
+            SignInConfiguration signIn = SignInConfiguration.From(configuration);
+            services.AddSingleton(signIn);
+            services.AddReaderSignIn(configuration, signIn, siteOptions.Authorization);
+            logger.LogInformation("Reader sign-in is {State}", signIn.Enabled ? "enabled" : "disabled");
+
             // Populated after the container is built (see BrandingAssetResolver), so the scoped
             // factory below — which only ever runs once a request is being served — reads the
             // resolved value and the prerendered header already carries the mark.
@@ -98,7 +113,11 @@ public class Program
             services.AddSingleton(brandingAssets);
             services.AddScoped(sp =>
             {
-                SiteShellOptions shell = SiteShellOptions.From(siteOptions, brandingAssets.LogoUrl);
+                // Only the spaces this request's reader may see: the prerendered shell, the bootstrap
+                // state the browser hydrates from, and the generated space index all follow it.
+                SiteShellOptions shell = SiteEndpoints.ForReader(
+                    SiteShellOptions.From(siteOptions, brandingAssets.LogoUrl, signIn.Enabled),
+                    sp.GetRequiredService<ReaderAccess>());
                 sp.GetRequiredService<NavigationBootstrapState>().Site = shell;
                 var state = new SiteShellState();
                 state.Apply(shell);
@@ -215,9 +234,27 @@ public class Program
             services.AddSingleton<IContentSource>(sp => sp.GetRequiredService<CachedContentSource>());
             services.AddSingleton<IContentLister>(sp => sp.GetRequiredService<CachedContentSource>());
 
+            // Each space's access.metadata.yml, read from its physical source and cached as a content
+            // fact keyed by the space's mount, so navigation's invalidation clears it too.
+            services.AddSingleton<AccessFileProvider>();
+            // Effective requirements: the site default, a space's floor, and its access file, combined
+            // per check so no cache entry ever holds one.
+            services.AddSingleton(sp => new AccessRequirementResolver(
+                spaceRegistry,
+                sp.GetRequiredService<AccessFileProvider>(),
+                siteOptions.Authorization,
+                sp.GetRequiredService<ILogger<AccessRequirementResolver>>()));
+            // One visibility rule for every surface and for the push hub; ReaderAccess holds its
+            // verdicts for the current request, evaluated once by the middleware below.
+            services.AddSingleton<SpaceVisibilityEvaluator>();
+            services.AddSingleton<ReaderCountComposer>();
+            services.AddSingleton<ActiveRoleSets>();
+            services.AddScoped<ReaderAccess>();
+
             services.AddSingleton<IMarkdownRenderer, MarkdigMarkdownRenderer>();
             services.AddSingleton<RenderedPageProvider>();
-            services.AddSingleton<IRenderedPageResolver>(sp => sp.GetRequiredService<RenderedPageProvider>());
+            // Pages reach readers only through the access check, which depends on the request.
+            services.AddScoped<IRenderedPageResolver, AuthorizingRenderedPageResolver>();
             services.AddScoped<PageLoader>();
             services.AddScoped<TocState>();
             services.AddScoped<SidebarState>();
@@ -256,7 +293,8 @@ public class Program
                 sp.GetRequiredService<ISmartCache>(),
                 sp.GetRequiredService<BackgroundRevalidationCache>(),
                 freshness,
-                siteOptions));
+                siteOptions,
+                sp.GetRequiredService<ILogger<FolderRecordProvider>>()));
             services.AddScoped<INavProvider, ServerNavProvider>();
 
             // Live navigation metadata push: SignalR hub + the publisher that broadcasts folder
@@ -284,6 +322,20 @@ public class Program
 
             app.UseResponseCompression();
 
+            // What this request's reader may see, evaluated once, ahead of everything that serves
+            // content, so every later component and endpoint reads initialized verdicts.
+            // Authentication runs immediately before it, so the verdicts follow the signed-in reader.
+            if (signIn.Enabled)
+            {
+                app.UseAuthentication();
+            }
+
+            app.Use(static async (context, next) =>
+            {
+                await context.RequestServices.GetRequiredService<ReaderAccess>().InitializeAsync(context);
+                await next(context);
+            });
+
             app.UseMiddleware<NavigationBootstrapMiddleware>();
 
             app.Use(async (context, next) =>
@@ -307,8 +359,14 @@ public class Program
             app.MapContentEndpoints();
             app.MapNavEndpoints();
             app.MapSiteEndpoints();
+            app.MapAuthEndpoints(signIn);
             app.MapTestContentEndpoints(app.Configuration);
-            app.MapHub<NavHub>(NavHubContract.Route);
+            app.MapHub<NavHub>(NavHubContract.Route, options =>
+            {
+                // A connection outlives the request that opened it, so it must end with the session that
+                // authorized it, or a reader whose session expired would keep receiving pushes.
+                options.CloseOnAuthenticationExpiration = true;
+            });
 
             app.MapRazorComponents<App>()
                 .AddInteractiveWebAssemblyRenderMode()

@@ -1,5 +1,6 @@
 using Diginsight.Components.Azure.Extensions;
 using Diginsight.Diagnostics;
+using Diginsight.SmartDocs.Web.Authorization;
 using Diginsight.SmartDocs.Web.Caching;
 using Diginsight.SmartDocs.Web.Rendering;
 using Diginsight.SmartDocs.Web.Shared;
@@ -29,16 +30,27 @@ public static class ContentEndpoints
     public static IEndpointRouteBuilder MapContentEndpoints(this IEndpointRouteBuilder app)
     {
         app.MapGet("/_content/{**key}", GetContentRawAsync);
-        app.MapGet("/_page", (RenderedPageProvider pages, HttpContext http, CancellationToken ct) =>
+        app.MapGet("/_page", (IRenderedPageResolver pages, HttpContext http, CancellationToken ct) =>
             ResolvePageAsync(null, pages, http, ct));
         app.MapGet("/_page/{**path}", ResolvePageAsync);
         return app;
     }
 
     private static async Task<IResult> GetContentRawAsync(
-        string key, IContentSource source, ContentFreshnessOptions freshness, HttpContext http, CancellationToken ct)
+        string key, IContentSource source, ContentFreshnessOptions freshness,
+        AccessRequirementResolver requirements, ReaderAccess reader,
+        HttpContext http, CancellationToken ct)
     {
         using var activity = Observability.ActivitySource.StartMethodActivity(logger, () => new { key });
+
+        // Checked before the read and before any entity tag, so a key the reader can't see answers
+        // exactly as a missing key does — never a 304, whatever If-None-Match the request carries.
+        AccessRequirement requirement = await requirements.ForContentKeyAsync(key, ct);
+        if (!reader.IsVisible(requirement))
+        {
+            activity?.SetOutput(new { found = false });
+            return Results.NotFound();
+        }
 
         ContentResult? result = await source.GetAsync(key, ct);
         activity?.SetOutput(new { found = result is not null });
@@ -50,10 +62,11 @@ public static class ContentEndpoints
         // Images and attachments: the browser may reuse its copy for the same tolerance the server
         // applies to content, and revalidates it afterwards instead of downloading it again. Markdown
         // read here — the client's fallback when it can't resolve a route — revalidates every time,
-        // because an article invalidated by a publish must not linger in the browser.
+        // because an article invalidated by a publish must not linger in the browser. Bytes of a
+        // restricted space are kept by no cache at all.
         string etag = HttpValidators.Tag(key, result.ETag);
-        string cacheControl = NavRules.IsMarkdown(key)
-            ? HttpValidators.Revalidate
+        string cacheControl = !requirement.IsEmpty ? HttpValidators.NoStorePrivate
+            : NavRules.IsMarkdown(key) ? HttpValidators.Revalidate
             : $"public, max-age={(int)freshness.Content.TotalSeconds}";
         if (HttpValidators.IsNotModified(http, etag, cacheControl))
         {
@@ -68,9 +81,14 @@ public static class ContentEndpoints
     /// backed by any of several candidate names, and the WASM client paid a round trip — and left a
     /// 404 in the browser console — for every one that did not exist. The candidate order is
     /// <see cref="PageLoader.Candidates"/> itself, so the two paths cannot drift apart.
+    /// <para>
+    /// Pages are read through <see cref="IRenderedPageResolver"/>, which checks the reader's access,
+    /// so whether a route answers depends on the reader: every answer is <c>private, no-cache</c>, and a
+    /// page the reader can't see answers <c>204</c>, exactly as a missing one does.
+    /// </para>
     /// </summary>
     private static async Task<IResult> ResolvePageAsync(
-        string? path, RenderedPageProvider pages, HttpContext http, CancellationToken ct)
+        string? path, IRenderedPageResolver pages, HttpContext http, CancellationToken ct)
     {
         using var activity = Observability.ActivitySource.StartMethodActivity(logger, () => new { path });
 
@@ -78,12 +96,13 @@ public static class ContentEndpoints
         if (resolution.Page is not { } page)
         {
             activity?.SetOutput(new { found = false });
+            http.Response.Headers.CacheControl = HttpValidators.RevalidatePrivate;
             return Results.NoContent();
         }
 
         byte[] body = JsonSerializer.SerializeToUtf8Bytes(page);
         activity?.SetOutput(new { found = true });
-        if (HttpValidators.IsNotModified(http, HttpValidators.Tag(body), HttpValidators.Revalidate))
+        if (HttpValidators.IsNotModified(http, HttpValidators.Tag(body), HttpValidators.RevalidatePrivate))
         {
             return Results.StatusCode(StatusCodes.Status304NotModified);
         }

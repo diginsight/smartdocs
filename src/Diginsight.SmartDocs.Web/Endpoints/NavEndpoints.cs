@@ -1,4 +1,5 @@
 using Diginsight.Diagnostics;
+using Diginsight.SmartDocs.Web.Authorization;
 using Diginsight.SmartDocs.Web.Navigation;
 using Diginsight.SmartDocs.Web.Shared.Navigation;
 using Diginsight.SmartDocs.Web.Shared.Sites;
@@ -58,15 +59,17 @@ public static class NavEndpoints
 
     private static async Task<IResult> GetNavChildrenAsync(
         string? prefix, INavBuilder nav, INavigationWarmupQueue warmup,
-        FolderRecordProvider folders,
+        ReaderAccess reader,
         IOptions<JsonOptions> json, HttpContext http, CancellationToken ct)
     {
         using var activity = Observability.ActivitySource.StartMethodActivity(logger, () => new { prefix });
 
-        IReadOnlyList<NavChild> children = await nav.GetChildrenAsync(prefix ?? string.Empty, ct);
+        // Only the children the reader may see, and folder records only for those.
+        IReadOnlyList<NavChild> children = await reader.FilterLevelAsync(
+            await nav.GetChildrenAsync(prefix ?? string.Empty, ct));
         FolderRecord[] records = await Task.WhenAll(children
             .Where(static child => child.IsSection && child.Prefix is not null)
-            .Select(child => folders.GetAsync(child.Prefix!, ct)));
+            .Select(child => reader.GetFolderAsync(child.Prefix!, ct)));
         var response = new NavLevelResponse(
             children.Select(static child => child.IsSection && child.Prefix is not null
                 ? NavLevelReference.Folder(child.Prefix)
@@ -79,8 +82,9 @@ public static class NavEndpoints
 
         // Serialized here rather than by Results.Json so the entity tag covers exactly the bytes sent:
         // a browser holding the same level revalidates it with a 304 instead of downloading it again.
+        // The level depends on the reader, so no shared cache may keep it.
         byte[] body = JsonSerializer.SerializeToUtf8Bytes(response, json.Value.SerializerOptions);
-        if (HttpValidators.IsNotModified(http, HttpValidators.Tag(body), HttpValidators.Revalidate))
+        if (HttpValidators.IsNotModified(http, HttpValidators.Tag(body), HttpValidators.RevalidatePrivate))
         {
             return Results.StatusCode(StatusCodes.Status304NotModified);
         }
@@ -90,18 +94,19 @@ public static class NavEndpoints
 
     private static async Task<IResult> GetFolderAsync(
         string? prefix,
-        FolderRecordProvider folders,
+        ReaderAccess reader,
         IOptions<JsonOptions> json, HttpContext http,
         CancellationToken cancellationToken)
     {
         using var activity = Observability.ActivitySource.StartMethodActivity(logger, () => new { prefix });
 
-        FolderRecord record = await folders.GetAsync(prefix ?? string.Empty, cancellationToken);
+        // A folder the reader can't see answers the record of a folder that doesn't exist.
+        FolderRecord record = await reader.GetFolderAsync(prefix ?? string.Empty, cancellationToken);
 
         // Tagged like /_nav/children, over the exact bytes sent: a folder record is the unit the
         // browser keeps and re-reads, so a repeat read of an unchanged record must cost a 304.
         byte[] body = JsonSerializer.SerializeToUtf8Bytes(record, json.Value.SerializerOptions);
-        if (HttpValidators.IsNotModified(http, HttpValidators.Tag(body), HttpValidators.Revalidate))
+        if (HttpValidators.IsNotModified(http, HttpValidators.Tag(body), HttpValidators.RevalidatePrivate))
         {
             return Results.StatusCode(StatusCodes.Status304NotModified);
         }
@@ -116,21 +121,26 @@ public static class NavEndpoints
         return Results.Json(new { version = CachedDynamicNavBuilder.Version });
     }
 
-    private static IResult GetNavTotal(FolderMetricsIndex metrics)
+    private static IResult GetNavTotal(ReaderAccess reader, HttpContext http)
     {
         using var activity = Observability.ActivitySource.StartMethodActivity(logger);
 
-        return metrics.TryGet(string.Empty) is { } site
+        // The total covers only the spaces the reader sees, so no shared cache may keep it.
+        http.Response.Headers.CacheControl = HttpValidators.RevalidatePrivate;
+        return reader.GetTotal() is { } site
             ? Results.Json(new FolderArticleStats(site.Count, site.Latest, null, site.Coverage))
             : Results.NoContent();
     }
 
-    private static async Task<IResult> GetNavIndexAsync(INavBuilder nav, CancellationToken ct)
+    private static async Task<IResult> GetNavIndexAsync(
+        INavBuilder nav, ReaderAccess reader, HttpContext http, CancellationToken ct)
     {
         using var activity = Observability.ActivitySource.StartMethodActivity(logger);
 
         // Client-abort cancellation is handled centrally by the /_nav group endpoint filter.
-        return Results.Json(await nav.GetIndexAsync(ct));
+        IReadOnlyList<NavLeaf> leaves = await reader.FilterIndexAsync(await nav.GetIndexAsync(ct));
+        http.Response.Headers.CacheControl = HttpValidators.RevalidatePrivate;
+        return Results.Json(leaves);
     }
 
     private static IResult InvalidateNavCache(

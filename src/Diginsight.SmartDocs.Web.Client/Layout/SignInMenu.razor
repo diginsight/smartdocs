@@ -1,0 +1,50 @@
+@using Microsoft.AspNetCore.Components.Authorization
+@using Diginsight.SmartDocs.Web.Shared.Navigation
+@using Diginsight.SmartDocs.Web.Shared.Sites
+@inject NavigationManager Navigation
+@inject SiteShellState Site
+@inject NavigationBootstrapState Bootstrap
+@implements IDisposable
+
+@if (Site.SignInEnabled)
+{
+    <div class="topmenu signin-menu">
+        @if (_user?.Identity?.IsAuthenticated == true)
+        {
+            <div class="topmenu-item">
+                <button class="topmenu-btn" type="button" title="@DisplayName" aria-label="@DisplayName">
+                    <i class="bi bi-person-circle"></i>
+                    <span class="signin-name">@DisplayName</span>
+                    <span class="caret">▾</span>
+                </button>
+                <div class="topmenu-dropdown">
+                    <ul class="dropdown-list">
+                        <li>
+                            @* A native form post: the server validates the antiforgery token and signs the
+                               reader out of the cookie and of Entra ID. The token comes from the host's
+                               bootstrap record, which survives hydration on this host. *@
+                            <form method="post" action="@SignOutPath">
+                                @if (Bootstrap.Reader is { SignOutFormField.Length: > 0, SignOutToken.Length: > 0 } reader)
+                                {
+                                    <input type="hidden" name="@reader.SignOutFormField" value="@reader.SignOutToken" />
+                                }
+                                <button class="dropdown-action" type="submit">
+                                    <i class="bi bi-box-arrow-right"></i> Sign out
+                                </button>
+                            </form>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        }
+        else
+        {
+            @* The anchor works before the client starts; once it runs, the click forces a full load,
+               because the client router would otherwise claim the server's sign-in route. *@
+            <a class="topmenu-link" href="@SignInUrl" title="Sign in" aria-label="Sign in" @onclick="SignIn" @onclick:preventDefault="true">
+                <i class="bi bi-box-arrow-in-right"></i>
+                <span class="signin-label">Sign in</span>
+            </a>
+        }
+    </div>
+}

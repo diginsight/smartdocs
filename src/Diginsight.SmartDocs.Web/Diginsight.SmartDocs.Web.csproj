@@ -16,6 +16,8 @@
     <PackageReference Include="Azure.Storage.Blobs" Version="12.*" />
     <!-- Host the WebAssembly client with prerendering. -->
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Server" Version="10.0.*" />
+    <PackageReference Include="Microsoft.Identity.Web" Version="4.16.1" />
+    <PackageReference Include="YamlDotNet" Version="18.1.0" />
   </ItemGroup>
 
   <!-- Diginsight telemetry (core + diagnostics + AspNetCore/OpenTelemetry + Log4Net + Stringify). -->

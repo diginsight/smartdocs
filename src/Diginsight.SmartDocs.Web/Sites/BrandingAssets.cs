@@ -1,3 +1,4 @@
+using Diginsight.SmartDocs.Web.Authorization;
 using Diginsight.SmartDocs.Web.ContentSources;
 using Diginsight.SmartDocs.Web.Shared;
 using Diginsight.SmartDocs.Web.Shared.Sites;
@@ -20,6 +21,13 @@ namespace Diginsight.SmartDocs.Web.Sites;
 /// <see cref="BrandingOptions.LogoPath"/> against that space's own content set; the first space
 /// carrying it wins. The shell then renders <see cref="LogoRoute"/> — one stable URL, identical on
 /// every page of every space, so the browser fetches the mark once.
+/// </para>
+/// <para>
+/// <see cref="LogoRoute"/> is deliberately left unauthorized, even when the space carrying the mark
+/// is restricted: the mark identifies the publisher on every page, including the 404 page and the
+/// generated index an anonymous reader sees, and it is a single configured asset named by the
+/// deployment, never a key a request chooses, so it reveals nothing of the space's content. A
+/// configured path that names an access file is refused at startup.
 /// </para>
 /// </summary>
 public sealed class BrandingAssets
@@ -80,6 +88,17 @@ public static class BrandingAssetResolver
         }
 
         string key = configured.Replace('\\', '/').TrimStart('/');
+
+        // The mark is read from a space's physical source, below the mounted view that refuses access
+        // files, and served without authorization. A LogoPath naming an access file would publish it.
+        if (AccessFile.IsAccessFileKey(key))
+        {
+            logger.LogError(
+                "Site:Branding:LogoPath '{Path}' names an access file, which is never served; "
+                + "the shell falls back to the built-in icon '{IconClass}'.",
+                configured, site.Branding.IconClass);
+            return;
+        }
 
         // Declaration order, read from the space registry's list rather than the content registry's
         // dictionary: "the first configured space that carries it" is only a rule if the order it

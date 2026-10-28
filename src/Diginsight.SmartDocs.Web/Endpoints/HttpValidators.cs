@@ -13,6 +13,15 @@ internal static class HttpValidators
     /// <summary>Cache-Control for a response the browser may keep but must revalidate before every use.</summary>
     public const string Revalidate = "no-cache";
 
+    /// <summary>
+    /// Cache-Control for a response whose content depends on the reader: the browser revalidates it
+    /// before every use, and no shared cache may keep it.
+    /// </summary>
+    public const string RevalidatePrivate = "private, no-cache";
+
+    /// <summary>Cache-Control for restricted bytes: nothing, the browser included, may keep them.</summary>
+    public const string NoStorePrivate = "private, no-store";
+
     /// <summary>A strong entity tag over the given parts, for responses whose identity spans several values.</summary>
     public static string Tag(params string?[] parts) => Tag(Encoding.UTF8.GetBytes(string.Join('\n', parts)));
 

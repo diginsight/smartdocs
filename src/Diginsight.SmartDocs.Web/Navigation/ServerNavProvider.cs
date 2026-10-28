@@ -1,14 +1,18 @@
 using Diginsight.Diagnostics;
+using Diginsight.SmartDocs.Web.Authorization;
 using Diginsight.SmartDocs.Web.Shared.Navigation;
 using Microsoft.Extensions.Logging;
 
 namespace Diginsight.SmartDocs.Web.Navigation;
 
-/// <summary>Server-side <see cref="INavProvider"/> — builds levels in-process (used during prerender).</summary>
+/// <summary>
+/// Server-side <see cref="INavProvider"/> — builds levels in-process (used during prerender). Every
+/// level, record and index it returns is filtered for the request's reader before it reaches the
+/// prerendered page or the bootstrap state the browser hydrates from.
+/// </summary>
 public sealed class ServerNavProvider(
     INavBuilder builder,
-    FolderMetricsIndex metrics,
-    FolderRecordProvider folders,
+    ReaderAccess reader,
     NavigationBootstrapState bootstrap,
     ILogger<ServerNavProvider> logger) : INavProvider
 {
@@ -16,8 +20,8 @@ public sealed class ServerNavProvider(
     {
         using var activity = Observability.ActivitySource.StartMethodActivity(logger, () => new { prefix });
 
-        IReadOnlyList<NavChild> level =
-            NavRules.WithoutEmptySections(await builder.GetChildrenAsync(prefix, ct));
+        IReadOnlyList<NavChild> level = NavRules.WithoutEmptySections(
+            await reader.FilterLevelAsync(await builder.GetChildrenAsync(prefix, ct)));
         bootstrap.SetLevel(prefix, level);
         FolderRecord?[] records = await Task.WhenAll(level
             .Where(static child => child.IsSection && child.Prefix is not null)
@@ -30,19 +34,19 @@ public sealed class ServerNavProvider(
     {
         using var activity = Observability.ActivitySource.StartMethodActivity(logger);
 
-        FolderArticleStats? total = metrics.TryGet(string.Empty) is { } site
+        FolderArticleStats? total = reader.GetTotal() is { } site
             ? new FolderArticleStats(site.Count, site.Latest, null, site.Coverage)
             : null;
         return Task.FromResult(total);
     }
 
     public async Task<FolderRecord?> GetFolderAsync(string prefix, CancellationToken ct = default) =>
-        await folders.GetAsync(prefix, ct);
+        await reader.GetFolderAsync(prefix, ct);
 
     public async Task<IReadOnlyList<NavLeaf>> GetIndexAsync(CancellationToken ct = default)
     {
         using var activity = Observability.ActivitySource.StartMethodActivity(logger);
 
-        return await builder.GetIndexAsync(ct);
+        return await reader.FilterIndexAsync(await builder.GetIndexAsync(ct));
     }
 }

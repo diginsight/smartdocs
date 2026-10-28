@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using Diginsight.Diagnostics;
 using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.Extensions.Logging;
+using Diginsight.SmartDocs.Web.Authorization;
 using Diginsight.SmartDocs.Web.Shared;
 using Diginsight.SmartDocs.Web.Shared.Navigation;
 
@@ -39,6 +40,11 @@ public sealed class FileSystemContentSource : IContentSource, IContentLister
         }
 
         if (!File.Exists(full))
+        {
+            return null;
+        }
+
+        if (IsAccessFileAlias(relative, full))
         {
             return null;
         }
@@ -96,7 +102,8 @@ public sealed class FileSystemContentSource : IContentSource, IContentLister
         string full = Path.GetFullPath(Path.Combine(_root, rel));
 
         string boundary = _root + Path.DirectorySeparatorChar;
-        if (!full.StartsWith(boundary, StringComparison.OrdinalIgnoreCase) || !File.Exists(full))
+        if (!full.StartsWith(boundary, StringComparison.OrdinalIgnoreCase) || !File.Exists(full)
+            || IsAccessFileAlias(rel, full))
         {
             return null;
         }
@@ -106,4 +113,14 @@ public sealed class FileSystemContentSource : IContentSource, IContentLister
         activity?.SetOutput(new { found = head is not null, length = head?.Length ?? 0 });
         return head;
     }
+
+    /// <summary>
+    /// True when a key that doesn't name an access file still resolved to one. On Windows,
+    /// <see cref="Path.GetFullPath(string)"/> expands 8.3 short names, so <c>ACCESS~1.YML</c> opens
+    /// <c>access.metadata.yml</c> although no check on the requested key can recognize it. Judging
+    /// the resolved name closes every such alias, while a request that names the file — the
+    /// access-file provider's own read — still reaches it.
+    /// </summary>
+    private static bool IsAccessFileAlias(string requested, string full) =>
+        AccessFile.IsAccessFileKey(Path.GetFileName(full)) && !AccessFile.IsAccessFileKey(requested);
 }

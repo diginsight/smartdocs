@@ -1,7 +1,9 @@
 using System.Collections.Concurrent;
 using System.Text.Json;
 using Diginsight.Diagnostics;
+using System.Text.Json.Serialization;
 using Diginsight.SmartDocs.Web.Shared.Navigation;
+using Diginsight.SmartDocs.Web.Shared.Sites;
 using Microsoft.Extensions.Logging;
 
 namespace Diginsight.SmartDocs.Web.Navigation;
@@ -22,13 +24,25 @@ namespace Diginsight.SmartDocs.Web.Navigation;
 /// <see cref="Coverage.Complete"/> value — which is what stops a partially loaded or partially
 /// scanned tree from ever displaying a wrong total.
 /// </para>
+/// <para>
+/// Next to the root cell the index keeps a <em>root-own</em> cell: the root-mounted space's articles
+/// outside every mount, folded in the same pass. A prefixed space's totals are already the cell of its
+/// mount folder, so a reader who sees only some spaces gets a site total by adding up the cells of the
+/// spaces they see, plus the root-own cell.
+/// </para>
 /// </summary>
 public sealed class FolderMetricsIndex(
-    IServiceProvider services,
-    ILogger<FolderMetricsIndex> logger) : IDisposable
+   IServiceProvider services,
+   SpaceRegistry spaces,
+   ILogger<FolderMetricsIndex> logger) : IDisposable
 {
-    private static readonly TimeSpan DebounceWindow = TimeSpan.FromMilliseconds(400);
+   private static readonly TimeSpan DebounceWindow = TimeSpan.FromMilliseconds(400);
 
+   // Bumped whenever the snapshot's shape changes; a snapshot in another format is ignored.
+   private const int SnapshotFormat = 2;
+
+   // Replaced as a whole, never mutated, so a reader sees one fold's value.
+   private volatile RootOwnValue _rootOwn = new(0, null, Coverage.None);
     private readonly ConcurrentDictionary<string, Cell> _cells = new(StringComparer.OrdinalIgnoreCase);
     private readonly SemaphoreSlim _drainGate = new(1, 1);
     private readonly object _timerGate = new();
@@ -72,6 +86,14 @@ public sealed class FolderMetricsIndex(
             : null;
     }
 
+    /// <summary>
+    /// The root-mounted space's own articles, outside every mount, or null while nothing is known. It is
+    /// part of the root cell's value; a reader who doesn't see everything adds it to the cells of the
+    /// mounted spaces they see.
+    /// </summary>
+    public FolderMetrics? TryGetRootOwn() =>
+        _rootOwn is { Coverage: not Coverage.None } own ? new FolderMetrics(own.Count, own.Latest, own.Coverage) : null;
+
     /// <summary>Snapshot of every tracked folder — used by the diagnostics endpoint.</summary>
     public IReadOnlyDictionary<string, FolderCellView> Dump() =>
         _cells.ToDictionary(
@@ -104,6 +126,20 @@ public sealed class FolderMetricsIndex(
         }
 
         ScheduleDrain();
+    }
+
+    /// <summary>
+    /// Like <see cref="Invalidate"/>, but only for a folder the index already tracks. A folder record
+    /// asked for a prefix that no content has (a mistyped or crafted route) must not make the index
+    /// track it: the next drain would fold the new cell and push a record for it, timed by whatever
+    /// change cleared the folder cache, hidden spaces included.
+    /// </summary>
+    public void InvalidateIfTracked(string prefix)
+    {
+        if (_cells.ContainsKey(Normalize(prefix)))
+        {
+            Invalidate(prefix);
+        }
     }
 
     /// <summary>Marks every tracked folder dirty (startup after loading a seed, or a manual rebuild).</summary>
@@ -172,11 +208,17 @@ public sealed class FolderMetricsIndex(
 
                 long observed = Interlocked.Read(ref cell.Invalidated);   // capture BEFORE
 
-                (int count, DateTimeOffset? latest, Coverage coverage) = await FoldAsync(prefix, ct);
+                (int count, DateTimeOffset? latest, Coverage coverage, RootOwnValue? own) = await FoldAsync(prefix, ct);
+
+                bool ownMoved = own is not null && Supersedes(own.Coverage, _rootOwn.Coverage) && _rootOwn != own;
 
                 if (Supersedes(coverage, cell.Coverage) &&
-                    (cell.Count != count || cell.Latest != latest || cell.Coverage != coverage))
+                    (ownMoved || cell.Count != count || cell.Latest != latest || cell.Coverage != coverage))
                 {
+                    if (ownMoved)
+                    {
+                        _rootOwn = own!;
+                    }
                     cell.Count = count;
                     cell.Latest = latest;
                     cell.Coverage = coverage;
@@ -310,7 +352,7 @@ public sealed class FolderMetricsIndex(
     /// Recomputes one folder from its direct children: section children contribute their own cell
     /// (no I/O), article leaves contribute 1. Only this folder's level is listed.
     /// </summary>
-    private async Task<(int Count, DateTimeOffset? Latest, Coverage Coverage)> FoldAsync(string prefix, CancellationToken ct)
+    private async Task<(int Count, DateTimeOffset? Latest, Coverage Coverage, RootOwnValue? Own)> FoldAsync(string prefix, CancellationToken ct)
     {
         IReadOnlyList<NavChild> level = await Nav.GetChildrenAsync(prefix, ct);
 
@@ -319,11 +361,18 @@ public sealed class FolderMetricsIndex(
         bool allKnown = true;
         bool anyContribution = false;
 
+        // At the root, the children that aren't a space's mount are the root-mounted space's own.
+        int ownCount = 0;
+        DateTimeOffset? ownLatest = null;
+        bool ownAllKnown = true;
+        bool ownAnyContribution = false;
+
         foreach (NavChild child in level)
         {
             if (child.IsSection && child.Prefix is not null)
             {
                 string childPrefix = Normalize(child.Prefix);
+                bool isOwn = prefix.Length == 0 && spaces.MountedAt(childPrefix) is null;
                 if (!_cells.TryGetValue(childPrefix, out Cell? sub))
                 {
                     // A section nothing registered — a folder created after the crawl. Registering it
@@ -331,29 +380,44 @@ public sealed class FolderMetricsIndex(
                     // and the drain would re-arm on it indefinitely.
                     _cells.TryAdd(childPrefix, new Cell { Invalidated = NextStamp(), Discovered = true });
                     allKnown = false;
+                    ownAllKnown &= !isOwn;
                     continue;
                 }
 
                 if (sub.Coverage == Coverage.None)
                 {
                     allKnown = false;         // unknown child contributes NOTHING (not zero)
+                    ownAllKnown &= !isOwn;
                     continue;
                 }
 
                 if (sub.Coverage == Coverage.Partial)
                 {
                     allKnown = false;
+                    ownAllKnown &= !isOwn;
                 }
 
                 count += sub.Count;
                 latest = Newer(latest, sub.Latest);
                 anyContribution = true;
+                if (isOwn)
+                {
+                    ownCount += sub.Count;
+                    ownLatest = Newer(ownLatest, sub.Latest);
+                    ownAnyContribution = true;
+                }
             }
             else if (!string.IsNullOrEmpty(child.Route))
             {
                 count++;
                 latest = Newer(latest, child.Date);
                 anyContribution = true;
+                if (prefix.Length == 0)
+                {
+                    ownCount++;
+                    ownLatest = Newer(ownLatest, child.Date);
+                    ownAnyContribution = true;
+                }
             }
         }
 
@@ -361,7 +425,13 @@ public sealed class FolderMetricsIndex(
             : anyContribution ? Coverage.Partial
             : Coverage.None;
 
-        return (count, latest, coverage);
+        RootOwnValue? own = prefix.Length > 0 ? null
+            : new RootOwnValue(
+                ownCount,
+                ownLatest,
+                ownAllKnown ? Coverage.Complete : ownAnyContribution ? Coverage.Partial : Coverage.None);
+
+        return (count, latest, coverage, own);
     }
 
     // Complete outranks Partial outranks None: a lower bound may never replace a true total.
@@ -409,9 +479,14 @@ public sealed class FolderMetricsIndex(
     {
         try
         {
-            var payload = _cells
+            var cells = _cells
                 .Where(kv => kv.Value.Coverage != Coverage.None)
                 .ToDictionary(kv => kv.Key, kv => new SnapshotEntry(kv.Value.Count, kv.Value.Latest, kv.Value.Coverage));
+            RootOwnValue own = _rootOwn;
+            var payload = new SnapshotFile(
+                SnapshotFormat,
+                cells,
+                own.Coverage == Coverage.None ? null : new SnapshotEntry(own.Count, own.Latest, own.Coverage));
 
             Directory.CreateDirectory(Path.GetDirectoryName(path)!);
             string tmp = path + ".tmp";
@@ -441,15 +516,19 @@ public sealed class FolderMetricsIndex(
                 return 0;
             }
 
-            var payload = JsonSerializer.Deserialize<Dictionary<string, SnapshotEntry>>(
+            SnapshotFile? payload = JsonSerializer.Deserialize<SnapshotFile>(
                 await File.ReadAllTextAsync(path, ct));
-            if (payload is null)
+            if (payload is null || payload.Format != SnapshotFormat || payload.Cells is null)
             {
+                logger.LogInformation(
+                    "Nav metrics snapshot ignored: it is in format {Found}, this build reads format {Expected}. The crawl rebuilds it.",
+                    payload?.Format ?? 0,
+                    SnapshotFormat);
                 return 0;
             }
 
             long stamp = NextStamp();
-            foreach ((string prefix, SnapshotEntry entry) in payload)
+            foreach ((string prefix, SnapshotEntry entry) in payload.Cells)
             {
                 Cell cell = _cells.GetOrAdd(prefix, static _ => new Cell());
                 cell.Count = entry.Count;
@@ -460,8 +539,13 @@ public sealed class FolderMetricsIndex(
                 cell.Discovered = prefix.Length == 0;
             }
 
-            logger.LogInformation("Nav metrics seeded from snapshot: {Count} folders", payload.Count);
-            return payload.Count;
+            if (payload.RootOwn is { } rootOwn)
+            {
+                _rootOwn = new RootOwnValue(rootOwn.Count, rootOwn.Latest, rootOwn.Coverage);
+            }
+
+            logger.LogInformation("Nav metrics seeded from snapshot: {Count} folders", payload.Cells.Count);
+            return payload.Cells.Count;
         }
         catch (Exception ex)
         {
@@ -492,6 +576,15 @@ public sealed class FolderMetricsIndex(
     }
 
     private sealed record SnapshotEntry(int Count, DateTimeOffset? Latest, Coverage Coverage);
+
+    // The "$format" key can't be mistaken for a folder: an older snapshot, a bare map of folders, has no
+    // such key and reads as format 0.
+    private sealed record SnapshotFile(
+        [property: JsonPropertyName("$format")] int Format,
+        [property: JsonPropertyName("cells")] Dictionary<string, SnapshotEntry>? Cells,
+        [property: JsonPropertyName("rootOwn")] SnapshotEntry? RootOwn);
+
+    private sealed record RootOwnValue(int Count, DateTimeOffset? Latest, Coverage Coverage);
 }
 
 /// <summary>A folder's current derived metrics as served to the navigation builder.</summary>

@@ -80,7 +80,7 @@ public sealed class DynamicNavBuilder(
             }
             else if (!string.IsNullOrEmpty(n.Route))
             {
-                leaves.Add(new NavLeaf(n.Text, n.Route, path, n.Date, n.Author));
+                leaves.Add(new NavLeaf(n.Text, n.Route, path, n.Date, n.Author) { SourceFolder = n.SourceFolder });
             }
         }
     }
@@ -109,7 +109,7 @@ public sealed class DynamicNavBuilder(
         // The site root gets a leading Home link.
         if (prefix.Length == 0)
         {
-            result.Insert(0, new NavChild("Home", string.Empty, null, "house-fill", false, false));
+            result.Insert(0, new NavChild("Home", string.Empty, null, "house-fill", false, false) { SourceFolder = prefix });
         }
 
         activity?.SetOutput(new { count = result.Count });
@@ -174,7 +174,7 @@ public sealed class DynamicNavBuilder(
             string label = head.Title ?? NavRules.Label(Path.GetFileNameWithoutExtension(entry.Name));
             return (NavRules.SortKey(entry.Name),
                 new NavChild(label, Route(entry.Path), null, null, false, false,
-                    Date: head.Date, Author: head.Author));
+                    Date: head.Date, Author: head.Author) { SourceFolder = prefix });
         }
 
         return null;
@@ -186,7 +186,10 @@ public sealed class DynamicNavBuilder(
         string label = string.IsNullOrWhiteSpace(space.Title) ? NavRules.Label(entry.Name) : space.Title;
         (int? articleCount, DateTimeOffset? latestUtc, Coverage coverage) = FolderAggregate(entry.Path, FolderMeta.None);
         var node = new NavChild(label, Route(entry.Path), entry.Path, "journal-bookmark", true, true,
-            ArticleCount: articleCount, LatestArticleUtc: latestUtc, CountCoverage: coverage);
+            ArticleCount: articleCount, LatestArticleUtc: latestUtc, CountCoverage: coverage)
+        {
+            SourceFolder = Folder(entry.Path),
+        };
 
         // Group 0 with a negative weight: mounts come first, in configuration order, ahead of a
         // root-mounted space's own numbered sections.
@@ -214,7 +217,10 @@ public sealed class DynamicNavBuilder(
             (int? articleCount, DateTimeOffset? latestUtc, Coverage coverage) = FolderAggregate(folder.Path, meta);
             return new NavChild(meta.Label ?? NavRules.Label(folder.Name), href, folder.Path, icon, true, true,
                 meta.Short, meta.TopbarHidden, meta.TopbarAlign,
-                ArticleCount: articleCount, LatestArticleUtc: latestUtc, CountCoverage: coverage);
+                ArticleCount: articleCount, LatestArticleUtc: latestUtc, CountCoverage: coverage)
+            {
+                SourceFolder = Folder(folder.Path),
+            };
         }
 
         // Collapse: exactly one article (or only an index/readme) → single link.
@@ -229,7 +235,10 @@ public sealed class DynamicNavBuilder(
         if (articles.Count == 1 && singleHead.Hidden)
         {
             return index is null ? null
-                : new NavChild(meta.Label ?? NavRules.Label(folder.Name), Route(folder.Path), null, meta.Icon, false, false);
+                : new NavChild(meta.Label ?? NavRules.Label(folder.Name), Route(folder.Path), null, meta.Icon, false, false)
+                {
+                    SourceFolder = Folder(folder.Path),
+                };
         }
 
         string? title = singleHead.Title;
@@ -238,7 +247,10 @@ public sealed class DynamicNavBuilder(
             : NavRules.Label(folder.Name));
         string route = single == index ? Route(folder.Path) : Route(single.Path);
         return new NavChild(label, route, null, meta.Icon, false, false,
-            Date: singleHead.Date, Author: singleHead.Author);
+            Date: singleHead.Date, Author: singleHead.Author)
+        {
+            SourceFolder = Folder(folder.Path),
+        };
     }
 
     /// <summary>
@@ -292,6 +304,8 @@ public sealed class DynamicNavBuilder(
     // The site root is the root-mounted space's top level; a mount segment is a prefixed space's.
     private bool IsSpaceRoot(string prefix) =>
         prefix.Length == 0 || spaces?.MountedAt(prefix) is not null;
+
+    private static string Folder(string path) => path.Replace('\\', '/').Trim('/');
 
     private static string Route(string path)
     {

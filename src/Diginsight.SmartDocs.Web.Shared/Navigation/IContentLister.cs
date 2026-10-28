@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace Diginsight.SmartDocs.Web.Shared.Navigation;
 
 /// <summary>A raw child of a storage "folder": either a sub-folder or a file, path-addressed.</summary>
@@ -43,10 +45,26 @@ public sealed record NavChild(
     string? Author = null,
     int? ArticleCount = null,
     DateTimeOffset? LatestArticleUtc = null,
-    Coverage CountCoverage = Coverage.None);
+    Coverage CountCoverage = Coverage.None)
+{
+    /// <summary>
+    /// The content folder this node comes from, which names its space: the folder's own path for a
+    /// section, a space mount and a collapsed one-page folder; the level's prefix for an article and
+    /// for <b>Home</b>. Authorization resolves a node's space from it, never from its route, because a
+    /// mount node and a root-mounted space's page can share a route. Server-only: it is left out of
+    /// navigation responses and the prerendered state, and kept in the server's cache.
+    /// </summary>
+    [JsonIgnore]
+    public string? SourceFolder { get; init; }
+}
 
 /// <summary>A flattened navigable article (leaf) with its section breadcrumb — used by menu search.</summary>
-public sealed record NavLeaf(string Text, string Route, string Path, DateTimeOffset? Date = null, string? Author = null);
+public sealed record NavLeaf(string Text, string Route, string Path, DateTimeOffset? Date = null, string? Author = null)
+{
+    /// <summary>The content folder the leaf comes from, carried from its <see cref="NavChild"/>. Server-only.</summary>
+    [JsonIgnore]
+    public string? SourceFolder { get; init; }
+}
 
 /// <summary>One breadcrumb segment: display text and an optional link route.</summary>
 public sealed record Crumb(string Text, string? Route);

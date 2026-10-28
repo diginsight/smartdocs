@@ -1,5 +1,7 @@
 using Diginsight.Diagnostics;
+using Diginsight.SmartDocs.Web.Authorization;
 using Diginsight.SmartDocs.Web.Shared.Navigation;
+using Diginsight.SmartDocs.Web.Shared.Sites;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Logging;
 
@@ -20,9 +22,18 @@ public sealed class NavChangePublisher(
     CachedDynamicNavBuilder nav,
     FolderRecordProvider folders,
     IHubContext<NavHub> hub,
+    ActiveRoleSets activeRoleSets,
+    SpaceVisibilityEvaluator evaluator,
+    AccessRequirementResolver requirements,
+    ReaderCountComposer counts,
+    SpaceRegistry spaces,
     ILogger<NavChangePublisher> logger)
 {
     private int _wired;
+
+    // The root-own value the previous drain left, to tell a change among the root-mounted space's own
+    // articles from a change in any other space. Written only by the drain's handler, which never overlaps itself.
+    private FolderMetrics? _lastRootOwn;
 
     // Coalesces whole-site rediscoveries: requests arriving while one runs trigger exactly one more.
     private int _rediscovering;
@@ -36,6 +47,7 @@ public sealed class NavChangePublisher(
             return;
         }
 
+        _lastRootOwn = metrics.TryGetRootOwn();
         metrics.Changed += OnMetricsChangedAsync;
     }
 
@@ -135,8 +147,42 @@ public sealed class NavChangePublisher(
                 return;
             }
 
-            await hub.Clients.All.SendAsync(NavHubContract.MetadataChanged, records);
-            logger.LogDebug("Pushed {Count} folder records", records.Length);
+            // The root-mounted space's own articles have no record of their own: their change moves only
+            // the root, so it is detected here, and it counts as a visible change for the readers who
+            // see that space.
+            FolderMetrics? rootOwn = metrics.TryGetRootOwn();
+            bool rootOwnMoved = rootOwn != _lastRootOwn;
+            _lastRootOwn = rootOwn;
+
+            int sent = 0;
+            foreach (RoleSet roles in activeRoleSets.Snapshot())
+            {
+                try
+                {
+                    ReaderVisibility visibility = await evaluator.EvaluateAsync(roles);
+                    (FolderRecord[] visible, int visibleChanges) = await RecordsForAsync(visibility, records);
+
+                    // A group gets its composed root only together with a change it can see, so a change in
+                    // a hidden space can't be timed from outside.
+                    bool seesRootOwn = rootOwnMoved
+                        && spaces.Root is { } rootSpace
+                        && visibility.Spaces.TryGetValue(rootSpace.Id, out SpaceVisibility? rootVerdict)
+                        && rootVerdict.IsVisible;
+                    if (visibleChanges == 0 && !seesRootOwn)
+                    {
+                        continue;
+                    }
+
+                    await hub.Clients.Group(ActiveRoleSets.GroupOf(roles)).SendAsync(NavHubContract.MetadataChanged, visible);
+                    sent++;
+                }
+                catch (Exception ex)
+                {
+                    logger.LogWarning(ex, "Nav metadata change publish failed for a role set");
+                }
+            }
+
+            logger.LogDebug("Pushed {Count} folder records to {Groups} groups", records.Length, sent);
         }
         catch (Exception ex)
         {
@@ -144,7 +190,7 @@ public sealed class NavChangePublisher(
         }
     }
 
-    /// <summary>Broadcasts every root section's current aggregate (called as the startup scan progresses).</summary>
+    /// <summary>Sends every active role set the root section aggregates it may see (called as the startup scan progresses).</summary>
     public async Task PublishCountsReadyAsync()
     {
         using var activity = Observability.ActivitySource.StartMethodActivity(logger);
@@ -152,9 +198,21 @@ public sealed class NavChangePublisher(
         try
         {
             FolderRecord[] records = await BuildRootRecordsAsync();
-            if (records.Length > 0)
+            foreach (RoleSet roles in activeRoleSets.Snapshot())
             {
-                await hub.Clients.All.SendAsync(NavHubContract.CountsReady, records);
+                try
+                {
+                    ReaderVisibility visibility = await evaluator.EvaluateAsync(roles);
+                    (FolderRecord[] visible, _) = await RecordsForAsync(visibility, records);
+                    if (visible.Length > 0)
+                    {
+                        await hub.Clients.Group(ActiveRoleSets.GroupOf(roles)).SendAsync(NavHubContract.CountsReady, visible);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    logger.LogWarning(ex, "Nav counts-ready publish failed for a role set");
+                }
             }
         }
         catch (Exception ex)
@@ -164,25 +222,55 @@ public sealed class NavChangePublisher(
     }
 
     /// <summary>
-    /// Sends the current root aggregates to a single just-connected client. A browser that connects
+    /// Sends the current root aggregates a single just-connected client may see. A browser that connects
     /// after the scan finished would otherwise never learn the counts.
     /// </summary>
-    public async Task SendCurrentCountsAsync(IClientProxy caller)
+    public async Task SendCurrentCountsAsync(IClientProxy caller, RoleSet roles)
     {
         using var activity = Observability.ActivitySource.StartMethodActivity(logger);
 
         try
         {
             FolderRecord[] records = await BuildRootRecordsAsync();
-            if (records.Length > 0)
+            ReaderVisibility visibility = await evaluator.EvaluateAsync(roles);
+            (FolderRecord[] visible, _) = await RecordsForAsync(visibility, records);
+            if (visible.Length > 0)
             {
-                await caller.SendAsync(NavHubContract.CountsReady, records);
+                await caller.SendAsync(NavHubContract.CountsReady, visible);
             }
         }
         catch (Exception ex)
         {
             logger.LogWarning(ex, "Nav counts-ready send-on-connect failed");
         }
+    }
+
+    /// <summary>
+    /// The records a reader may see, with the root's counts composed for them, and how many of the
+    /// others they see. The site's own record is never hidden; every other record is checked against
+    /// its space.
+    /// </summary>
+    private async Task<(FolderRecord[] Records, int VisibleChanges)> RecordsForAsync(
+        ReaderVisibility visibility, IReadOnlyList<FolderRecord> all)
+    {
+        var visible = new List<FolderRecord>(all.Count);
+        int others = 0;
+        foreach (FolderRecord record in all)
+        {
+            if (record.Prefix.Length == 0)
+            {
+                visible.Add(counts.ComposeRootRecord(record, visibility));
+                continue;
+            }
+
+            if (visibility.SeesEverything || visibility.IsVisible(await requirements.ForFolderAsync(record.Prefix)))
+            {
+                visible.Add(record);
+                others++;
+            }
+        }
+
+        return (visible.ToArray(), others);
     }
 
     private async Task<FolderRecord[]> BuildRootRecordsAsync()

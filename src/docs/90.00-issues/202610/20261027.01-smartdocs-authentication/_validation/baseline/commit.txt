@@ -1,0 +1,8 @@
+baseline-commit: 875698d1e4e4b08c49c4aaa7e637a79d60b52bbe
+captured: 2026-10-28
+
+# Uncommitted changes under src/ outside src/docs/ at capture time.
+# The baseline build in F4-regression builds the commit above and does NOT contain them:
+#    M src/Diginsight.SmartDocs.Web.Client/packages.lock.json
+#    M src/Diginsight.SmartDocs.Web/packages.lock.json
+#    M src/Diginsight.SmartDocs.Web/wwwroot/app.css

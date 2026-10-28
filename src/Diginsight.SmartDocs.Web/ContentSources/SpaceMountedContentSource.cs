@@ -1,4 +1,6 @@
+using System.Collections.Concurrent;
 using Diginsight.Diagnostics;
+using Diginsight.SmartDocs.Web.Authorization;
 using Diginsight.SmartDocs.Web.Shared;
 using Diginsight.SmartDocs.Web.Shared.Navigation;
 using Diginsight.SmartDocs.Web.Shared.Sites;
@@ -21,6 +23,7 @@ public sealed class SpaceMountedContentSource : IContentSource, IContentLister
     private readonly SpaceRegistry registry;
     private readonly IReadOnlyDictionary<string, SpaceContentAccess> bySpaceId;
     private readonly ILogger<SpaceMountedContentSource> logger;
+    private readonly ConcurrentDictionary<string, byte> warnedNestedAccessFiles = new(StringComparer.Ordinal);
 
     public SpaceMountedContentSource(
         SpaceRegistry registry, SpaceContentRegistry spaces, ILogger<SpaceMountedContentSource> logger)
@@ -33,6 +36,13 @@ public sealed class SpaceMountedContentSource : IContentSource, IContentLister
     public Task<ContentResult?> GetAsync(string contentKey, CancellationToken ct = default)
     {
         using var activity = Observability.HotPathActivitySource.StartMethodActivity(logger, () => new { contentKey });
+
+        // An access file reveals which permissions and roles open its space, so no content surface
+        // ever serves one, at any depth. AccessFileProvider reads it from the physical source instead.
+        if (AccessFile.IsAccessFileKey(contentKey))
+        {
+            return Task.FromResult<ContentResult?>(null);
+        }
 
         return TryMap(contentKey, out SpaceContentAccess? access, out string inner)
             ? access.Source.GetAsync(inner, ct)
@@ -54,7 +64,7 @@ public sealed class SpaceMountedContentSource : IContentSource, IContentLister
             return [];
         }
 
-        IReadOnlyList<ChildEntry> children = await access.Lister.ListChildrenAsync(inner, ct) ?? [];
+        IReadOnlyList<ChildEntry> children = WithoutAccessFiles(access.Space, await access.Lister.ListChildrenAsync(inner, ct) ?? []);
         if (access.Space.IsRootMounted)
         {
             return children;
@@ -69,6 +79,11 @@ public sealed class SpaceMountedContentSource : IContentSource, IContentLister
     public Task<string?> ReadHeadAsync(string key, CancellationToken ct = default)
     {
         using var activity = Observability.HotPathActivitySource.StartMethodActivity(logger, () => new { key });
+
+        if (AccessFile.IsAccessFileKey(key))
+        {
+            return Task.FromResult<string?>(null);
+        }
 
         return TryMap(key, out SpaceContentAccess? access, out string inner)
             ? access.Lister.ReadHeadAsync(inner, ct)
@@ -85,7 +100,7 @@ public sealed class SpaceMountedContentSource : IContentSource, IContentLister
 
         if (registry.Root is { } root && bySpaceId.TryGetValue(root.Id, out SpaceContentAccess? rootAccess))
         {
-            IReadOnlyList<ChildEntry> own = await rootAccess.Lister.ListChildrenAsync(string.Empty, ct) ?? [];
+            IReadOnlyList<ChildEntry> own = WithoutAccessFiles(root, await rootAccess.Lister.ListChildrenAsync(string.Empty, ct) ?? []);
             items.AddRange(own.Where(c => registry.MountedAt(c.Name) is null));
         }
 
@@ -98,9 +113,46 @@ public sealed class SpaceMountedContentSource : IContentSource, IContentLister
         return items;
     }
 
+    /// <summary>
+    /// Drops access files from one level of a space's listing. A file below the space's content root
+    /// is logged once per path: version 1 reads only the root file, so a misplaced one must not look
+    /// as if it restricted its folder. Only listings warn — they report files that exist — so request
+    /// traffic for invented keys can't flood the log.
+    /// </summary>
+    private IReadOnlyList<ChildEntry> WithoutAccessFiles(SpaceOptions space, IReadOnlyList<ChildEntry> children)
+    {
+        List<ChildEntry>? kept = null;
+        for (int i = 0; i < children.Count; i++)
+        {
+            ChildEntry child = children[i];
+            if (!AccessFile.IsAccessFileKey(child.Name))
+            {
+                kept?.Add(child);
+                continue;
+            }
+
+            kept ??= children.Take(i).ToList();
+            string inner = Normalize(child.Path);
+            if (AccessFile.IsNestedAccessFileKey(inner)
+                && warnedNestedAccessFiles.TryAdd($"{space.Id}/{inner}".ToLowerInvariant(), 0))
+            {
+                logger.LogWarning(
+                    "Space '{SpaceId}' has {FileName} at '{Path}', below its content root. Version 1 reads only the file at the content root, so this one restricts nothing. It is never served.",
+                    space.Id,
+                    AccessFile.FileName,
+                    inner);
+            }
+        }
+
+        return kept ?? children;
+    }
+
     private bool TryMap(string key, [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out SpaceContentAccess? access, out string inner)
     {
-        if (registry.TryResolve(Normalize(key), out SpaceOptions space, out inner)
+        // A key with a dot, empty or encoded segment could be resolved by a store into another space
+        // than the one its first segment names, which is the space the access check placed it in.
+        if (ContentKeyGuard.IsSafe(key)
+            && registry.TryResolve(Normalize(key), out SpaceOptions space, out inner)
             && bySpaceId.TryGetValue(space.Id, out access))
         {
             return true;

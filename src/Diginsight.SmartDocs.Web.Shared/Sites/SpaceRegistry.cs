@@ -116,8 +116,9 @@ public sealed class SpaceRegistry
             throw new InvalidOperationException("Site:Spaces is empty. Configure at least one space.");
         }
 
-        foreach (SpaceOptions s in spaces)
+        for (int index = 0; index < spaces.Count; index++)
         {
+            SpaceOptions s = spaces[index];
             if (string.IsNullOrWhiteSpace(s.Id))
             {
                 throw new InvalidOperationException("Every space requires a non-empty Id.");
@@ -140,6 +141,12 @@ public sealed class SpaceRegistry
             if (blob && string.IsNullOrWhiteSpace(s.Blob.ContainerName))
             {
                 throw new InvalidOperationException($"Space '{s.Id}' uses Blob but no ContainerName is configured.");
+            }
+
+            if (!SiteAuthorizationOptions.IsAcceptedRequirement(s.Access))
+            {
+                throw new InvalidOperationException(
+                    $"Space '{s.Id}' has Access '{s.Access}' (Site:Spaces:{index}:Access). A space floor accepts only an empty value or '{SiteAuthorizationOptions.Authenticated}'.");
             }
         }
 

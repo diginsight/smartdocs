@@ -464,6 +464,85 @@ body {
     color: var(--brand);
 }
 
+.markdown-body details {
+    margin: 1rem 0;
+    padding: 0 1rem;
+    border: 1px solid var(--brand);
+    border-radius: 4px;
+    background: var(--bg);
+    overflow-wrap: anywhere;
+}
+
+.markdown-body details > summary {
+    position: relative;
+    display: block;
+    margin: 0 -1rem;
+    padding: 0.65rem 2.5rem 0.65rem 2.75rem;
+    border-radius: 3px;
+    background: var(--hover);
+    background: color-mix(in srgb, var(--brand) 10%, var(--bg));
+    color: var(--fg);
+    font-weight: 600;
+    cursor: pointer;
+    list-style: none;
+}
+
+.markdown-body details > summary::-webkit-details-marker {
+    display: none;
+}
+
+.markdown-body details > summary::before {
+    content: "\270e";
+    position: absolute;
+    top: 0.75rem;
+    left: 0.9rem;
+    width: 1.25rem;
+    height: 1.25rem;
+    border-radius: 50%;
+    background: var(--brand);
+    color: var(--on-brand);
+    font-size: 0.9rem;
+    font-weight: 400;
+    line-height: 1.25rem;
+    text-align: center;
+}
+
+.markdown-body details > summary::after {
+    content: "";
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    width: 0.45rem;
+    height: 0.45rem;
+    border-right: 2px solid currentColor;
+    border-bottom: 2px solid currentColor;
+    transform: rotate(45deg);
+}
+
+.markdown-body details[open] {
+    padding-bottom: 0.75rem;
+}
+
+.markdown-body details[open] > summary {
+    margin-bottom: 0.75rem;
+    border-bottom: 1px solid var(--brand);
+    border-radius: 3px 3px 0 0;
+}
+
+.markdown-body details[open] > summary::after {
+    top: 1.2rem;
+    transform: rotate(225deg);
+}
+
+.markdown-body details > summary:focus-visible {
+    outline: 2px solid var(--brand);
+    outline-offset: 2px;
+}
+
+.markdown-body details > :last-child:not(summary) {
+    margin-bottom: 0;
+}
+
 .markdown-body pre {
     background: var(--pre-bg);
     padding: 1rem;
@@ -574,6 +653,31 @@ body {
     .topbar-search-label {
         display: none;
     }
+
+    /* The reader's name and the "Sign in" label give way like the search label; the icon stays,
+       and the button's title and accessible name carry the text. */
+    .signin-menu .signin-name,
+    .signin-menu .signin-label {
+        display: none;
+    }
+
+    /* The site title yields last: it shrinks with an ellipsis instead of pushing the controls
+       past the right edge. */
+    .brand {
+        flex: 0 1 auto;
+        min-width: 0;
+    }
+
+    .brand > span {
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+}
+
+.signin-name {
+    max-width: 14rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 /* ---- top-level menus ---- */

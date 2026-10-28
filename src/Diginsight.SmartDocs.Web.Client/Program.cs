@@ -5,6 +5,7 @@ using Diginsight.SmartDocs.Web.Shared.Navigation;
 using Diginsight.SmartDocs.Web.Shared.Rendering;
 using Diginsight.SmartDocs.Web.Shared.Services;
 using Diginsight.SmartDocs.Web.Shared.Sites;
+using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
 using Microsoft.JSInterop;
 
@@ -30,6 +31,11 @@ builder.Services.AddScoped<INavProvider, HttpNavProvider>();
 builder.Services.AddScoped<NavHubClient>();
 builder.Services.AddSingleton<NavigationBootstrapState>();
 
+// The reader's sign-in state, restored from the host's bootstrap record below: only whether they
+// are signed in and their display name, never roles or tokens.
+builder.Services.AddAuthorizationCore();
+builder.Services.AddCascadingAuthenticationState();
+builder.Services.AddSingleton<AuthenticationStateProvider, BootstrapAuthenticationStateProvider>();
 WebAssemblyHost host = builder.Build();
 string? bootstrapJson = await host.Services.GetRequiredService<IJSRuntime>()
     .InvokeAsync<string?>("appUi.readBootstrap");
@@ -42,6 +48,7 @@ if (!string.IsNullOrWhiteSpace(bootstrapJson) &&
     bootstrap.Page = restored.Page;
     bootstrap.Levels = restored.Levels;
     bootstrap.FolderRecords = restored.FolderRecords;
+    bootstrap.Reader = restored.Reader;
 }
 
 await host.RunAsync();

@@ -57,4 +57,11 @@ public sealed class ContentFreshnessOptions
     /// that length is preferable to search lagging until the next invalidation call.
     /// </summary>
     public TimeSpan? NavIndex { get; set; }
+
+    /// <summary>
+    /// Tolerance for a space's parsed <c>access.metadata.yml</c>. Short, because it bounds how long a
+    /// changed access file takes to apply when no invalidation call arrived — a mapping removed from a
+    /// repository should stop opening its space within seconds. A read costs one small file per space.
+    /// </summary>
+    public TimeSpan Access { get; set; } = TimeSpan.FromSeconds(30);
 }
