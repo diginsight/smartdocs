@@ -12,7 +12,7 @@ publish: false
 
 Use this how-to to prepare reader access for one deployment. Microsoft Entra ID decides which app roles a reader holds. Each repository's `access.metadata.yml` decides what those roles grant in that repository's space. SmartDocs combines all of a reader's roles by union, separately in each space.
 
-This is a provisioning procedure, not a deployment-completion record. **Don't enable restrictions in deployed overlays or publish access files to deployed spaces until every exit criterion of the [implementation plan](01-roles-permissions-support.plan.md) is met.** Session 6's execution-order waiver doesn't waive that rollout boundary.
+This is a provisioning procedure, not a deployment-completion record. **Don't enable restrictions in deployed overlays or publish access files to deployed spaces until every exit criterion of the [implementation plan](01-roles-permissions-support.plan.md) is met.** Every criterion was met locally on 2026-11-02, as [sequence 04](_validation/20261102.04-validation-sequence.md) records. A deployment still validates its own sign-in flow before it enables restrictions, as [Validate before rollout](#-validate-before-rollout) describes.
 
 ## 📚 Table of contents
 
@@ -148,7 +148,7 @@ These six operating rules apply after rollout is authorized:
 2. **Protect every publication of the same content.** Exclude `access.metadata.yml` from any other generator that builds that content root. For MkDocs, add the pattern below to `exclude_docs`. Restrict that other site to the same readers, or stop publishing the restricted space there; hiding the access file alone doesn't protect its pages.
 3. **Use direct user membership.** App role assignments to groups don't cascade through nested groups. Adding a group inside a role group doesn't grant its users the app role.
 4. **Separate shared caches by deployment.** When Redis is enabled, give every deployment its own `Diginsight:SmartCache:Redis:KeyPrefix`; don't reuse another deployment's namespace.
-5. **Revoke actual grants.** Remove a user's group membership, direct app-role assignment, or repository mapping. Disabling an app role isn't a substitute for removing existing assignments. Membership changes need a new sign-in to update the cookie's roles; mapping changes take effect on subsequent server checks after invalidation or expiry of the access-file cache.
+5. **Revoke actual grants.** Remove a user's group membership, direct app-role assignment, or repository mapping. Disabling an app role isn't a substitute for removing existing assignments. Membership changes need a new sign-in to update the cookie's roles, and an open session keeps its roles until `Site:Authorization:SessionLifetime` ends it. Entra may also take a minute or more to reflect a membership change in new tokens: in the development tenant, an added role appeared about 75 seconds after the change, and a removal 38 seconds after. Mapping changes take effect on subsequent server checks after invalidation or expiry of the access-file cache.
 6. **Make site-wide grants explicit.** To give one role access everywhere, map that role in every repository's access file. No deployment setting grants a permission across repositories, and a grant in one space never opens another.
 
 For MkDocs, merge this into its configuration without replacing other exclusions:
@@ -158,13 +158,13 @@ exclude_docs: |
   access.metadata.yml
 ```
 
-After an access-file change, call the deployment's `POST /_nav/invalidate`, with its configured invalidation credential. A path-scoped invalidation is appropriate for a changed subtree; a global invalidation refreshes the whole navigation view. This isn't an app-only permission grant: invalidation keeps its existing shared-secret mechanism.
+After an access-file change, call the deployment's `POST /_nav/invalidate`, with its configured invalidation credential. A path-scoped invalidation is appropriate for a changed subtree; a global invalidation refreshes the whole navigation view. This isn't an app-only permission grant: invalidation keeps its existing shared-secret mechanism. **Set `Site:InvalidateApiKey` on every deployed host.** The endpoint checks the `X-Invalidate-Key` header only when a key is configured, so a host without one lets anyone trigger an invalidation.
 
 ## 🧪 Validate before rollout
 
 Build the host and client together, run the access profile in a visible console, and validate in a visible browser. The owner completes sign-ins; don't capture credentials or put tenant-identifying screenshots in public evidence.
 
-Check anonymous, signed-in/no-role, single-role, and multi-role readers against the expected spaces. Then complete the remaining session-5 scenarios: authorized versus anonymous push delivery, session expiry and revocation, response cache headers, byte-identical public-baseline comparison, unreadable/invalid/required-but-missing access files, and root-mount route divergence.
+Check anonymous, signed-in/no-role, single-role, and multi-role readers against the expected spaces. Then repeat the end-to-end scenarios that [sequence 04](_validation/20261102.04-validation-sequence.md) recorded locally: authorized versus anonymous push delivery, session expiry and revocation, response cache headers, byte-identical public-baseline comparison, unreadable/invalid/required-but-missing access files, and root-mount route divergence. On a deployed host, also confirm that sign-in completes through the certificate-based authorization-code flow, which no local run has exercised, and that `POST /_nav/invalidate` refuses a request without the key.
 
 Record each actual run with screenshots under this work item's `_validation/` folder. A source-level control or a successful build isn't proof that an unexecuted browser scenario passes.
 
@@ -177,15 +177,15 @@ The plan's discovery items record what was learned locally:
 | `DS-1-group-licence` | The development tenant has P1/P2, so the four fixture roles were granted through four security groups. Other tenants without that licence must use direct user assignments. |
 | `DS-2-client-credential` | The development registration accepted the credential-free ID-token flow. No client secret was created. This doesn't prove the deployed certificate/code flow. |
 | `DS-3-test-accounts` | One account represented *none*, *reader*, *multi*, and contributor scenarios through membership changes and fresh sign-ins. |
-| `DS-4-hub-expiry` | **Unresolved.** Sequence 04 stopped at CLI authentication preflight; cookie-authenticated hub expiry wasn't observed. Don't claim it works. |
+| `DS-4-hub-expiry` | **Resolved on the positive branch** on 2026-11-02. With a five-minute session lifetime, the server closed the cookie-authenticated hub connection when the session expired, and the client reconnected anonymously. |
 
-The implementation configures `CloseOnAuthenticationExpiration`, but its effect on the cookie-authenticated hub still needs `F2-revocation`. If the connection remains open, the plan's defined negative branch removes expired connections from role-set groups before pushes, then reruns the scenario. That branch hasn't been selected or implemented without evidence.
+The implementation configures `CloseOnAuthenticationExpiration`, and [sequence 04](_validation/20261102.04-validation-sequence.md) observed it close a cookie-authenticated hub connection at the end of its session. The plan's negative branch, which would remove expired connections from role-set groups before each push, wasn't needed.
 
 ## 🏁 Conclusion
 
-Keep identity grants in Entra, permission composition in each repository, and deployment-specific restrictions in the private overlay. Use required access files and consistent restrictions on every publication to avoid accidental public access. Finish the outstanding end-to-end validation before enabling restrictions in deployed environments.
+Keep identity grants in Entra, permission composition in each repository, and deployment-specific restrictions in the private overlay. Use required access files and consistent restrictions on every publication to avoid accidental public access. Validate each deployment's own sign-in flow and invalidation key before enabling restrictions there.
 
-Previous: [Roles and permissions analysis](01-roles-permissions-support.analysis.md). Next: [Implementation plan and outstanding validation](01-roles-permissions-support.plan.md).
+Previous: [Roles and permissions analysis](01-roles-permissions-support.analysis.md). Next: [Implementation plan](01-roles-permissions-support.plan.md).
 
 ## 📚 References
 
@@ -202,10 +202,10 @@ The Microsoft-maintained project documents certificate descriptions, including K
 Defines exclusion patterns for files that must not enter the built site. Excluding the access file doesn't replace authorization of the generated pages.
 
 **[SmartDocs implementation plan](01-roles-permissions-support.plan.md)** 📘 [Official repository source]  
-Defines the rollout boundary, discovery branches, session rules, and exit criteria. Its session-5 markers remain authoritative for work not yet validated.
+Defines the rollout boundary, discovery branches, session rules, and exit criteria, with the evidence that met each criterion. Its park lot holds the deployment work, `PL-7-deployed-registrations`.
 
-**[Recorded anonymous validation](./_validation/20261028.01-validation-sequence.md)**, **[counts and push validation](./_validation/20261028.02-validation-sequence.md)**, **[sign-in validation](./_validation/20261028.03-validation-sequence.md)**, and **[blocked end-to-end preflight](./_validation/20261028.04-validation-sequence.md)** 📘 [Official repository evidence]  
-These records distinguish passing local scenarios from the end-to-end scenarios that haven't run. They aren't evidence of a deployed rollout.
+**[Recorded anonymous validation](./_validation/20261028.01-validation-sequence.md)**, **[counts and push validation](./_validation/20261028.02-validation-sequence.md)**, **[sign-in validation](./_validation/20261028.03-validation-sequence.md)**, **[blocked end-to-end preflight](./_validation/20261028.04-validation-sequence.md)**, and **[end-to-end validation](./_validation/20261102.04-validation-sequence.md)** 📘 [Official repository evidence]  
+These records show which scenarios passed locally, and the preflight that first blocked the end-to-end run. They aren't evidence of a deployed rollout.
 
 <!--
 validations:
@@ -217,6 +217,6 @@ validations:
 article_metadata:
   filename: "02-reader-access-provisioning.md"
   created: "2026-10-28"
-  last_updated: "2026-10-28"
-  version: "1.0"
+  last_updated: "2026-11-02"
+  version: "1.1"
 -->

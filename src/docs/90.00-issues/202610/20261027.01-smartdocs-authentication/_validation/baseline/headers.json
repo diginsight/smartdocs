@@ -1,0 +1,42 @@
+{
+  "nav-children-root": {
+    "url": "/_nav/children?prefix=",
+    "status": 200,
+    "cacheControl": "no-cache",
+    "etag": "\"E5D374B39F554FCEB4C8D60E31BFD20A\"",
+    "contentType": "application/json; charset=utf-8",
+    "bytes": 4810
+  },
+  "nav-folder-root": {
+    "url": "/_nav/folder?prefix=",
+    "status": 200,
+    "cacheControl": "no-cache",
+    "etag": "\"9DDEF0889CF71C11DD65AF644B01AA40\"",
+    "contentType": "application/json; charset=utf-8",
+    "bytes": 299
+  },
+  "nav-total": {
+    "url": "/_nav/total",
+    "status": 200,
+    "cacheControl": null,
+    "etag": null,
+    "contentType": "application/json; charset=utf-8",
+    "bytes": 85
+  },
+  "nav-index": {
+    "url": "/_nav/index",
+    "status": 200,
+    "cacheControl": null,
+    "etag": null,
+    "contentType": "application/json; charset=utf-8",
+    "bytes": 9498
+  },
+  "site": {
+    "url": "/_site",
+    "status": 200,
+    "cacheControl": null,
+    "etag": null,
+    "contentType": "application/json; charset=utf-8",
+    "bytes": 4223
+  }
+}

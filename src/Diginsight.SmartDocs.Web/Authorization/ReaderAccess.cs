@@ -12,6 +12,7 @@ namespace Diginsight.SmartDocs.Web.Authorization;
 /// Filters find each node's space from its <see cref="NavChild.SourceFolder"/>, never from its route:
 /// a mount node and a root-mounted space's page can share a route. A node that carries no source
 /// folder can't be placed in a space, so it is dropped whenever the reader doesn't see everything.
+/// The site root's generated <b>Home</b> link is the one exception, decided by what <c>/</c> shows.
 /// </para>
 /// </summary>
 public sealed class ReaderAccess(
@@ -66,7 +67,9 @@ public sealed class ReaderAccess(
             return Task.FromResult(level);
         }
 
-        IReadOnlyList<NavChild> kept = level.Where(child => IsFolderVisible(child.SourceFolder)).ToList();
+        IReadOnlyList<NavChild> kept = level
+            .Where(child => IsSiteHome(child) ? IsSiteHomeVisible() : IsFolderVisible(child.SourceFolder))
+            .ToList();
         return Task.FromResult(kept);
     }
 
@@ -123,4 +126,18 @@ public sealed class ReaderAccess(
             ? IsSpaceVisible(space.Id)
             : Visibility.OutsideVisible;
     }
+
+    /// <summary>
+    /// True for the site root's generated <b>Home</b> link, the only node with the empty route: index
+    /// pages never become nodes, and a collapsed folder or a mount routes to its own path.
+    /// </summary>
+    private static bool IsSiteHome(NavChild child) => !child.IsSection && child.Route is { Length: 0 };
+
+    /// <summary>
+    /// The Home link opens <c>/</c>, which shows a root-mounted space's page when the reader sees that
+    /// space and the generated index otherwise. Taking the outside verdict when the root-mounted space
+    /// is hidden keeps the root level shaped exactly as on a site with no root-mounted space, so the
+    /// missing link can't reveal that a hidden space claims the root.
+    /// </summary>
+    private bool IsSiteHomeVisible() => IsFolderVisible(string.Empty) || Visibility.OutsideVisible;
 }
