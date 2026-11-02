@@ -12,21 +12,21 @@ source_sets:
 
 <!--
 verification_stamp:
-  generated: "2026-10-28"
-  verified: "2026-10-28"
+  generated: "2026-11-02"
+  verified: "2026-11-02"
   gate_outcome: "pass-with-gaps"
   evidence:
     - dossier: "_evidence/smartdocs-web/configuration.md"
       observed: "2026-10-28"
     - dossier: "_evidence/smartdocs-web/code.md"
-      observed: "2026-10-28"
+      observed: "2026-11-02"
     - dossier: "_evidence/smartdocs-web/devops.md"
       observed: "2026-08-18"
     - dossier: "_evidence/smartdocs-web/environment.md"
       observed: "2026-08-18"
     - dossier: "_evidence/smartdocs-web/security.md"
-      observed: "2026-10-28"
-  open_gaps: 3
+      observed: "2026-11-02"
+  open_gaps: 4
 -->
 
 # Configuration settings
@@ -67,11 +67,11 @@ Values below are those declared **in this repository**. An empty value is not a 
 |---|---|---|
 | `Site:Title` | `Diginsight SmartDocs` | site title ^[configuration-05] |
 | `Site:NotFoundPath` | `404.html` | declared; what consumes it is not established — see below ^[configuration-05] |
-| `Site:InvalidateApiKey` | *(deployment-specific)* | Management protection for invalidation; verify the deployed guard independently ^[security-05,security-06] |
+| `Site:InvalidateApiKey` | *(deployment-specific)* | Opt-in management guard: when set, `POST /_nav/invalidate` requires a matching `X-Invalidate-Key` header and answers 401 otherwise; when empty, the endpoint is open ^[security-05,security-06] |
 | `Site:MetricsSnapshotPath` | *(not declared in the public base file)* | falls back to `nav-metrics-snapshot.json` beside the application binaries ^[code-37] |
 | `Site:Branding:ProductName` | `Diginsight SmartDocs` | ^[configuration-06] |
 | `Site:Branding:IconClass` | `bi-lightbulb-fill` | ^[configuration-06] |
-| `Site:Branding:LogoPath` | *(empty)* | ^[configuration-06] |
+| `Site:Branding:LogoPath` | *(empty)* | ^[configuration-06] Resolved once at startup and served at `/_branding/logo` to every caller with public caching, even from a protected space; a path naming an access file is refused with an `Error` log entry and the built-in icon is shown ^[security-44] |
 
 ### `Site:Spaces`
 
@@ -101,10 +101,10 @@ The `Development` overlay replaces the source for this space with `FileSystem`, 
 | `AzureAd:CallbackPath` | `/signin-oidc` | Identity callback, not the sign-in initiation route ^[configuration-31] |
 | `AzureAd:SignedOutCallbackPath` | `/signout-callback-oidc` | Identity sign-out callback ^[configuration-32] |
 | `Site:Authorization:DefaultRequirement` | Empty | Only empty or case-insensitive `authenticated`; additive to every space ^[configuration-34] |
-| `Site:Authorization:SessionLifetime` | `08:00:00` | Positive duration; fixed, non-sliding cookie lifetime, not replaced by token lifetime ^[configuration-35] |
+| `Site:Authorization:SessionLifetime` | `08:00:00` | Positive duration; fixed, non-sliding cookie lifetime, not replaced by token lifetime ^[configuration-35] An open session keeps its roles until this lifetime ends; the hub then closes the connection ^[security-38] |
 | `Diginsight:SmartCache:SmartDocs:Access` | `00:00:30` | Parsed access-file freshness, not a proven end-to-end revocation deadline ^[configuration-38] |
 
-The host retains token claim names and reads its configured roles/name claims. ^[configuration-40] Base settings don't explicitly select a response type or declare a client secret/certificate. ^[configuration-41] Local sequence 03 observed an ID-token development flow; it doesn't validate a deployed certificate-backed code flow. ^[code-59] Follow the [provisioning guide](../90.00-issues/202610/20261027.01-smartdocs-authentication/02-reader-access-provisioning.md) rather than putting credentials in public settings.
+The host retains token claim names and reads its configured roles/name claims. ^[configuration-40] Base settings don't explicitly select a response type or declare a client secret/certificate. ^[configuration-41] Local sequence 03 observed an ID-token development flow, and the 2026-11-02 local end-to-end run used the same kind of development registration; neither validates a deployed certificate-backed code flow. ^[code-59,code-63] Follow the [provisioning guide](../90.00-issues/202610/20261027.01-smartdocs-authentication/02-reader-access-provisioning.md) rather than putting credentials in public settings.
 
 ### `Diginsight:SmartCache`
 
@@ -202,6 +202,8 @@ The composition root, for every service registration decision it makes. ^[code-0
 > **Not established**: what consumes `Site:NotFoundPath`. The key and its `404.html` value are declared, but no record establishes the code path that serves it. ^[gap]
 
 > **Not established**: the effective configuration of either deployed environment. Space declarations, optional cache companions and telemetry settings depend on external overlays; this refresh isn't a deployed-configuration observation. ^[gap]
+
+> **Not established**: certificate-based code-flow sign-in in a deployed environment. Every recorded run used a development sign-in registration on a local host, and whether the sign-in registrations are deployed to production isn't established. ^[gap]
 
 ## 🔗 Related
 

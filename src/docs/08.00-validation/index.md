@@ -12,14 +12,14 @@ source_sets:
 
 <!--
 verification_stamp:
-  generated: "2026-10-28"
-  verified: "2026-10-28"
+  generated: "2026-11-02"
+  verified: "2026-11-02"
   gate_outcome: "pass-with-gaps"
   evidence:
     - dossier: "_evidence/smartdocs-web/devops.md"
       observed: "2026-08-18"
     - dossier: "_evidence/smartdocs-web/code.md"
-      observed: "2026-10-28"
+      observed: "2026-11-02"
     - dossier: "_evidence/smartdocs-web-shared/code.md"
       observed: "2026-10-28"
     - dossier: "_evidence/smartdocs-web-client/configuration.md"
@@ -63,9 +63,10 @@ What this repository checks automatically, where those checks run, and — at le
 | Sequence 01 | PASS: anonymous surface filtering and concealment | No signed-in behavior or composed-count proof ^[smartdocs-web/code-57] |
 | Sequence 02 | PASS: anonymous visible-only totals, hidden-change suppression, visible-change push control and snapshot restart | Not signed-in cross-group isolation or expiry ^[smartdocs-web/code-58] |
 | Sequence 03 | PASS after fixes: sign-in/bootstrap, space-local role union, changed mappings, sign-out and responsive menu | Not hub expiry, lifetime-bound revocation or all F scenarios ^[smartdocs-web/code-59] |
-| Sequence 04 | FAIL at authentication preflight | F1–F6 **NOT RUN**; DS-4 unresolved ^[smartdocs-web/code-60] |
+| Sequence 04 (2026-10-28) | FAIL at authentication preflight; superseded by the 2026-11-02 run | F1–F6 **NOT RUN**; DS-4 unresolved ^[smartdocs-web/code-60] |
+| Sequence 04 (2026-11-02) | PASS: F1 pushes per role set, F2 revocation with DS-4 hub expiry resolved positively, F3 cache headers, F4 byte-identical anonymous regression, F5 fail-closed access files, F6 mount-route divergence after one fix, newest dates and branding | Local host, fixture tree, development sign-in registration and one test account; no deployed environment or phone widths ^[smartdocs-web/code-63,smartdocs-web/code-64,smartdocs-web/code-65,smartdocs-web/code-66,smartdocs-web/code-67,smartdocs-web/code-68,smartdocs-web/code-69,smartdocs-web/code-70] |
 
-These are historical manual fixture observations, not tests run by this documentation refresh. See the [implementation plan](../90.00-issues/202610/20261027.01-smartdocs-authentication/01-roles-permissions-support.plan.md) and its validation records. The owner waived session 5 only as an execution prerequisite for documentation; neither the rollout boundary nor the missing validation evidence was waived.
+These are manual fixture observations on a local host, not tests run by this documentation refresh. See the [implementation plan](../90.00-issues/202610/20261027.01-smartdocs-authentication/01-roles-permissions-support.plan.md) and its validation records. The 2026-10-28 sequence 04 stopped before any scenario ran and is kept as history; the 2026-11-02 sequence 04 supersedes it. ^[smartdocs-web/code-60,smartdocs-web/code-63] During that run, a hidden space mounted at the site root was found to remove the root's Home link for readers who couldn't see it; the navigation filter was fixed during the run and the scenario passed afterwards. ^[smartdocs-web/code-62,smartdocs-web/code-68]
 
 ## 🕳️ Open questions
 
@@ -77,7 +78,7 @@ These are historical manual fixture observations, not tests run by this document
 
 > **Not established**: whether any change is built or checked before it is merged. Every trigger block in `.github/workflows/` was read; all four workflows trigger on `push` to `main` or `workflow_dispatch` only, and no `pull_request`-triggered workflow was found. ^[gap]
 
-> **Not established**: the complete signed-in push/expiry/revocation/header/baseline/failure-recovery matrix. Sequence 04's preflight failure didn't execute F1–F6. ^[gap]
+> **Not established**: reader-access behaviour in a deployed environment. Every recorded sequence ran on a local host with a fixture tree, a development sign-in registration and one test account; no deployed-environment run, certificate-based code-flow sign-in or phone-width check was recorded, and whether the sign-in registrations are deployed to production isn't established. ^[gap]
 
 ## 🔗 Related
 

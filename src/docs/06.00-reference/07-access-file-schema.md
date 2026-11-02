@@ -11,17 +11,17 @@ source_sets:
 
 <!--
 verification_stamp:
-  generated: "2026-10-28"
-  verified: "2026-10-28"
+  generated: "2026-11-02"
+  verified: "2026-11-02"
   gate_outcome: "pass-with-gaps"
   evidence:
     - dossier: "_evidence/smartdocs-web/security.md"
-      observed: "2026-10-28"
+      observed: "2026-11-02"
     - dossier: "_evidence/smartdocs-web/code.md"
-      observed: "2026-10-28"
+      observed: "2026-11-02"
     - dossier: "_evidence/smartdocs-web/configuration.md"
       observed: "2026-10-28"
-  open_gaps: 1
+  open_gaps: 2
 -->
 
 # Access-file schema
@@ -86,13 +86,17 @@ This example requires `ProductA.Read`; `ProductA.Write` doesn't itself create an
 
 Unresolvable requirements also deny visibility. Unreadable outcomes aren't cached; requirements and grants use the same file read. ^[smartdocs-web/security-25] Missing, valid and invalid parsed facts have a default 30-second freshness; effective principal permissions aren't shared cache entries. ^[smartdocs-web/code-48,smartdocs-web/configuration-38]
 
+A manual run on a local host on 2026-11-02 observed this policy. An exclusively locked file, an invalid file and a required file moved away each hid their space from every reader, including one holding its role, and logged one `Error` entry naming the failure; anonymous answers didn't change. Restoring the file and invalidating navigation brought the space back. ^[smartdocs-web/security-39,smartdocs-web/code-67]
+
 ## 🔗 Used by
 
 `AccessFileProvider` supplies physical-source facts, `AccessRequirementResolver` combines additive requirements, and `SpaceVisibilityEvaluator` expands roles and checks coverage. Request-scoped `ReaderAccess` applies the result across content, pages, navigation, shell and push boundaries. ^[smartdocs-web/code-46,smartdocs-web/code-47,smartdocs-web/code-48,smartdocs-web/code-49,smartdocs-web/code-52]
 
 ## 🕳️ Open questions
 
-> **Not established**: the end-to-end unreadable/invalid/required-missing recovery scenario hasn't run. Sequence 04 stopped at authentication preflight; the source failure policy isn't a substitute for F5 evidence. ^[gap]
+> **Not established**: the failure policy in a deployed environment, whose content source may differ from the local file system. The recorded failures were applied to files on a local host only. ^[gap]
+
+> **Not established**: automated coverage of the failure policy. No test exercising unreadable, invalid or required-missing access files was found; the evidence is one manual run. ^[gap]
 
 ## 🔗 Related
 

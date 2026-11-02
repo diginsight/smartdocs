@@ -13,12 +13,12 @@ source_sets:
 
 <!--
 verification_stamp:
-  generated: "2026-10-28"
-  verified: "2026-10-28"
+  generated: "2026-11-02"
+  verified: "2026-11-02"
   gate_outcome: "pass-with-gaps"
   evidence:
     - dossier: "_evidence/smartdocs-web/code.md"
-      observed: "2026-10-28"
+      observed: "2026-11-02"
     - dossier: "_evidence/smartdocs-web/configuration.md"
       observed: "2026-10-28"
     - dossier: "_evidence/smartdocs-web/data.md"
@@ -28,7 +28,7 @@ verification_stamp:
     - dossier: "_evidence/smartdocs-web/environment.md"
       observed: "2026-08-18"
     - dossier: "_evidence/smartdocs-web/security.md"
-      observed: "2026-10-28"
+      observed: "2026-11-02"
   open_gaps: 3
 -->
 
@@ -100,11 +100,13 @@ The application **watches nothing and rescans on no schedule**. `WatchForChanges
 
 **Invalidating warms what it drops.** Because the index is expensive, dropping it moves the cost onto a reader rather than removing it. The endpoint therefore starts a background rebuild of the index and of every level before returning, so the pipeline is not kept waiting and the next reader finds the cache already warm.
 
-The endpoint compares the supplied key against `Site:InvalidateApiKey` with `CryptographicOperations.FixedTimeEquals` and returns `401` on mismatch. ^[code-15,security-05]
+The guard is opt-in by configuration: when `Site:InvalidateApiKey` is set, the endpoint compares the supplied key against it with `CryptographicOperations.FixedTimeEquals` and returns `401` on mismatch; when no key is configured, the endpoint is open. ^[code-15,security-05,security-06]
 
 ### Propagating counts
 
 `NavChangePublisher` is wired after the application is built and before the host begins serving. ^[code-35] It sends absolute `FolderRecord` arrays to role-set groups, filters their non-root records, and composes the root for each recipient set. Hidden-only mutations don't generate `MetadataChanged` for readers who see no changed content. ^[code-33,code-52] Snapshot format 2 preserves cells and `rootOwn`, not reader-specific totals. ^[code-51]
+
+A manual run on a local host on 2026-11-02 saw a push update a signed-in reader's counts without a reload while an anonymous connection received nothing. It also saw the hub close a connection when its sign-in session expired; the client then reconnected anonymously and received the anonymous counts. ^[code-63,code-64,security-38]
 
 ## 🔗 Dependencies
 
@@ -112,7 +114,7 @@ Diginsight.SmartCache provides the caching primitives; `AddSmartCache(...).AddHt
 
 ## 🧭 Design decisions
 
-**Cache content facts, then filter at the boundary.** SmartCache registration is unconditional; its configured expirations are outer limits, while the access-file freshness setting bounds reuse of parsed access facts. ^[configuration-09,configuration-38] Reader visibility and totals are composed after those shared facts are retrieved. ^[code-47,code-48,code-50]
+**Cache content facts, then filter at the boundary.** SmartCache registration is unconditional; its configured expirations are outer limits, while the access-file freshness setting bounds reuse of parsed access facts. ^[configuration-09,configuration-38] Reader visibility and totals are composed after those shared facts are retrieved. ^[code-47,code-48,code-50] The same 2026-11-02 run observed private cache policies on reader-filtered responses, and anonymous navigation and site responses byte-identical to the pre-change baseline apart from `Cache-Control`. ^[code-65,code-66]
 
 **Persist the metrics snapshot outside the application folder.** The snapshot path comes from `Site:MetricsSnapshotPath` when that is non-empty, and otherwise sits beside the application binaries. ^[code-37] The pipeline sets that value as an App Service application setting on both deployments. ^[devops-18]
 
@@ -120,7 +122,7 @@ Diginsight.SmartCache provides the caching primitives; `AddSmartCache(...).AddHt
 
 ## 🕳️ Open questions
 
-> **Not established**: cookie-authenticated hub expiry, the full response-header matrix, and public-baseline byte equivalence remain unobserved: sequence 04 records a blocked preflight, not completed end-to-end scenarios. ^[gap]
+> **Not established**: whether hub expiry, the response headers and anonymous response equivalence hold in a deployed environment. They were observed only on a local host with a fixture tree; no deployed-environment run was recorded. ^[gap]
 
 > **Not established**: how long after a publish a reader sees new content. The three mechanisms above — the invalidation call, the metrics drain and the hub push — are each established separately, but no record joins them into one latency figure. The navigation-metrics drain is debounced by 400 ms (`FolderMetricsIndex.cs`, line 30); that is a lower bound on scheduling delay, not a user-visible latency. No rationale for the value is recorded, no test pins it, and no end-to-end latency was measured. ^[gap]
 

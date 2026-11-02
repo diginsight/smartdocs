@@ -7,23 +7,24 @@ source_sets:
   - settings-sources
   - composition-root
   - authn-authz-surface
+  - test-surface
 ---
 
 <!--
 verification_stamp:
-  generated: "2026-10-28"
-  verified: "2026-10-28"
+  generated: "2026-11-02"
+  verified: "2026-11-02"
   gate_outcome: "pass-with-gaps"
   evidence:
     - dossier: "_evidence/smartdocs-web/configuration.md"
       observed: "2026-10-28"
     - dossier: "_evidence/smartdocs-web/code.md"
-      observed: "2026-10-28"
+      observed: "2026-11-02"
     - dossier: "_evidence/smartdocs-web/security.md"
-      observed: "2026-10-28"
+      observed: "2026-11-02"
     - dossier: "_evidence/smartdocs-web-shared/code.md"
       observed: "2026-10-28"
-  open_gaps: 1
+  open_gaps: 2
 -->
 
 # Running against the private overlay
@@ -55,13 +56,13 @@ verification_stamp:
 3. The `Site` section is bound and eagerly resolved. A missing section throws `InvalidOperationException("Missing 'Site' configuration section.")` rather than starting with defaults. ^[smartdocs-web/code-06]
 4. `SpaceRegistry` validates the spaces on construction: at least one, each with an identifier, each route base a single segment. ^[smartdocs-web-shared/code-23]
 5. Each space's physical source is chosen from its `Source` value — filesystem or blob ^[smartdocs-web/code-08] — and wrapped in a `CachedContentSource` ^[smartdocs-web/code-09]. With `Source: Blob`, the source authenticates with `DefaultAzureCredential`, so it runs as the developer's own identity. ^[security-08]
-6. The application serves the environment's content locally.
+6. The application serves the environment's content locally. ^[smartdocs-web/code-08,smartdocs-web/code-09]
 
 ### Reader-access fixture overlay
 
 `https - access` selects `Development`, the `access` overlay, and the same private peer root. The profile alone doesn't enable sign-in: the resolved `AzureAd:ClientId` must be nonblank. ^[configuration-39,configuration-28] Define complete space elements in the overlay because the base space array is empty. ^[configuration-07]
 
-The local ID-token sign-in and role-view checks in sequence 03 passed; this doesn't prove a deployed certificate-backed code flow or hub expiry. ^[smartdocs-web/code-59,smartdocs-web/code-60] Use the [provisioning guide](../90.00-issues/202610/20261027.01-smartdocs-authentication/02-reader-access-provisioning.md) for identity and access-policy setup. Keep actual identifiers and credentials in the private overlay.
+The local ID-token sign-in and role-view checks in sequence 03 passed. ^[smartdocs-web/code-59] A later run through this profile, on 2026-11-02, exercised the full reader-access matrix against a fixture tree and passed, including hub closure at session expiry. ^[smartdocs-web/code-63,smartdocs-web/code-64] In that run a newly added role reached a sign-in about 75 seconds after it was added, and a removal showed at a sign-in 38 seconds after it was made, so allow for that delay when changing test memberships. ^[smartdocs-web/security-41] None of this proves a deployed certificate-backed code flow. ^[smartdocs-web/security-34] Use the [provisioning guide](../90.00-issues/202610/20261027.01-smartdocs-authentication/02-reader-access-provisioning.md) for identity and access-policy setup. Keep actual identifiers and credentials in the private overlay.
 
 ## 🔀 Alternate and failure paths
 
@@ -75,11 +76,13 @@ The local ID-token sign-in and role-view checks in sequence 03 passed; this does
 
 ## 🧪 What proves it
 
-Startup validates the space registry and authorization-option constraints. ^[smartdocs-web-shared/code-23,configuration-34,configuration-35,configuration-36] Existing sequence 03 adds a bounded local sign-in and role-view observation, not an assurance of any deployed overlay's contents. ^[smartdocs-web/code-59]
+Startup validates the space registry and authorization-option constraints. ^[smartdocs-web-shared/code-23,configuration-34,configuration-35,configuration-36] Existing sequence 03 adds a bounded local sign-in and role-view observation, and the 2026-11-02 sequence 04 a local end-to-end reader-access run; neither is an assurance of any deployed overlay's contents. ^[smartdocs-web/code-59,smartdocs-web/code-63]
 
 ## 🕳️ Open questions
 
 > **Not established**: the effective configuration of either deployed environment. The overlay files are held in the private peer repository, and the workflows mask their identifying values, so what this profile actually loads was not observable from this repository. ^[gap]
+
+> **Not established**: certificate-based code-flow sign-in in a deployed environment. Every recorded run used a development sign-in registration on a local host, and whether the sign-in registrations are deployed to production isn't established. ^[gap]
 
 ## 🔗 Related
 
