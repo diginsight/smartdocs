@@ -1,4 +1,6 @@
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Routing;
+using Microsoft.Extensions.Logging;
 using Microsoft.JSInterop;
 using Diginsight.SmartDocs.Web.Shared.Navigation;
 using Diginsight.SmartDocs.Web.Shared.Sites;
@@ -11,6 +13,12 @@ public partial class MainLayout
     private bool _searchOpen;
     private bool _notifyOpen;
     private DotNetObjectReference<MainLayout>? _selfRef;
+    private string _themeStorageKey = "lh-theme";
+    private string? _defaultTheme;
+    private int _themeRevision;
+    private bool _themeReadPending;
+    private bool _rerenderMermaid;
+    private (string Key, string? Theme)? _pendingThemeWrite;
 
     private string BrandIconClass => string.IsNullOrWhiteSpace(Site.Branding.IconClass)
         ? "bi-lightbulb-fill"
@@ -69,8 +77,8 @@ public partial class MainLayout
     protected override async Task OnInitializedAsync()
     {
         Theme.Changed += OnThemeChanged;
+        Theme.PreferenceChanged += OnThemePreferenceChanged;
         Sidebar.Changed += OnSidebarChanged;
-        Site.Changed += OnSiteChanged;
 
         // The footer counter is fed by the navigation menu as it loads (see NavStats): no dedicated
         // count query, and refreshes are debounced so they never impact rendering.
@@ -90,9 +98,45 @@ public partial class MainLayout
 
         // The picker lists what this deployment offers, which only the site payload knows.
         Theme.SetCatalog(Site.Themes);
+        SelectThemeContext();
+        Site.Changed += OnSiteChanged;
+        Navigation.LocationChanged += OnLocationChanged;
     }
 
-    private void OnSiteChanged() => InvokeAsync(StateHasChanged);
+    private void OnSiteChanged() => InvokeAsync(() =>
+    {
+        Theme.SetCatalog(Site.Themes);
+        SelectThemeContext(force: true);
+        StateHasChanged();
+    });
+
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs e) => InvokeAsync(() =>
+    {
+        SelectThemeContext();
+        StateHasChanged();
+    });
+
+    private void SelectThemeContext(bool force = false)
+    {
+        SpaceShellInfo? space = Site.ResolveSpace(Navigation.ToBaseRelativePath(Navigation.Uri).Split('?', '#')[0]);
+        string key = "lh-theme";
+        string defaultTheme = Site.Branding.DefaultTheme;
+        if (space is not null && !string.IsNullOrWhiteSpace(space.DefaultTheme))
+        {
+            key = $"lh-theme:{space.Id}";
+            defaultTheme = space.DefaultTheme;
+        }
+        if (!force && key == _themeStorageKey && defaultTheme == _defaultTheme)
+        {
+            return;
+        }
+
+        _themeStorageKey = key;
+        _defaultTheme = defaultTheme;
+        _themeRevision++;
+        _themeReadPending = true;
+        Theme.ApplyPreference(defaultTheme);
+    }
 
     private void OnArticleChanged() => InvokeAsync(StateHasChanged);
 
@@ -109,28 +153,71 @@ public partial class MainLayout
 
     private void OnSidebarChanged() => InvokeAsync(StateHasChanged);
 
-    private async void OnThemeChanged()
+    private void OnThemeChanged()
     {
-        try
-        {
-            await JS.InvokeVoidAsync("localStorage.setItem", "lh-theme", Theme.ThemeId);
-            await JS.InvokeVoidAsync("appUi.rerenderMermaid");
-        }
-        catch
-        {
-            /* JS not available during prerender */
-        }
+        _rerenderMermaid = true;
+        InvokeAsync(StateHasChanged);
+    }
 
-        await InvokeAsync(StateHasChanged);
+    private void OnThemePreferenceChanged(string? theme)
+    {
+        _themeRevision++;
+        _themeReadPending = false;
+        _pendingThemeWrite = (_themeStorageKey, theme);
+        InvokeAsync(StateHasChanged);
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        if (_themeReadPending)
+        {
+            _themeReadPending = false;
+            int revision = _themeRevision;
+            string? saved = null;
+            try
+            {
+                saved = await JS.InvokeAsync<string?>("localStorage.getItem", _themeStorageKey);
+            }
+            catch (JSException ex)
+            {
+                Logger.LogWarning(ex, "Unable to read the saved theme; using the configured default");
+            }
+
+            // A navigation or reader choice while storage was read supersedes this result.
+            if (revision == _themeRevision)
+            {
+                Theme.ApplyPreference(_defaultTheme, saved);
+            }
+        }
+
+        if (_pendingThemeWrite is { } preference)
+        {
+            _pendingThemeWrite = null;
+            try
+            {
+                if (preference.Theme is null)
+                {
+                    await JS.InvokeVoidAsync("localStorage.removeItem", preference.Key);
+                }
+                else
+                {
+                    await JS.InvokeVoidAsync("localStorage.setItem", preference.Key, preference.Theme);
+                }
+            }
+            catch (JSException ex)
+            {
+                Logger.LogWarning(ex, "Unable to save the theme preference; the selection applies only to this page session");
+            }
+        }
+
+        if (_rerenderMermaid)
+        {
+            _rerenderMermaid = false;
+            await JS.InvokeVoidAsync("appUi.rerenderMermaid");
+        }
+
         if (firstRender)
         {
-            // Reader choice wins; the deployment's branding theme only supplies the first load.
-            string? saved = await JS.InvokeAsync<string?>("localStorage.getItem", "lh-theme");
-            Theme.SetTheme(string.IsNullOrWhiteSpace(saved) ? Site.Branding.DefaultTheme : saved);
             await JS.InvokeVoidAsync("appUi.initResizer");
             await JS.InvokeVoidAsync("appUi.initTocResizer");
             await JS.InvokeVoidAsync("appUi.initHeaderMetrics");
@@ -142,6 +229,8 @@ public partial class MainLayout
     public void Dispose()
     {
         Theme.Changed -= OnThemeChanged;
+        Theme.PreferenceChanged -= OnThemePreferenceChanged;
+        Navigation.LocationChanged -= OnLocationChanged;
         Sidebar.Changed -= OnSidebarChanged;
         Site.Changed -= OnSiteChanged;
         Stats.Changed -= OnStatsChanged;

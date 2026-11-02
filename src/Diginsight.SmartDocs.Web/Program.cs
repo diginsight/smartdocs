@@ -99,6 +99,16 @@ public class Program
             // misconfigured space; space floors are checked by SpaceRegistry below.
             siteOptions.Authorization.Validate();
 
+            IReadOnlyList<ThemeOption> themes = ThemeCatalog.Resolve(siteOptions.Themes);
+            foreach (SpaceOptions space in siteOptions.Spaces)
+            {
+                if (!string.IsNullOrWhiteSpace(space.DefaultTheme) && !themes.Any(t => t.Id == space.DefaultTheme))
+                {
+                    throw new InvalidOperationException(
+                        $"Space '{space.Id}' DefaultTheme '{space.DefaultTheme}' is not in the site's theme catalog.");
+                }
+            }
+
             // Entra sign-in, wired only when AzureAd:ClientId is set; otherwise the host stays
             // anonymous-only and registers no authentication service at all.
             SignInConfiguration signIn = SignInConfiguration.From(configuration);
@@ -123,7 +133,7 @@ public class Program
                 state.Apply(shell);
                 return state;
             });
-            services.AddScoped(_ => new ThemeState(ThemeCatalog.Resolve(siteOptions.Themes)));
+            services.AddScoped(_ => new ThemeState(themes));
             var spaceRegistry = new SpaceRegistry(siteOptions.Spaces);
             services.AddSingleton(spaceRegistry);
             logger.LogInformation(

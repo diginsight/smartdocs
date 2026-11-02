@@ -168,6 +168,7 @@ public sealed class SpaceShellInfo
     public string IconUrl { get; set; } = string.Empty;
     public string Description { get; set; } = string.Empty;
     public string RepositoryUrl { get; set; } = string.Empty;
+    public string DefaultTheme { get; set; } = string.Empty;
 
     public static SpaceShellInfo From(SpaceOptions space) => new()
     {
@@ -180,6 +181,7 @@ public sealed class SpaceShellInfo
                 space.IconPath.Trim().Replace('\\', '/')).TrimStart('/').Split('/').Select(Uri.EscapeDataString)),
         Description = space.Description,
         RepositoryUrl = space.RepositoryUrl,
+        DefaultTheme = space.DefaultTheme,
     };
 
     [JsonIgnore]
@@ -305,6 +307,12 @@ public sealed class SpaceOptions
 
     /// <summary>Repository this documentation was generated from, linked from the index.</summary>
     public string RepositoryUrl { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Optional theme from the site's catalog. When set, this space has its own saved reader
+    /// preference; otherwise it inherits the site's theme and shared preference.
+    /// </summary>
+    public string DefaultTheme { get; set; } = string.Empty;
 
     /// <summary>Whether GPTBot may crawl this space's published content. Denied by default.</summary>
     public bool AllowGptBot { get; set; }

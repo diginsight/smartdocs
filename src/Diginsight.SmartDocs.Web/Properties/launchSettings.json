@@ -34,6 +34,9 @@
         "AppsettingsEnvironmentName": "devdocs"
       }
     },
+    // Serves the public Learning Hub at /learn and the internal one, for signed-in readers with a
+    // Learning Hub role, at /learn-internal. The reader app registration and the internal content
+    // root come from smartdocs.internal\src\Diginsight.SmartDocs.Web\appsettings.devlearn.json.
     "https - devlearn": {
       "commandName": "Project",
       "dotnetRunMessages": true,
@@ -41,7 +44,8 @@
       "applicationUrl": "https://localhost:7280;http://localhost:5280",
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development",
-        "AppsettingsEnvironmentName": "devlearn"
+        "AppsettingsEnvironmentName": "devlearn",
+        "ExternalConfigurationFolder": "..\\..\\..\\smartdocs.internal"
       }
     },
     "https - devec4": {

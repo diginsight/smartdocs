@@ -60,7 +60,7 @@ Keep the registration's tenant and client IDs in the private configuration. Use 
 
 For the validated local, credential-free mode, allow **ID tokens** under **Implicit grant and hybrid flows**. The observed request uses `response_type=id_token` and `response_mode=form_post`; it doesn't redeem an authorization code. Don't describe that development setup as a tested certificate-based code flow.
 
-For a deployed host, use a client certificate held in Key Vault and the authorization-code flow. Upload the certificate's public part to the reader registration, configure Microsoft Identity Web's supported `AzureAd:ClientCredentials` certificate description, and grant the host identity the required certificate/secret access. Keep the private key in Key Vault and verify rotation and access before rollout. The official certificate configuration guide in References defines the supported description fields.
+For a production deployment, use a client certificate held in Key Vault and the authorization-code flow. Upload the certificate's public part to the reader registration, configure Microsoft Identity Web's supported `AzureAd:ClientCredentials` certificate description, and grant the host identity the required certificate/secret access. Keep the private key in Key Vault and verify rotation and access before rollout. The official certificate configuration guide in References defines the supported description fields.
 
 If a local code-redemption setup instead requires a temporary client secret, store it with .NET user-secrets for the host project, never in an overlay or this guide. A certificate-based deployed flow hasn't been validated by this work item's local ID-token run.
 
@@ -140,6 +140,24 @@ A nonempty `AzureAd:ClientId` enables sign-in. `DefaultRequirement` and the per-
 
 `AccessFileRequired: true` keeps a space hidden while its root access file is missing. Without it, a missing access file contributes no requirement. Invalid or unreadable access files fail closed in the implementation. Role maps belong in repository access files, not in `Site:Authorization`.
 
+### Space colors (optional)
+
+Set `DefaultTheme` on each space to give public and internal content different default palettes. The local `devlearn` overlay uses `cosmo` for `/learn` and `sandstone` for `/learn-internal`; `Site:Branding:DefaultTheme` supplies the site-index default. A space's theme ID must exist in the resolved `Site:Themes` catalog (the built-in catalog when no themes are declared), or startup fails with the space and invalid ID.
+
+An explicit space default creates a separate browser preference, stored as `lh-theme:<space-id>`. The **About** menu still lets readers choose any offered theme, but a choice in one space doesn't recolor the other. **Reset theme** removes that space's saved choice and restores its configured default. Defaults apply during server rendering and when navigating between spaces.
+
+Spaces without `DefaultTheme` keep the existing site-wide `lh-theme` preference and fall back to `Site:Branding:DefaultTheme`, then the first light theme. An old global choice isn't copied into spaces with explicit defaults. Theme colors are a visual cue, not an access control; authorization and navigation filtering remain unchanged.
+
+### Blob-backed App Service deployments
+
+Keep the routes, access floors, required-policy flags, and themes when replacing a filesystem source with Blob Storage. Set each space's `Source` to `Blob` and supply its own `Blob:AccountUri` and `Blob:ContainerName`; don't use a local `FileSystem:RootPath`. Place the internal repository's access file at the **container root**, not alongside the application's settings. Keep the containers private and grant the host identity read access; reader roles don't grant direct storage access.
+
+App Service uses double underscores for nested settings. For example, `Site__Spaces__1__Blob__ContainerName`, `Site__Spaces__1__Access=authenticated`, and `Site__Spaces__1__AccessFileRequired=true` configure the second space. The old `Content__*` and `BlobProxy__*` settings don't configure this implementation's spaces. Keep live settings aligned with the private deployment overlay so a later publish doesn't restore stale configuration.
+
+Verify the **deployed binary** enforces authorization before mounting protected storage. Configuration alone can't add missing code. Similarly, saved per-space theme defaults require a host and client release containing that feature. Register the cloud HTTPS sign-in and signed-out callback URLs; preserve localhost URLs when a test registration is deliberately shared. A registration has only one front-channel logout URL, so shared-origin sign-out needs its own validation.
+
+[Sequence 07](_validation/20261102.07-validation-sequence.md) records the Testmc configuration-only update using the existing ID-token registration. Public reading, anonymous denial, and the provider prompt passed; real-account role acceptance, sign-out, and the pending per-space theme deployment weren't covered. This test setup isn't evidence of a production certificate/code-flow rollout.
+
 ## 📦 Publish and operate safely
 
 These six operating rules apply after rollout is authorized:
@@ -164,7 +182,7 @@ After an access-file change, call the deployment's `POST /_nav/invalidate`, with
 
 Build the host and client together, run the access profile in a visible console, and validate in a visible browser. The owner completes sign-ins; don't capture credentials or put tenant-identifying screenshots in public evidence.
 
-Check anonymous, signed-in/no-role, single-role, and multi-role readers against the expected spaces. Then repeat the end-to-end scenarios that [sequence 04](_validation/20261102.04-validation-sequence.md) recorded locally: authorized versus anonymous push delivery, session expiry and revocation, response cache headers, byte-identical public-baseline comparison, unreadable/invalid/required-but-missing access files, and root-mount route divergence. On a deployed host, also confirm that sign-in completes through the certificate-based authorization-code flow, which no local run has exercised, and that `POST /_nav/invalidate` refuses a request without the key.
+Check anonymous, signed-in/no-role, single-role, and multi-role readers against the expected spaces. Then repeat the end-to-end scenarios that [sequence 04](_validation/20261102.04-validation-sequence.md) recorded locally: authorized versus anonymous push delivery, session expiry and revocation, response cache headers, byte-identical public-baseline comparison, unreadable/invalid/required-but-missing access files, and root-mount route divergence. For production, also confirm that sign-in completes through the certificate-based authorization-code flow, which no local run has exercised. On every deployed host, confirm that `POST /_nav/invalidate` refuses a request without the key.
 
 Record each actual run with screenshots under this work item's `_validation/` folder. A source-level control or a successful build isn't proof that an unexecuted browser scenario passes.
 

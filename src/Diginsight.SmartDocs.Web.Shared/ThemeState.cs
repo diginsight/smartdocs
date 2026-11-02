@@ -212,7 +212,7 @@ public static class ThemeCatalog
 /// <para>
 /// The catalog arrives from configuration, so this type holds no palette of its own and no hardcoded
 /// default identifier: the defaults are simply the first light and first dark theme the deployment
-/// offers, and <c>Site:Branding:DefaultTheme</c> may name a different one for first load.
+/// offers. The active space or <c>Site:Branding:DefaultTheme</c> may name a different default.
 /// </para>
 /// </summary>
 public sealed class ThemeState
@@ -223,7 +223,7 @@ public sealed class ThemeState
 
     public ThemeState()
     {
-        ThemeId = DefaultLight;
+        ThemeId = DefaultThemeId = DefaultLight;
     }
 
     public ThemeState(IReadOnlyList<ThemeOption> catalog)
@@ -235,6 +235,8 @@ public sealed class ThemeState
     public IReadOnlyList<ThemeOption> Options => options;
 
     public string ThemeId { get; private set; } = string.Empty;
+
+    public string DefaultThemeId { get; private set; } = string.Empty;
 
     public ThemeOption? Current => options.FirstOrDefault(o => o.Id == ThemeId);
 
@@ -249,6 +251,9 @@ public sealed class ThemeState
         options.FirstOrDefault(static o => o.Dark)?.Id ?? DefaultLight;
 
     public event Action? Changed;
+
+    /// <summary>An explicit reader choice to save, or null to remove the current override.</summary>
+    public event Action<string?>? PreferenceChanged;
 
     /// <summary>
     /// Adopts the deployment's catalog. Called on the server at startup and in the browser once
@@ -266,16 +271,34 @@ public sealed class ThemeState
             ThemeId = DefaultLight;
         }
 
+        DefaultThemeId = DefaultLight;
         Changed?.Invoke();
+    }
+
+    /// <summary>Restores a scope's default and saved choice without saving either as a new choice.</summary>
+    public void ApplyPreference(string? defaultTheme, string? savedTheme = null)
+    {
+        ThemeOption? configured = options.FirstOrDefault(o => o.Id == defaultTheme);
+        DefaultThemeId = configured?.Id ?? DefaultLight;
+        lastLight = configured?.Dark == true ? null : DefaultThemeId;
+        lastDark = configured?.Dark == true ? DefaultThemeId : null;
+        SetCurrent(options.FirstOrDefault(o => o.Id == savedTheme)?.Id ?? DefaultThemeId);
     }
 
     public void SetTheme(string? id)
     {
-        if (string.IsNullOrEmpty(id) || id == ThemeId || options.All(o => o.Id != id))
+        if (string.IsNullOrEmpty(id) || options.All(o => o.Id != id))
         {
             return;
         }
 
+        SetCurrent(id);
+        PreferenceChanged?.Invoke(id);
+    }
+
+    private void SetCurrent(string id)
+    {
+        bool changed = ThemeId != id;
         ThemeId = id;
 
         // Remember the choice per side so the light/dark button can return to it. Without this the
@@ -290,7 +313,10 @@ public sealed class ThemeState
             lastLight = id;
         }
 
-        Changed?.Invoke();
+        if (changed)
+        {
+            Changed?.Invoke();
+        }
     }
 
     /// <summary>
@@ -299,5 +325,9 @@ public sealed class ThemeState
     /// </summary>
     public void Toggle() => SetTheme(Dark ? lastLight ?? DefaultLight : lastDark ?? DefaultDark);
 
-    public void Reset() => SetTheme(DefaultLight);
+    public void Reset()
+    {
+        ApplyPreference(DefaultThemeId);
+        PreferenceChanged?.Invoke(null);
+    }
 }
