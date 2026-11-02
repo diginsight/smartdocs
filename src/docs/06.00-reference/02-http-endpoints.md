@@ -11,14 +11,14 @@ source_sets:
 
 <!--
 verification_stamp:
-  generated: "2026-10-28"
-  verified: "2026-10-28"
+  generated: "2026-11-02"
+  verified: "2026-11-02"
   gate_outcome: "pass-with-gaps"
   evidence:
     - dossier: "_evidence/smartdocs-web/code.md"
-      observed: "2026-10-28"
+      observed: "2026-11-02"
     - dossier: "_evidence/smartdocs-web/security.md"
-      observed: "2026-10-28"
+      observed: "2026-11-02"
     - dossier: "_evidence/smartdocs-web/configuration.md"
       observed: "2026-10-28"
   open_gaps: 4
@@ -84,19 +84,23 @@ These are mapped **only** when `Testing:ContentMutationEnabled` is true. When it
 | `/_auth/signout` | POST | Enabled only with sign-in; validates antiforgery, signs out cookie/OIDC, returns to `/`; invalid form returns 400 ^[configuration-33] |
 | `/_site` | GET | Shell state with only visible spaces ^[code-49] |
 | `/robots.txt` | GET | Policy derived from anonymous visibility, not requesting identity ^[code-49] |
+| `/_branding/logo` | GET | The brand mark configured by `Site:Branding:LogoPath`, with public caching; 404 when none is configured or the configured path was refused ^[security-44] |
 
 ## 🔐 Authorisation
 
 | Surface | Guard |
 |---|---|
-| `/_nav/invalidate` | Separate configuration-dependent management guard; reader permissions aren't management grants. Verify its deployed enforcement independently ^[security-05,security-06] |
+| `/_nav/invalidate` | Opt-in management guard: with `Site:InvalidateApiKey` set, a matching `X-Invalidate-Key` header is required; with no key configured, the endpoint is open. Reader permissions aren't management grants ^[security-05,security-06] |
 | `/_test/*`, `/_nav/metrics` | Not mapped at all unless `Testing:ContentMutationEnabled` is true ^[code-17] ^[security-07] |
 | Content, pages, navigation, shell and bootstrap | Explicit server-side reader visibility; denied results use missing-content representations ^[security-03,security-04,security-26] |
-| Hub | Server-derived role-set group and per-push visibility evaluation ^[security-30] |
+| `/_branding/logo` | None, by design: the configured mark is served to every caller even when it lives in a protected space, while that file's own URL still answers 404 to readers who can't see it; a path naming an access file is refused at startup ^[security-44] |
+| Hub | Server-derived role-set group and per-push visibility evaluation; the connection closes when its sign-in session expires ^[security-30,security-38] |
 
 Nonblank `AzureAd:ClientId` enables optional authentication before reader access. There is no blanket fallback authorization policy: public spaces remain readable anonymously. ^[security-02,security-03] Site-default `authenticated` challenges unsigned page requests before existence lookup. ^[security-26]
 
 Reader-dependent JSON uses `private, no-cache`; injected HTML and restricted successful raw bytes use `private, no-store`. Public Markdown revalidates and public assets retain freshness. Raw authorization precedes content reads and ETag handling; filtered response ETags describe only the reader's response. ^[code-10,code-11,security-27]
+
+A manual run on a local host on 2026-11-02 observed these policies. A protected asset answered 404 with and without `If-None-Match: *`, exactly as a nonexistent key did, and a hidden prefix and a nonexistent one returned byte-identical empty listings. ^[code-65,security-40] The anonymous `/_nav/children?prefix=`, `/_nav/folder?prefix=`, `/_nav/total`, `/_nav/index` and `/_site` responses were byte-identical to the pre-change baseline, with only `Cache-Control` gaining `private`. ^[code-66]
 
 ## ⚠️ Failure modes
 
@@ -104,7 +108,7 @@ Reader-dependent JSON uses `private, no-cache`; injected HTML and restricted suc
 |---|---|
 | A content key does not resolve | 404 ^[code-10] |
 | Nothing is known about the root aggregate yet | 204 ^[code-13] |
-| The invalidation key does not match | 401 ^[code-15] |
+| A key is configured and the invalidation key does not match | 401 ^[code-15,security-06] |
 | The client disconnects mid-request | 499, via an endpoint filter that maps `OperationCanceledException` raised on the request's own `RequestAborted` token ^[code-19] ^[security-20] |
 | An unhandled exception outside `Development` | Handled at `/error` in a fresh scope ^[code-38] ^[security-17] |
 
@@ -114,7 +118,7 @@ Front-matter parsing is capped at 64 KB per document, which bounds the cost of s
 
 ## 🕳️ Open questions
 
-> **Not established**: the complete runtime cache-header matrix, expiry, revocation and baseline-regression scenarios remain pending after sequence 04's blocked preflight. ^[gap]
+> **Not established**: whether the response headers, concealment and anonymous response equivalence hold in a deployed environment. They were observed only on a local host with a fixture tree; no deployed-environment run was recorded. ^[gap]
 
 > **Not established**: whether either deployed environment supplies `Site:InvalidateApiKey`. The pipeline writes the setting only when the corresponding optional secret exists, and secret presence is a repository-settings fact this repository does not carry. ^[gap]
 

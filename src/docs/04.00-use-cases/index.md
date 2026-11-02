@@ -8,16 +8,17 @@ source_sets:
   - deployment-descriptor
   - domain-model
   - authn-authz-surface
+  - test-surface
 ---
 
 <!--
 verification_stamp:
-  generated: "2026-10-28"
-  verified: "2026-10-28"
+  generated: "2026-11-02"
+  verified: "2026-11-02"
   gate_outcome: "pass-with-gaps"
   evidence:
     - dossier: "_evidence/smartdocs-web/code.md"
-      observed: "2026-10-28"
+      observed: "2026-11-02"
     - dossier: "_evidence/smartdocs-web/devops.md"
       observed: "2026-08-18"
     - dossier: "_evidence/smartdocs-content/data.md"
@@ -31,7 +32,7 @@ verification_stamp:
 
 What people do with this system, step by step, and what each step can be observed doing.
 
-One captured deploy run records the build-and-deploy sequence. ^[devops-28] Existing local reader-access sequences also record passing anonymous and signed-in fixture observations, with explicit coverage limits. ^[code-57,code-58,code-59] Other behavior remains source-derived; sequence 04 records a blocked preflight, not completed end-to-end validation. ^[code-60]
+One captured deploy run records the build-and-deploy sequence. ^[devops-28] Local reader-access sequences record passing anonymous and signed-in fixture observations, with explicit coverage limits. ^[code-57,code-58,code-59] A 2026-11-02 run on a local host then passed the end-to-end reader-access matrix, superseding an earlier attempt that stopped before any scenario ran. ^[code-60,code-63]
 
 ## 🗺️ Pages in this section
 
@@ -53,7 +54,7 @@ One captured deploy run records the build-and-deploy sequence. ^[devops-28] Exis
 
 ## 🕳️ Open questions
 
-> **Not established**: no automated regression suite was discovered. Manual sequences 01–03 provide bounded observations, while F1–F6 and hub-expiry validation remain pending. ^[gap]
+> **Not established**: no automated regression suite was discovered, and no reader-access run in a deployed environment was recorded. The manual sequences, including the 2026-11-02 end-to-end run, ran on a local host only. ^[gap]
 
 ## 🔗 Related
 

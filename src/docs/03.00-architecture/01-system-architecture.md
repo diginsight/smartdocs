@@ -14,12 +14,12 @@ source_sets:
 
 <!--
 verification_stamp:
-  generated: "2026-10-28"
-  verified: "2026-10-28"
+  generated: "2026-11-02"
+  verified: "2026-11-02"
   gate_outcome: "pass-with-gaps"
   evidence:
     - dossier: "_evidence/smartdocs-web/code.md"
-      observed: "2026-10-28"
+      observed: "2026-11-02"
     - dossier: "_evidence/smartdocs-web/configuration.md"
       observed: "2026-10-28"
     - dossier: "_evidence/smartdocs-web/data.md"
@@ -110,7 +110,7 @@ The shared loader retains its ordered candidate ladder, but a handled rendered-p
 
 The host initializes request-scoped `ReaderAccess` after optional authentication and before bootstrap, route guarding, and endpoint execution. ^[smartdocs-web/code-46] Every space combines the site default, deployment floor, and access-file requirement; a signed-in reader's roles grant permissions only through that space's own file. All required permissions must be covered. ^[smartdocs-web/code-47]
 
-Shared caches hold content facts, not reader-filtered responses. Navigation uses source-folder provenance for ownership, so a displayed route isn't an authorization key. ^[smartdocs-web/code-48,smartdocs-web/code-49] See [Security](../09.00-security/index.md) and the [access-file schema](../06.00-reference/07-access-file-schema.md).
+Shared caches hold content facts, not reader-filtered responses. Navigation uses source-folder provenance for ownership, so a displayed route isn't an authorization key. ^[smartdocs-web/code-48,smartdocs-web/code-49] The one exception is the root's generated Home link, which has no source folder: it stays whenever the reader sees the space mounted at the root or anything outside spaces, so a hidden root-mounted space leaves the root level unchanged. ^[smartdocs-web/code-62,smartdocs-web/code-68] See [Security](../09.00-security/index.md) and the [access-file schema](../06.00-reference/07-access-file-schema.md).
 
 ### Building the sidebar
 

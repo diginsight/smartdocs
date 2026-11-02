@@ -11,14 +11,14 @@ source_sets:
 
 <!--
 verification_stamp:
-  generated: "2026-10-28"
-  verified: "2026-10-28"
+  generated: "2026-11-02"
+  verified: "2026-11-02"
   gate_outcome: "pass-with-gaps"
   evidence:
     - dossier: "_evidence/smartdocs-web-shared/code.md"
       observed: "2026-10-28"
     - dossier: "_evidence/smartdocs-web/code.md"
-      observed: "2026-10-28"
+      observed: "2026-11-02"
   open_gaps: 1
 -->
 
@@ -116,6 +116,8 @@ A name excluded at step 1 is never read, so neither its metadata nor its front m
 **A collapsed folder's link follows its representative.** The emitted route is the folder's own path when the index or readme represents it, and the article's path with the extension stripped when an article does. ^[smartdocs-web/code-44]
 
 **Authorization follows provenance, not that link.** `NavChild` and `NavLeaf` retain nonserialized `SourceFolder`; the server uses it to find the owning space and removes unplaceable entries when filtering is required. The shared unfiltered tree remains reusable, but every reader response filters its level/index and composes visible counts. ^[smartdocs-web-shared/code-30,smartdocs-web/code-49,smartdocs-web/code-50]
+
+**The root's Home entry follows the root-mounted space.** When filtering is required, the generated Home entry is kept whenever the reader can see the space mounted at the root, or entries outside any space are visible. A hidden root-mounted space therefore yields the same root level as a site with none, and its presence can't be inferred from a missing Home entry. Every other entry is still decided by its `SourceFolder`. ^[smartdocs-web/code-62] A manual run on a local host on 2026-11-02 confirmed the equivalence after this rule was added. ^[smartdocs-web/code-68]
 
 **A hidden single article falls back to the index.** When the one article is hidden by front matter, the folder still yields a link to the folder path if an index or readme exists, and yields nothing otherwise. ^[smartdocs-web/code-45]
 

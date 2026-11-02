@@ -8,16 +8,17 @@ source_sets:
   - domain-model
   - composition-root
   - authn-authz-surface
+  - test-surface
 ---
 
 <!--
 verification_stamp:
-  generated: "2026-10-28"
-  verified: "2026-10-28"
+  generated: "2026-11-02"
+  verified: "2026-11-02"
   gate_outcome: "pass-with-gaps"
   evidence:
     - dossier: "_evidence/smartdocs-web/code.md"
-      observed: "2026-10-28"
+      observed: "2026-11-02"
     - dossier: "_evidence/smartdocs-web/data.md"
       observed: "2026-08-18"
     - dossier: "_evidence/smartdocs-web/configuration.md"
@@ -27,7 +28,7 @@ verification_stamp:
     - dossier: "_evidence/smartdocs-web-shared/code.md"
       observed: "2026-10-28"
     - dossier: "_evidence/smartdocs-web/security.md"
-      observed: "2026-10-28"
+      observed: "2026-11-02"
   open_gaps: 2
 -->
 
@@ -72,18 +73,18 @@ verification_stamp:
 | Site default requires `authenticated` and reader is unsigned | The page guard challenges before looking up existence. ^[smartdocs-web/code-54] |
 | The document declares `publish: false` or `draft: true` | `Hidden` is computed as `!publish \|\| draft` and the document is excluded from navigation. ^[smartdocs-web/code-22] |
 | The reader navigates away mid-request | An endpoint filter converts `OperationCanceledException` raised on the request's own `RequestAborted` token into HTTP 499 rather than a 500. ^[smartdocs-web/code-19] |
-| The request is for a raw asset rather than a page | `GET /_content/{**key}` returns the bytes and content type directly, or 404 when absent. ^[smartdocs-web/code-10] |
+| The request is for a raw asset rather than a page | `GET /_content/{**key}` returns the bytes and content type directly, or 404 when absent. ^[smartdocs-web/code-10] A key the reader can't see answers 404 too, before any entity tag is compared, so a conditional request can't confirm it exists. ^[smartdocs-web/security-40] |
 | An unhandled error occurs outside `Development` | The exception handler at `/error` takes it, in a fresh scope. ^[smartdocs-web/code-38] |
 
 ## 🧪 What proves it
 
-Existing local sequences 01 and 03 record passing anonymous concealment and signed-in role views respectively. ^[smartdocs-web/code-57,smartdocs-web/code-59] These are bounded manual fixture observations, not an automated suite or proof of the unexecuted F1–F6 scenarios. ^[smartdocs-web/code-60]
+Existing local sequences 01 and 03 record passing anonymous concealment and signed-in role views respectively. ^[smartdocs-web/code-57,smartdocs-web/code-59] A later manual run on a local host, on 2026-11-02, recorded the end-to-end matrix passing. A hidden protected asset answered 404 exactly as a missing one did, and a hidden space's listing and a nonexistent one were byte-identical empty listings. ^[smartdocs-web/code-65,smartdocs-web/security-37] Readers kept a removed role until their session expired and lost it at the next sign-in. ^[smartdocs-web/code-64] An unreadable, invalid or missing access file hid its space from every reader until it was restored. ^[smartdocs-web/code-67] These are manual fixture observations, not an automated suite. ^[smartdocs-web/code-63]
 
 ## 🕳️ Open questions
 
 > **Not established**: no automated test covers document resolution or rendering. Prior manual observations don't replace a discoverable regression suite. ^[gap]
 
-> **Not established**: the full end-to-end expiry, revocation, response-header and baseline-equivalence scenarios remain pending after sequence 04's blocked preflight. ^[gap]
+> **Not established**: how reading a protected document behaves in a deployed environment. Every recorded run used a local host, a fixture tree and a development sign-in registration, and whether the sign-in registrations are deployed to production isn't established. ^[gap]
 
 ## 🔗 Related
 

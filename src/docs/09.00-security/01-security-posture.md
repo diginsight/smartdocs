@@ -14,17 +14,17 @@ source_sets:
 
 <!--
 verification_stamp:
-  generated: "2026-10-28"
-  verified: "2026-10-28"
+  generated: "2026-11-02"
+  verified: "2026-11-02"
   gate_outcome: "pass-with-gaps"
   evidence:
     - dossier: "_evidence/smartdocs-web/security.md"
-      observed: "2026-10-28"
+      observed: "2026-11-02"
     - dossier: "_evidence/smartdocs-web/configuration.md"
       observed: "2026-10-28"
     - dossier: "_evidence/smartdocs-web/devops.md"
       observed: "2026-08-18"
-  open_gaps: 8
+  open_gaps: 9
 -->
 
 # Security posture
@@ -36,12 +36,14 @@ verification_stamp:
 - [🪪 Identity and authorisation](#-identity-and-authorisation)
 - [🔐 Data protection](#-data-protection)
 - [🗝️ Secret handling](#-secret-handling)
-- [⚠️ Established absences](#-established-absences)
+- [⚠️ Known absences](#-known-absences)
 - [🕳️ Open questions](#-open-questions)
 - [🔗 Related](#-related)
 ## 🎯 What is protected
 
 The host can serve both public and restricted documentation. Reader visibility applies to raw bytes, rendered pages, navigation, counts, shell/bootstrap state and hub messages. ^[security-04,security-30] Content-store identity and the ability to publish, invalidate or mutate content remain separate concerns. ^[security-05,security-07,security-08,security-10]
+
+A manual run on a local host on 2026-11-02 exercised these protections end to end: hidden content answered exactly as missing content, access files that couldn't be read or validated hid their space, and pushes reached only the readers allowed to see them. ^[security-34,security-37,security-39] One exception is deliberate: the configured brand mark is served to every caller with public caching, even when the image lives in a protected space, while the image's own address still answers as missing to readers who can't see it. A brand-mark path naming an access file is refused at startup and the built-in icon is shown instead. ^[security-44]
 
 ## 🧱 Trust boundaries
 
@@ -59,11 +61,11 @@ The host can serve both public and restricted documentation. Reader visibility a
 
 **Inbound.** Nonblank `AzureAd:ClientId` enables Microsoft Identity Web sign-in. Authentication runs before request-scoped reader visibility; explicit server-side filtering, not a blanket fallback policy, controls content. ^[security-02,security-03] Case-insensitive roles grant a union of permissions separately within each space, and every combined site/space/file requirement must be covered. ^[security-24]
 
-Invalid, unreadable or required-but-missing access files deny visibility. The host checks exact selected content keys, conceals denials as missing content, and excludes access-file bytes from all mounted reads. ^[security-25,security-26,security-29] A private-site default challenges unsigned page requests before existence lookup. ^[security-26]
+Invalid, unreadable or required-but-missing access files deny visibility. The host checks exact selected content keys, conceals denials as missing content, and excludes access-file bytes from all mounted reads. ^[security-25,security-26,security-29] A private-site default challenges unsigned page requests before existence lookup. ^[security-26] Navigation filtering keeps the root's generated Home link whenever the reader sees the space mounted at the root or anything outside spaces, so a hidden root-mounted space doesn't reveal itself by removing that link. ^[security-45]
 
-**Session.** The cookie is HttpOnly, always Secure and SameSite=Lax. Its configured positive lifetime defaults to eight hours without sliding or token-lifetime substitution. Sign-in accepts local return targets only; sign-out is an antiforgery-validated POST. ^[security-28]
+**Session.** The cookie is HttpOnly, always Secure and SameSite=Lax. Its configured positive lifetime defaults to eight hours without sliding or token-lifetime substitution. Sign-in accepts local return targets only; sign-out is an antiforgery-validated POST. ^[security-28] Roles come from the claims issued at sign-in, so an open session keeps a removed role until the session expires, and a membership change shows only at a later sign-in once the identity provider issues it. ^[security-38,security-41]
 
-**Management.** Invalidation retains its independent management protection. Reader roles don't grant management access, and source wiring alone doesn't establish the adequacy of deployed protection. ^[security-05,security-06]
+**Management.** The invalidation guard is opt-in by configuration. With `Site:InvalidateApiKey` set, the endpoint requires a matching `X-Invalidate-Key` header and otherwise answers 401; with no key configured, it's open to any caller. Reader roles don't grant management access. ^[security-05,security-06]
 
 Test mutations are mapped only when `Testing:ContentMutationEnabled` is true; source wiring doesn't prove its value in a deployed instance. ^[security-07]
 
@@ -85,8 +87,9 @@ Test mutations are mapped only when `Testing:ContentMutationEnabled` is true; so
 | Hidden documents | A document declaring `publish: false` or `draft: true` is marked hidden and excluded from navigation ^[security-14] |
 | Cancellation | A client disconnect is translated to HTTP 499 by an endpoint filter rather than surfacing as a server error ^[security-20] |
 | Reader-dependent response reuse | Private revalidation for page/nav/site JSON; no storage for injected HTML and restricted successful raw bytes ^[security-27] |
+| Conditional requests for hidden bytes | Visibility is checked before any entity tag, so a hidden asset answers 404 even to a conditional request ^[security-40] |
 | Content-key guards | Ambiguous keys rejected before reads; filesystem containment and blob-container checks preserved ^[security-31] |
-| Hub isolation | Server-derived role-set membership and per-push visibility/count composition; cookie-expiry closure not yet proven ^[security-30] |
+| Hub isolation | Server-derived role-set membership and per-push visibility/count composition; a connection closes when its sign-in session expires ^[security-30,security-38] |
 
 ## 🗝️ Secret handling
 
@@ -99,21 +102,24 @@ Test mutations are mapped only when `Testing:ContentMutationEnabled` is true; so
 - The overlay's `Deployment` section is **removed** from the settings file before it is staged into the published output, so deployment metadata never reaches the running application. ^[devops-15]
 - The invalidation key is written as an App Service application setting only when the corresponding optional secret is present. ^[devops-18]
 
-## ⚠️ Established absences
+## ⚠️ Known absences
 
 These were established by reading the artifact that would carry the control. Each is what was *not* found, not a route to exploit.
 
 | Absence | Established from |
 |---|---|
-| No completed reader-access end-to-end matrix | Sequences 01–03 passed bounded checks, but sequence 04 stopped at preflight ^[security-32,security-33,security-34] |
-| Deployed management enforcement isn't established by source alone | The invalidation guard depends on configuration ^[security-06] |
+| The navigation version isn't filtered by reader | The version endpoint answers every caller with a site-wide change number, so a caller can tell that something changed, though not what, even in a space they can't see ^[security-42] |
+| No handler for a failed sign-in callback | A failed callback isn't turned into a reader-facing sign-in response ^[security-43] |
+| Management protection is opt-in | The invalidation endpoint is open whenever no key is configured ^[security-06] |
 | No security assessment catalogue is declared | No control set, no requirement register and no dimension declaration was found ^[security-01] |
 | No manual approval or review gate in any workflow | No workflow declares one inside its job definition ^[devops-27] |
 | The overlay is checked for two keys only | The staging step fails only when `Site.Spaces` or `Deployment.WebAppName` is missing ^[devops-16] |
 
 ## 🕳️ Open questions
 
-> **Not established**: effective cookie-expiry hub closure, lifetime-bound revocation, signed-in cross-group pushes, full cache-header coverage and the other F1–F6 outcomes. The session-6 execution waiver doesn't prove these scenarios; DS-4 remains open. ^[gap]
+> **Not established**: how reader access behaves in a deployed environment. Validation ran on a local host only; no deployed-environment run was recorded. ^[gap]
+
+> **Not established**: certificate-based code-flow sign-in in a deployed environment. Every recorded run used a development sign-in registration on a local host, and whether the sign-in registrations are deployed to production isn't established. ^[gap]
 
 > **Not established**: no rate limiting or request throttling was found. A rate-limiting policy, throttling middleware and a request-size limit on the anonymous read surface were sought — the composition root and the endpoint definitions were searched for `AddRateLimiter`, `UseRateLimiter`, `RequestSizeLimit` and equivalents — and none is present. ^[gap]
 

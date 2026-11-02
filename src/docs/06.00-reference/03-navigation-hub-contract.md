@@ -11,12 +11,14 @@ source_sets:
 
 <!--
 verification_stamp:
-  generated: "2026-10-28"
-  verified: "2026-10-28"
+  generated: "2026-11-02"
+  verified: "2026-11-02"
   gate_outcome: "pass-with-gaps"
   evidence:
     - dossier: "_evidence/smartdocs-web/code.md"
-      observed: "2026-10-28"
+      observed: "2026-11-02"
+    - dossier: "_evidence/smartdocs-web/security.md"
+      observed: "2026-11-02"
     - dossier: "_evidence/smartdocs-web-shared/code.md"
       observed: "2026-10-28"
     - dossier: "_evidence/smartdocs-web-client/code.md"
@@ -66,7 +68,9 @@ The shared assembly still declares the type below. Its existence doesn't make it
 
 **The values are absolute, not increments.** Despite the type name, `ArticleCount` is the count beneath the prefix rather than a change to a previous count. ^[smartdocs-web-shared/code-09]
 
-**Recipients are role sets, not person identifiers.** The server normalizes signed-in state and roles into a group identity, tracks active sets, and reevaluates space visibility before pushes. A hidden-only mutation doesn't emit `MetadataChanged` for an unaffected reader. ^[smartdocs-web/code-52]
+**Recipients are role sets, not person identifiers.** The server normalizes signed-in state and roles into a group identity, tracks active sets, and reevaluates space visibility before pushes. A hidden-only mutation doesn't emit `MetadataChanged` for an unaffected reader. ^[smartdocs-web/code-52] A manual run on a local host on 2026-11-02 observed this: a signed-in reader's counts updated without a reload when a probe article was added to and removed from a space that reader could open, while an anonymous connection received no `MetadataChanged` message. ^[smartdocs-web/code-63]
+
+**A connection lives no longer than its sign-in session.** The hub closes a connection when the cookie session that authorized it expires; the client then reconnects anonymously and receives the anonymous composition. In the same run, with a five-minute session, the server sent the close about five minutes after sign-in, and a role removed mid-session kept working until then. ^[smartdocs-web/code-64,smartdocs-web/security-38]
 
 **Coverage travels with the count.** `None` renders as `…`, `Partial` as `≥ N` and `Complete` as `N`; `Partial` supersedes `None` and `Complete` supersedes both. ^[smartdocs-web-shared/code-11] An unknown count is therefore never rendered as zero. ^[smartdocs-web-shared/code-12]
 
@@ -82,7 +86,7 @@ The connection is established with `WithAutomaticReconnect()` ^[smartdocs-web-cl
 
 ## 🕳️ Open questions
 
-> **Not established**: signed-in cross-group pushes, cookie-expiry closure, and lifetime-bound revocation. `CloseOnAuthenticationExpiration=true` is implemented, but sequence 04 ran none of F1–F6 and left DS-4 unresolved. ^[gap]
+> **Not established**: role-set pushes and session-expiry closure in a deployed environment. They were observed only in a manual run on a local host with a development sign-in registration; no automated test covers them. ^[gap]
 
 ## 🔗 Related
 
