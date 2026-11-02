@@ -11,8 +11,8 @@ source_sets:
 
 <!--
 verification_stamp:
-  generated: "2026-08-18"
-  verified: "2026-08-18"
+  generated: "2026-10-28"
+  verified: "2026-10-28"
   gate_outcome: "pass-with-gaps"
   evidence:
     - dossier: "_evidence/smartdocs-web/environment.md"
@@ -20,11 +20,11 @@ verification_stamp:
     - dossier: "_evidence/smartdocs-web/devops.md"
       observed: "2026-08-18"
     - dossier: "_evidence/smartdocs-web/configuration.md"
-      observed: "2026-08-18"
+      observed: "2026-10-28"
     - dossier: "_evidence/smartdocs-web/data.md"
       observed: "2026-08-18"
     - dossier: "_evidence/smartdocs-web/security.md"
-      observed: "2026-08-18"
+      observed: "2026-10-28"
   open_gaps: 4
 -->
 
@@ -40,7 +40,6 @@ verification_stamp:
 - [🧾 Provenance](#-provenance)
 - [🕳️ Open questions](#-open-questions)
 - [🔗 Related](#-related)
-
 ## 🎯 Purpose
 
 `testmc` is one of the two GitHub deployment environments the workflows name. ^[environment-01] It hosts the **learn app service** — the Learning Hub deployment of Diginsight SmartDocs — and is targeted by the *01 · Deploy Learning Hub* workflow, which calls the reusable build-and-deploy workflow with the `testmc` deployment environment. ^[devops-05]

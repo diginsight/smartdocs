@@ -8,18 +8,19 @@ source_sets:
   - settings-sources
   - entry-points
   - domain-model
+  - authn-authz-surface
 ---
 
 <!--
 verification_stamp:
-  generated: "2026-08-18"
-  verified: "2026-08-18"
+  generated: "2026-10-28"
+  verified: "2026-10-28"
   gate_outcome: "pass-with-gaps"
   evidence:
     - dossier: "_evidence/smartdocs-web/code.md"
-      observed: "2026-08-18"
+      observed: "2026-10-28"
     - dossier: "_evidence/smartdocs-web/configuration.md"
-      observed: "2026-08-18"
+      observed: "2026-10-28"
     - dossier: "_evidence/smartdocs-web/data.md"
       observed: "2026-08-18"
     - dossier: "_evidence/smartdocs-web/devops.md"
@@ -27,7 +28,7 @@ verification_stamp:
     - dossier: "_evidence/smartdocs-web/environment.md"
       observed: "2026-08-18"
     - dossier: "_evidence/smartdocs-web/security.md"
-      observed: "2026-08-18"
+      observed: "2026-10-28"
   open_gaps: 3
 -->
 
@@ -42,7 +43,6 @@ verification_stamp:
 - [🧭 Design decisions](#-design-decisions)
 - [🕳️ Open questions](#-open-questions)
 - [🔗 Related](#-related)
-
 ## 🎯 Purpose and context
 
 Rendering at request time is the design commitment. Caching is what makes that commitment affordable, and invalidation is what keeps it honest. This page describes both, and the several independent layers they are spread across.
@@ -54,6 +54,7 @@ Rendering at request time is the design commitment. Caching is what makes that c
 | `CachedContentSource` | Document bytes, per space and path | ^[code-09,data-11] |
 | `CachedDynamicNavBuilder` | Built navigation levels, in an in-process memory cache | ^[code-34,data-14] |
 | Folder metrics | Article counts and latest dates per folder, seeded at startup from a JSON snapshot | ^[code-36,data-09,data-10] |
+| Access-file facts | Parsed root access files, cached by mount; effective requirements aren't cached | ^[code-48] |
 | Redis (optional) | A passive store behind SmartCache | ^[configuration-10,configuration-20] |
 | Service Bus (optional) | Cross-instance invalidation messages | ^[configuration-11,configuration-19] |
 
@@ -76,6 +77,8 @@ flowchart TB
 ### The cache key
 
 `ContentPathCacheKey` is a value type over the space and the path. ^[data-12] Because the key carries the space, two spaces holding a file at the same path cannot collide — the failure a plain path string would have permitted.
+
+The access-file cache stores missing, valid, or invalid outcomes for a default freshness of 30 seconds; unreadable outcomes aren't cached. Requirements and visible totals are recomputed from those facts for the reader, not stored as principal-specific shared entries. ^[code-48,code-50,configuration-38] Reader-dependent JSON revalidates privately, injected HTML and restricted asset bytes aren't stored, and public assets retain their public freshness policy. ^[code-53]
 
 ### The two optional companions
 
@@ -101,7 +104,7 @@ The endpoint compares the supplied key against `Site:InvalidateApiKey` with `Cry
 
 ### Propagating counts
 
-`NavChangePublisher` is wired after the application is built and before the host begins serving ^[code-35], and updates reach connected browsers over the navigation hub ^[code-18]. A published entry carries a prefix, an article count, a latest date, an author and a coverage value — and those values are **absolute**, not increments, despite the type being named a delta. A single change publishes one entry for the changed folder and one for each ancestor up to the root. ^[code-33]
+`NavChangePublisher` is wired after the application is built and before the host begins serving. ^[code-35] It sends absolute `FolderRecord` arrays to role-set groups, filters their non-root records, and composes the root for each recipient set. Hidden-only mutations don't generate `MetadataChanged` for readers who see no changed content. ^[code-33,code-52] Snapshot format 2 preserves cells and `rootOwn`, not reader-specific totals. ^[code-51]
 
 ## 🔗 Dependencies
 
@@ -109,7 +112,7 @@ Diginsight.SmartCache provides the caching primitives; `AddSmartCache(...).AddHt
 
 ## 🧭 Design decisions
 
-**`Diginsight:SmartCache:Enabled` does nothing.** The key is declared as `false` in the public settings ^[configuration-09,data-13], but `SmartCacheCoreOptions` exposes no `Enabled` property — it has `Mode`, which resolves to `InMemory` — so the value is read by nobody and the cache is active regardless. The expirations beside it *are* bound: 31 days absolute, seven days sliding, seven days maximum age. Those are the outer limits; `ContentFreshness` is what governs freshness in practice, because it overrides the maximum age per operation.
+**Cache content facts, then filter at the boundary.** SmartCache registration is unconditional; its configured expirations are outer limits, while the access-file freshness setting bounds reuse of parsed access facts. ^[configuration-09,configuration-38] Reader visibility and totals are composed after those shared facts are retrieved. ^[code-47,code-48,code-50]
 
 **Persist the metrics snapshot outside the application folder.** The snapshot path comes from `Site:MetricsSnapshotPath` when that is non-empty, and otherwise sits beside the application binaries. ^[code-37] The pipeline sets that value as an App Service application setting on both deployments. ^[devops-18]
 
@@ -117,7 +120,7 @@ Diginsight.SmartCache provides the caching primitives; `AddSmartCache(...).AddHt
 
 ## 🕳️ Open questions
 
-> **Not established**: `Diginsight:SmartCache:Enabled` is `false` in the public settings, and the overlay that would change it per environment lives outside this repository. Whether caching is active in either deployed environment was not observable. ^[gap]
+> **Not established**: cookie-authenticated hub expiry, the full response-header matrix, and public-baseline byte equivalence remain unobserved: sequence 04 records a blocked preflight, not completed end-to-end scenarios. ^[gap]
 
 > **Not established**: how long after a publish a reader sees new content. The three mechanisms above — the invalidation call, the metrics drain and the hub push — are each established separately, but no record joins them into one latency figure. The navigation-metrics drain is debounced by 400 ms (`FolderMetricsIndex.cs`, line 30); that is a lower bound on scheduling delay, not a user-visible latency. No rationale for the value is recorded, no test pins it, and no end-to-end latency was measured. ^[gap]
 

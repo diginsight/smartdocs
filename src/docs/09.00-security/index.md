@@ -10,16 +10,17 @@ source_sets:
   - security-catalogue
   - entry-points
   - pipeline-definition
+  - settings-sources
 ---
 
 <!--
 verification_stamp:
-  generated: "2026-08-18"
-  verified: "2026-08-18"
+  generated: "2026-10-28"
+  verified: "2026-10-28"
   gate_outcome: "pass-with-gaps"
   evidence:
     - dossier: "_evidence/smartdocs-web/security.md"
-      observed: "2026-08-18"
+      observed: "2026-10-28"
     - dossier: "_evidence/smartdocs-web/devops.md"
       observed: "2026-08-18"
   open_gaps: 1
@@ -42,9 +43,11 @@ This chapter carries an overview and a posture page only. **No security assessme
 ## 🔑 Key points
 
 - **The pipeline holds the strongest declared controls.** Azure sign-in uses an OIDC federated credential with no stored client secret ^[security-09]; the values read from the private overlay are passed to `::add-mask::` before they can reach a log ^[security-19]; and the overlay itself is fetched at run time rather than committed ^[devops-13].
-- **The application has almost no inbound guard.** No authentication or authorisation middleware is registered ^[security-02], no `[Authorize]` attribute or `RequireAuthorization()` call appears in the source ^[security-03], and the content and navigation read endpoints declare no identity requirement ^[security-04]. One endpoint — `POST /_nav/invalidate` — compares a shared-secret header in constant time ^[security-05], and that comparison is skipped entirely when the configured key is empty ^[security-06].
+- **Reader access is server-authoritative.** Optional Entra sign-in precedes explicit per-space filtering across content, pages, navigation, shell and counts; roles expand through each space's own file. ^[security-02,security-03,security-04,security-24]
+- **Restricted content fails closed.** Invalid/unreadable and required-but-missing files deny visibility; access-file bytes aren't publicly served. ^[security-25,security-29]
+- **Response reuse and pushes respect the reader.** Private cache policies and server-derived role-set groups are implemented, but cookie-expiry closure and the complete end-to-end matrix remain unproven. ^[security-27,security-30,security-34]
 - **No content credential exists to leak.** Outbound access to the content store uses `DefaultAzureCredential`; no account key, shared-access signature or connection string is accepted. ^[security-08]
-- **No secret value appears in this repository.** Every credential-shaped settings key is declared empty, and the settings file states that storage identity is deliberately absent. ^[security-18]
+- **Secret observations are scoped.** The inspected public base leaves identity/invalidation values unset; this isn't a repository-wide secret scan. ^[security-18]
 - **Absence is documented as absence.** Where no control was found, the posture page says so and does not infer that none was wanted.
 
 ## 🕳️ Open questions

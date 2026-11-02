@@ -6,24 +6,26 @@ description: "Every configuration key this application declares, with its declar
 source_sets:
   - settings-sources
   - composition-root
+  - options-model
+  - authn-authz-surface
 ---
 
 <!--
 verification_stamp:
-  generated: "2026-08-18"
-  verified: "2026-08-18"
+  generated: "2026-10-28"
+  verified: "2026-10-28"
   gate_outcome: "pass-with-gaps"
   evidence:
     - dossier: "_evidence/smartdocs-web/configuration.md"
-      observed: "2026-08-18"
+      observed: "2026-10-28"
     - dossier: "_evidence/smartdocs-web/code.md"
-      observed: "2026-08-18"
+      observed: "2026-10-28"
     - dossier: "_evidence/smartdocs-web/devops.md"
       observed: "2026-08-18"
     - dossier: "_evidence/smartdocs-web/environment.md"
       observed: "2026-08-18"
     - dossier: "_evidence/smartdocs-web/security.md"
-      observed: "2026-08-18"
+      observed: "2026-10-28"
   open_gaps: 3
 -->
 
@@ -39,7 +41,6 @@ verification_stamp:
 - [🔗 Used by](#-used-by)
 - [🕳️ Open questions](#-open-questions)
 - [🔗 Related](#-related)
-
 ## 🎯 Purpose
 
 - **Kind**: configuration surface
@@ -52,7 +53,7 @@ Values below are those declared **in this repository**. An empty value is not a 
 
 | Source | Selected by | Note |
 |---|---|---|
-| `appsettings.json` | always | declares every key the host reads, with environment-specific values left empty ^[configuration-01] |
+| `appsettings.json` | always | declares base defaults, but an empty space array isn't a standalone content configuration ^[configuration-01] |
 | `appsettings.Development.json` | the standard ASP.NET Core environment mechanism | ^[configuration-02] |
 | `appsettings.local.json` | present for developer-machine overrides | ^[configuration-03] |
 | Out-of-tree overlay | `ExternalConfigurationFolder` + `AppsettingsEnvironmentName` | read by `ConfigureAppConfiguration2` ^[configuration-04] ^[code-03] |
@@ -66,7 +67,7 @@ Values below are those declared **in this repository**. An empty value is not a 
 |---|---|---|
 | `Site:Title` | `Diginsight SmartDocs` | site title ^[configuration-05] |
 | `Site:NotFoundPath` | `404.html` | declared; what consumes it is not established — see below ^[configuration-05] |
-| `Site:InvalidateApiKey` | *(empty)* | compared against `X-Invalidate-Key`; when empty the check is skipped entirely ^[configuration-05] ^[code-16] |
+| `Site:InvalidateApiKey` | *(deployment-specific)* | Management protection for invalidation; verify the deployed guard independently ^[security-05,security-06] |
 | `Site:MetricsSnapshotPath` | *(not declared in the public base file)* | falls back to `nav-metrics-snapshot.json` beside the application binaries ^[code-37] |
 | `Site:Branding:ProductName` | `Diginsight SmartDocs` | ^[configuration-06] |
 | `Site:Branding:IconClass` | `bi-lightbulb-fill` | ^[configuration-06] |
@@ -74,29 +75,42 @@ Values below are those declared **in this repository**. An empty value is not a 
 
 ### `Site:Spaces`
 
-One space is declared in the public repository. ^[configuration-07]
+The base file declares an **empty array**. Each environment must supply complete space elements; array binding is by index, so don't depend on a partial element inheriting a usable space. ^[configuration-07]
 
-| Key | Declared value |
+| Key | Model/configuration contract |
 |---|---|
-| `Id` | `diginsight.smartdocs` |
-| `RouteBase` | `/` |
-| `Title` | `SmartDocs` |
-| `RepositoryUrl` | `https://github.com/diginsight/smartdocs` |
-| `Source` | `Blob` |
-| `Blob:AccountUri` | *(empty — supplied by the overlay)* |
-| `Blob:ContainerName` | *(empty — supplied by the overlay)* |
+| `Id` | Required space identifier ^[configuration-17] |
+| `RouteBase` | Mount used by the registry ^[configuration-08] |
+| `Source` and physical-source options | Supplied by the environment ^[configuration-07,configuration-17] |
+| `Access` | Empty by default; only empty or `authenticated`, additive to file requirements ^[configuration-36] |
+| `AccessFileRequired` | `false` by default; when true a missing root file hides the space ^[configuration-37] |
 
 The settings file states that a space's mount point is stated by `RouteBase` and nothing else, that at most one space may claim `/`, and that every other space reserves the first segment of its route base. ^[configuration-08] `SpaceRegistry` enforces that at least one space exists, that every space declares an id and that every route base is a single segment, and resolves a request path by longest matching route base. ^[code-07]
 
-`SpaceOptions` supplies the defaults: `RouteBase` `/`, `Source` `Blob`, `FileSystem.RootPath` `.` and `WatchForChanges` `false`. ^[configuration-17]
+`SiteOptions` and `SpaceOptions` provide the shared model; startup eagerly binds and validates it. ^[configuration-17]
 
 The `Development` overlay replaces the source for this space with `FileSystem`, a root path of `..\docs`, and `WatchForChanges: true`. ^[environment-11]
+
+### Reader identity and authorization
+
+| Key | Base/model default | Contract |
+|---|---|---|
+| `AzureAd:Instance` | `https://login.microsoftonline.com/` | Bound to Microsoft Identity Web ^[configuration-29] |
+| `AzureAd:TenantId` | Empty | Environment must supply usable identity configuration ^[configuration-30] |
+| `AzureAd:ClientId` | Empty | Nonblank enables sign-in; blank disables the auth registration, middleware, and routes ^[configuration-28] |
+| `AzureAd:CallbackPath` | `/signin-oidc` | Identity callback, not the sign-in initiation route ^[configuration-31] |
+| `AzureAd:SignedOutCallbackPath` | `/signout-callback-oidc` | Identity sign-out callback ^[configuration-32] |
+| `Site:Authorization:DefaultRequirement` | Empty | Only empty or case-insensitive `authenticated`; additive to every space ^[configuration-34] |
+| `Site:Authorization:SessionLifetime` | `08:00:00` | Positive duration; fixed, non-sliding cookie lifetime, not replaced by token lifetime ^[configuration-35] |
+| `Diginsight:SmartCache:SmartDocs:Access` | `00:00:30` | Parsed access-file freshness, not a proven end-to-end revocation deadline ^[configuration-38] |
+
+The host retains token claim names and reads its configured roles/name claims. ^[configuration-40] Base settings don't explicitly select a response type or declare a client secret/certificate. ^[configuration-41] Local sequence 03 observed an ID-token development flow; it doesn't validate a deployed certificate-backed code flow. ^[code-59] Follow the [provisioning guide](../90.00-issues/202610/20261027.01-smartdocs-authentication/02-reader-access-provisioning.md) rather than putting credentials in public settings.
 
 ### `Diginsight:SmartCache`
 
 | Key | Declared value | Effect |
 |---|---|---|
-| `Enabled` | `false` | ^[configuration-09] |
+| `SizeLimit` | `64000000` | Positive limit applied by startup; no `Enabled: false` declaration ^[configuration-09] |
 | `AbsoluteExpiration` | `31.00:00:00` | 31 days ^[configuration-09] |
 | `MaxAge` | `7.00:00:00` | 7 days ^[configuration-09] |
 | `SlidingExpiration` | `7.00:00:00` | 7 days ^[configuration-09] |
@@ -163,18 +177,19 @@ The log4net sink writes to `%USERPROFILE%\LogFiles\Diginsight\Diginsight.SmartDo
 | Profile | Sets |
 |---|---|
 | `http`, `https` | `ASPNETCORE_ENVIRONMENT=Development` and `AppsettingsEnvironmentName=Development` ^[configuration-23] |
-| `https - Testmc` | `AppsettingsEnvironmentName=Testmc` and an `ExternalConfigurationFolder` pointing at the private peer repository checked out beside this one ^[configuration-24] |
+| `https - Testmc` | `Development`, `AppsettingsEnvironmentName=Testmc`, and the private peer root ^[configuration-24] |
+| `https - access` | `Development`, `AppsettingsEnvironmentName=access`, and the private peer root; profile alone doesn't enable sign-in ^[configuration-39] |
 
 ## 🔑 Keys and constraints
 
 - `Site` is bound **and eagerly resolved** at startup. A missing section throws `InvalidOperationException("Missing 'Site' configuration section.")` rather than starting with defaults. ^[code-06]
 - At least one space must be declared, every space must have an identifier, and every route base must be a single segment. ^[code-07]
-- No connection string, account key, client secret or certificate value appears anywhere in this repository's settings files; every such key is declared empty or omitted. ^[configuration-25]
+- The inspected host base file contains no populated credential; this isn't a repository-wide secret scan. ^[configuration-25]
 - The overlay's `Deployment` section is read by the pipeline, masked, and then **removed** before the settings file is staged into the published output, so it is never visible to the running application. ^[devops-15]
 
 ## ⚠️ Usage constraints
 
-An empty `Site:InvalidateApiKey` does not close the invalidation endpoint — it removes the check, and the endpoint then accepts any caller. ^[code-16] ^[security-06]
+Management protection is deployment-specific and separate from reader roles. Verify its effective configuration before exposing an instance. ^[security-05,security-06]
 
 ## 🔗 Used by
 
@@ -186,7 +201,7 @@ The composition root, for every service registration decision it makes. ^[code-0
 
 > **Not established**: what consumes `Site:NotFoundPath`. The key and its `404.html` value are declared, but no record establishes the code path that serves it. ^[gap]
 
-> **Not established**: the effective configuration of either deployed environment. The values in force at runtime for `Site:Spaces`, `Diginsight:SmartCache:Enabled` and `OpenTelemetry:AzureMonitorConnectionString` live in overlay files in the private peer repository and are masked by the workflows. ^[gap]
+> **Not established**: the effective configuration of either deployed environment. Space declarations, optional cache companions and telemetry settings depend on external overlays; this refresh isn't a deployed-configuration observation. ^[gap]
 
 ## 🔗 Related
 

@@ -11,8 +11,8 @@ source_sets:
 
 <!--
 verification_stamp:
-  generated: "2026-08-18"
-  verified: "2026-08-18"
+  generated: "2026-10-28"
+  verified: "2026-10-28"
   gate_outcome: "pass-with-gaps"
   evidence:
     - dossier: "_evidence/smartdocs-web/environment.md"
@@ -20,9 +20,9 @@ verification_stamp:
     - dossier: "_evidence/smartdocs-web/devops.md"
       observed: "2026-08-18"
     - dossier: "_evidence/smartdocs-web/configuration.md"
-      observed: "2026-08-18"
+      observed: "2026-10-28"
     - dossier: "_evidence/smartdocs-web/security.md"
-      observed: "2026-08-18"
+      observed: "2026-10-28"
   open_gaps: 2
 -->
 

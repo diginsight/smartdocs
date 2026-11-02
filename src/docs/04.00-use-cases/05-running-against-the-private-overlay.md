@@ -6,27 +6,37 @@ description: "A developer runs the application locally with an environment's rea
 source_sets:
   - settings-sources
   - composition-root
+  - authn-authz-surface
 ---
 
 <!--
 verification_stamp:
-  generated: "2026-08-18"
-  verified: "2026-08-18"
+  generated: "2026-10-28"
+  verified: "2026-10-28"
   gate_outcome: "pass-with-gaps"
   evidence:
     - dossier: "_evidence/smartdocs-web/configuration.md"
-      observed: "2026-08-18"
+      observed: "2026-10-28"
     - dossier: "_evidence/smartdocs-web/code.md"
-      observed: "2026-08-18"
+      observed: "2026-10-28"
     - dossier: "_evidence/smartdocs-web/security.md"
-      observed: "2026-08-18"
+      observed: "2026-10-28"
     - dossier: "_evidence/smartdocs-web-shared/code.md"
-      observed: "2026-08-18"
+      observed: "2026-10-28"
   open_gaps: 1
 -->
 
 # Running against the private overlay
 
+## 📚 Table of contents
+
+- [🎯 Goal](#-goal)
+- [✅ Preconditions](#-preconditions)
+- [🔬 Flow](#-flow)
+- [🔀 Alternate and failure paths](#-alternate-and-failure-paths)
+- [🧪 What proves it](#-what-proves-it)
+- [🕳️ Open questions](#-open-questions)
+- [🔗 Related](#-related)
 ## 🎯 Goal
 
 - **Actor**: a developer with access to the private peer repository
@@ -47,6 +57,12 @@ verification_stamp:
 5. Each space's physical source is chosen from its `Source` value — filesystem or blob ^[smartdocs-web/code-08] — and wrapped in a `CachedContentSource` ^[smartdocs-web/code-09]. With `Source: Blob`, the source authenticates with `DefaultAzureCredential`, so it runs as the developer's own identity. ^[security-08]
 6. The application serves the environment's content locally.
 
+### Reader-access fixture overlay
+
+`https - access` selects `Development`, the `access` overlay, and the same private peer root. The profile alone doesn't enable sign-in: the resolved `AzureAd:ClientId` must be nonblank. ^[configuration-39,configuration-28] Define complete space elements in the overlay because the base space array is empty. ^[configuration-07]
+
+The local ID-token sign-in and role-view checks in sequence 03 passed; this doesn't prove a deployed certificate-backed code flow or hub expiry. ^[smartdocs-web/code-59,smartdocs-web/code-60] Use the [provisioning guide](../90.00-issues/202610/20261027.01-smartdocs-authentication/02-reader-access-provisioning.md) for identity and access-policy setup. Keep actual identifiers and credentials in the private overlay.
+
 ## 🔀 Alternate and failure paths
 
 | Situation | What happens |
@@ -59,7 +75,7 @@ verification_stamp:
 
 ## 🧪 What proves it
 
-The startup validations are the only checks: the eager options resolution ^[smartdocs-web/code-06] and the space-registry validation ^[smartdocs-web-shared/code-23] both fail loudly rather than degrading. Neither asserts anything about the overlay's contents beyond the presence of the sections they read.
+Startup validates the space registry and authorization-option constraints. ^[smartdocs-web-shared/code-23,configuration-34,configuration-35,configuration-36] Existing sequence 03 adds a bounded local sign-in and role-view observation, not an assurance of any deployed overlay's contents. ^[smartdocs-web/code-59]
 
 ## 🕳️ Open questions
 

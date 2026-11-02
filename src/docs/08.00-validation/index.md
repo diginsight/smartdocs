@@ -7,20 +7,21 @@ source_sets:
   - test-surface
   - pipeline-definition
   - release-gates
+  - authn-authz-surface
 ---
 
 <!--
 verification_stamp:
-  generated: "2026-08-18"
-  verified: "2026-08-18"
+  generated: "2026-10-28"
+  verified: "2026-10-28"
   gate_outcome: "pass-with-gaps"
   evidence:
     - dossier: "_evidence/smartdocs-web/devops.md"
       observed: "2026-08-18"
     - dossier: "_evidence/smartdocs-web/code.md"
-      observed: "2026-08-18"
+      observed: "2026-10-28"
     - dossier: "_evidence/smartdocs-web-shared/code.md"
-      observed: "2026-08-18"
+      observed: "2026-10-28"
     - dossier: "_evidence/smartdocs-web-client/configuration.md"
       observed: "2026-08-18"
   open_gaps: 5
@@ -28,6 +29,14 @@ verification_stamp:
 
 # Validation
 
+## 📚 Table of contents
+
+- [🎯 Introduction](#-introduction)
+- [🗺️ Pages in this section](#-pages-in-this-section)
+- [🔑 Key points](#-key-points)
+- [🧪 Recorded reader-access validation](#-recorded-reader-access-validation)
+- [🕳️ Open questions](#-open-questions)
+- [🔗 Related](#-related)
 ## 🎯 Introduction
 
 What this repository checks automatically, where those checks run, and — at least as importantly — what they leave unchecked.
@@ -47,17 +56,28 @@ What this repository checks automatically, where those checks run, and — at le
 - **The application ships test-only endpoints.** `POST /_test/article`, `DELETE /_test/article` and `GET /_nav/metrics` are mapped only when `Testing:ContentMutationEnabled` is true; when it is false the routes do not exist. ^[smartdocs-web/code-17]
 - **Deployment is triggered, not gated.** Workflows 01 and 02 run on a push to `main` under the project paths, or on manual dispatch ^[devops-07]; workflow 03 runs on a push to `main` under `src/docs/**`, or on manual dispatch ^[devops-20]. No workflow declares a manual approval or review gate inside its job definition. ^[devops-27]
 
+## 🧪 Recorded reader-access validation
+
+| Existing local run | Recorded result | Boundary |
+|---|---|---|
+| Sequence 01 | PASS: anonymous surface filtering and concealment | No signed-in behavior or composed-count proof ^[smartdocs-web/code-57] |
+| Sequence 02 | PASS: anonymous visible-only totals, hidden-change suppression, visible-change push control and snapshot restart | Not signed-in cross-group isolation or expiry ^[smartdocs-web/code-58] |
+| Sequence 03 | PASS after fixes: sign-in/bootstrap, space-local role union, changed mappings, sign-out and responsive menu | Not hub expiry, lifetime-bound revocation or all F scenarios ^[smartdocs-web/code-59] |
+| Sequence 04 | FAIL at authentication preflight | F1–F6 **NOT RUN**; DS-4 unresolved ^[smartdocs-web/code-60] |
+
+These are historical manual fixture observations, not tests run by this documentation refresh. See the [implementation plan](../90.00-issues/202610/20261027.01-smartdocs-authentication/01-roles-permissions-support.plan.md) and its validation records. The owner waived session 5 only as an execution prerequisite for documentation; neither the rollout boundary nor the missing validation evidence was waived.
+
 ## 🕳️ Open questions
 
 > **Not established**: whether any automated test asserts application behaviour. A test project, test-framework reference or test-discovery entry was sought across the solution and the tree — `src/Diginsight.SmartDocs.slnx` was enumerated and `*Test*.csproj`, `*Tests*` directories and test-framework package references were searched for. None was found. ^[gap]
 
 > **Not established**: whether the behaviours documented in the [Reference](../06.00-reference/index.md) chapter — label derivation, sort ordering, folder classification, front-matter defaults, coverage merging — behave as declared. Unit tests for `NavRules`, `FrontMatter`, `PageLoader` and `SpaceRegistry` were sought specifically and not found, so those pages are established from source rather than from executed cases. ^[gap]
 
-> **Not established**: what consumes the test-only endpoints. The routes are declared ^[smartdocs-web/code-17]; no caller, suite or harness for them was found in this repository. ^[gap]
+> **Not established**: a discoverable automated harness for the test-only endpoints. Manual fixture procedures exist, but aren't an automated regression suite. ^[gap]
 
 > **Not established**: whether any change is built or checked before it is merged. Every trigger block in `.github/workflows/` was read; all four workflows trigger on `push` to `main` or `workflow_dispatch` only, and no `pull_request`-triggered workflow was found. ^[gap]
 
-> **Not established**: whether any manual validation procedure exists. No validation-sequence artifact, test plan or checklist was found under the searched roots. ^[gap]
+> **Not established**: the complete signed-in push/expiry/revocation/header/baseline/failure-recovery matrix. Sequence 04's preflight failure didn't execute F1–F6. ^[gap]
 
 ## 🔗 Related
 

@@ -8,18 +8,19 @@ source_sets:
   - entry-points
   - deployment-descriptor
   - settings-sources
+  - authn-authz-surface
 ---
 
 <!--
 verification_stamp:
-  generated: "2026-08-18"
-  verified: "2026-08-18"
+  generated: "2026-10-28"
+  verified: "2026-10-28"
   gate_outcome: "pass-with-gaps"
   evidence:
     - dossier: "_evidence/smartdocs-web/code.md"
-      observed: "2026-08-18"
+      observed: "2026-10-28"
     - dossier: "_evidence/smartdocs-web/configuration.md"
-      observed: "2026-08-18"
+      observed: "2026-10-28"
     - dossier: "_evidence/smartdocs-web/environment.md"
       observed: "2026-08-18"
     - dossier: "_evidence/smartdocs-web/devops.md"
@@ -39,7 +40,6 @@ verification_stamp:
 - [🚀 How it ships](#-how-it-ships)
 - [🗺️ Where to go next](#-where-to-go-next)
 - [🕳️ Open questions](#-open-questions)
-
 ## 🎯 What this repository contains
 
 Three .NET projects and the content they serve.
@@ -55,6 +55,8 @@ Alongside them sits `src/docs`, the Markdown content set this repository publish
 ## 🧭 How it works, in one paragraph
 
 A request arrives for any path. The host resolves that path to a space by longest matching route base, asks that space's content source for a document, and renders the Markdown to HTML with Markdig. ^[code-07,code-09,code-20,code-21] The sidebar is not a file — a level is built by listing the children of a prefix, scoring them, and ordering them by the naming and sorting rules. ^[code-23,code-28,code-29] Nothing is read from a pre-built manifest.
+
+Optional Entra sign-in adds reader identity. The host authorizes the exact selected content key and filters navigation, shell state and counts per space; the browser's account display isn't permission authority. ^[code-20,code-46,code-49,code-50,code-54] Start with the [access-file schema](06.00-reference/07-access-file-schema.md) or the [provisioning guide](90.00-issues/202610/20261027.01-smartdocs-authentication/02-reader-access-provisioning.md).
 
 ## 🗄️ Where content lives
 

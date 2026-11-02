@@ -6,20 +6,21 @@ description: "The SignalR contract carrying navigation updates to the browser."
 source_sets:
   - domain-model
   - entry-points
+  - authn-authz-surface
 ---
 
 <!--
 verification_stamp:
-  generated: "2026-08-18"
-  verified: "2026-08-18"
+  generated: "2026-10-28"
+  verified: "2026-10-28"
   gate_outcome: "pass-with-gaps"
   evidence:
     - dossier: "_evidence/smartdocs-web/code.md"
-      observed: "2026-08-18"
+      observed: "2026-10-28"
     - dossier: "_evidence/smartdocs-web-shared/code.md"
-      observed: "2026-08-18"
+      observed: "2026-10-28"
     - dossier: "_evidence/smartdocs-web-client/code.md"
-      observed: "2026-08-18"
+      observed: "2026-10-28"
   open_gaps: 1
 -->
 
@@ -31,7 +32,7 @@ verification_stamp:
 - **Component**: `smartdocs-web-shared`
 - **Declared in**: `Navigation/NavHubContracts.cs`
 
-One file, shared by both sides, so the server cannot send a message shape the client does not expect.
+Shared constants name the events; the current publisher sends absolute `FolderRecord` arrays. ^[smartdocs-web/code-33]
 
 ## 📋 Members
 
@@ -45,7 +46,13 @@ One file, shared by both sides, so the server cannot send a message shape the cl
 
 Both names are declared once in this file, so client and server share one literal definition of the hub surface. ^[smartdocs-web-shared/code-08]
 
-### `NavAggregateDelta`
+### Current payload: `FolderRecord[]`
+
+Both events carry folder records, filtered for their recipient role set. Root count, latest date, and coverage are replaced with a reader-visible composition; other records must belong to visible spaces. ^[smartdocs-web/code-33,smartdocs-web/code-50]
+
+### Other shared type: `NavAggregateDelta`
+
+The shared assembly still declares the type below. Its existence doesn't make it the current publisher payload. ^[smartdocs-web-shared/code-09,smartdocs-web/code-33]
 
 | Member | Type | Meaning |
 |---|---|---|
@@ -59,7 +66,7 @@ Both names are declared once in this file, so client and server share one litera
 
 **The values are absolute, not increments.** Despite the type name, `ArticleCount` is the count beneath the prefix rather than a change to a previous count. ^[smartdocs-web-shared/code-09]
 
-**One change publishes several entries.** A change publishes one entry for the changed folder and one for each ancestor up to the root, so a client can refresh a whole spine from a single message. ^[smartdocs-web-shared/code-10] ^[smartdocs-web/code-33]
+**Recipients are role sets, not person identifiers.** The server normalizes signed-in state and roles into a group identity, tracks active sets, and reevaluates space visibility before pushes. A hidden-only mutation doesn't emit `MetadataChanged` for an unaffected reader. ^[smartdocs-web/code-52]
 
 **Coverage travels with the count.** `None` renders as `…`, `Partial` as `≥ N` and `Complete` as `N`; `Partial` supersedes `None` and `Complete` supersedes both. ^[smartdocs-web-shared/code-11] An unknown count is therefore never rendered as zero. ^[smartdocs-web-shared/code-12]
 
@@ -75,7 +82,7 @@ The connection is established with `WithAutomaticReconnect()` ^[smartdocs-web-cl
 
 ## 🕳️ Open questions
 
-> **Not established**: the hub declares no authorisation guard, and none of the recorded members carries a space identifier. Whether a multi-space deployment would expose one space's counts to another space's readers was not established, because no such deployment exists to observe. ^[gap]
+> **Not established**: signed-in cross-group pushes, cookie-expiry closure, and lifetime-bound revocation. `CloseOnAuthenticationExpiration=true` is implemented, but sequence 04 ran none of F1–F6 and left DS-4 unresolved. ^[gap]
 
 ## 🔗 Related
 

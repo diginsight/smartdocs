@@ -6,20 +6,21 @@ description: "Every route this application maps, what it returns, and what guard
 source_sets:
   - entry-points
   - composition-root
+  - authn-authz-surface
 ---
 
 <!--
 verification_stamp:
-  generated: "2026-08-18"
-  verified: "2026-09-04"
+  generated: "2026-10-28"
+  verified: "2026-10-28"
   gate_outcome: "pass-with-gaps"
   evidence:
     - dossier: "_evidence/smartdocs-web/code.md"
-      observed: "2026-09-04"
+      observed: "2026-10-28"
     - dossier: "_evidence/smartdocs-web/security.md"
-      observed: "2026-09-04"
+      observed: "2026-10-28"
     - dossier: "_evidence/smartdocs-web/configuration.md"
-      observed: "2026-08-18"
+      observed: "2026-10-28"
   open_gaps: 4
 -->
 
@@ -34,7 +35,6 @@ verification_stamp:
 - [📏 Limits](#-limits)
 - [🕳️ Open questions](#-open-questions)
 - [🔗 Related](#-related)
-
 ## 🎯 Purpose
 
 - **Kind**: HTTP minimal-API endpoints and one SignalR hub
@@ -48,15 +48,17 @@ verification_stamp:
 | Route | Method | Returns |
 |---|---|---|
 | `/_content/{**key}` | GET | The raw bytes and content type for a key; 404 when absent ^[code-10] |
+| `/_page`, `/_page/{**path}` | GET | Root or route-path rendered page; 204 for hidden/missing, 304 for matching successful-response ETag. `path` isn't a query selector ^[code-61] |
 
 ### Navigation
 
 | Route | Method | Returns |
 |---|---|---|
-| `/_nav/children?prefix=` | GET | The children of one level, as `IReadOnlyList<NavChild>`. Also starts a fire-and-forget warm of two levels deeper ^[code-11] |
+| `/_nav/children?prefix=` | GET | Reader-filtered `NavLevelResponse` with article/folder references and folder records; queues warming at depth 3 ^[code-11] |
 | `/_nav/version` | GET | `{ version: long }` — a monotonically increasing value callers can use to detect staleness ^[code-12] |
-| `/_nav/total` | GET | The root `FolderArticleStats`, or 204 while the aggregate is not yet known ^[code-13] |
-| `/_nav/index` | GET | The flattened article index, as `IReadOnlyList<NavLeaf>` ^[code-14] |
+| `/_nav/total` | GET | Reader-composed root `FolderArticleStats`, or 204 while unknown ^[code-13] |
+| `/_nav/index` | GET | Reader-filtered flattened article index ^[code-14] |
+| `/_nav/folder?prefix=` | GET | Visible folder record, or the unknown-folder representation when hidden ^[security-26] |
 | `/_nav/invalidate?path=` | POST | Discards cached navigation for a path ^[code-15] |
 
 ### Test-only
@@ -74,15 +76,27 @@ These are mapped **only** when `Testing:ContentMutationEnabled` is true. When it
 |---|---|---|
 | `/_nav/hub` | SignalR | `MetadataChanged`, `CountsReady`. The current root counts are sent on `OnConnectedAsync` ^[code-18] |
 
+### Identity and shell
+
+| Route | Method | Contract |
+|---|---|---|
+| `/_auth/signin?returnUrl=` | GET | Enabled only with sign-in; OIDC challenge, local return target or `/` ^[configuration-33] |
+| `/_auth/signout` | POST | Enabled only with sign-in; validates antiforgery, signs out cookie/OIDC, returns to `/`; invalid form returns 400 ^[configuration-33] |
+| `/_site` | GET | Shell state with only visible spaces ^[code-49] |
+| `/robots.txt` | GET | Policy derived from anonymous visibility, not requesting identity ^[code-49] |
+
 ## 🔐 Authorisation
 
 | Surface | Guard |
 |---|---|
-| `/_nav/invalidate` | `X-Invalidate-Key` compared against `Site:InvalidateApiKey` using `CryptographicOperations.FixedTimeEquals`, a constant-time comparison; 401 on mismatch ^[code-15] ^[security-05]. **When the configured key is empty the check is skipped entirely and the endpoint accepts any caller.** ^[code-16] ^[security-06] |
+| `/_nav/invalidate` | Separate configuration-dependent management guard; reader permissions aren't management grants. Verify its deployed enforcement independently ^[security-05,security-06] |
 | `/_test/*`, `/_nav/metrics` | Not mapped at all unless `Testing:ContentMutationEnabled` is true ^[code-17] ^[security-07] |
-| Everything else | The content and navigation read endpoints declare no identity requirement ^[security-04] |
+| Content, pages, navigation, shell and bootstrap | Explicit server-side reader visibility; denied results use missing-content representations ^[security-03,security-04,security-26] |
+| Hub | Server-derived role-set group and per-push visibility evaluation ^[security-30] |
 
-No authentication middleware and no authorisation middleware is registered ^[security-02], and no `[Authorize]` attribute or `RequireAuthorization()` call appears in the source tree ^[security-03].
+Nonblank `AzureAd:ClientId` enables optional authentication before reader access. There is no blanket fallback authorization policy: public spaces remain readable anonymously. ^[security-02,security-03] Site-default `authenticated` challenges unsigned page requests before existence lookup. ^[security-26]
+
+Reader-dependent JSON uses `private, no-cache`; injected HTML and restricted successful raw bytes use `private, no-store`. Public Markdown revalidates and public assets retain freshness. Raw authorization precedes content reads and ETag handling; filtered response ETags describe only the reader's response. ^[code-10,code-11,security-27]
 
 ## ⚠️ Failure modes
 
@@ -100,7 +114,7 @@ Front-matter parsing is capped at 64 KB per document, which bounds the cost of s
 
 ## 🕳️ Open questions
 
-> **Not established**: whether any of these endpoints is intended to be reachable without authorisation. The *absence* of a guard is established; the *intent* behind that absence is not, and this documentation does not treat an unguarded endpoint as a deliberately anonymous one. ^[gap]
+> **Not established**: the complete runtime cache-header matrix, expiry, revocation and baseline-regression scenarios remain pending after sequence 04's blocked preflight. ^[gap]
 
 > **Not established**: whether either deployed environment supplies `Site:InvalidateApiKey`. The pipeline writes the setting only when the corresponding optional secret exists, and secret presence is a repository-settings fact this repository does not carry. ^[gap]
 

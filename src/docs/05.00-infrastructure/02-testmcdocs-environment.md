@@ -11,8 +11,8 @@ source_sets:
 
 <!--
 verification_stamp:
-  generated: "2026-08-18"
-  verified: "2026-08-18"
+  generated: "2026-10-28"
+  verified: "2026-10-28"
   gate_outcome: "pass-with-gaps"
   evidence:
     - dossier: "_evidence/smartdocs-web/environment.md"
@@ -20,11 +20,11 @@ verification_stamp:
     - dossier: "_evidence/smartdocs-web/devops.md"
       observed: "2026-08-18"
     - dossier: "_evidence/smartdocs-web/configuration.md"
-      observed: "2026-08-18"
+      observed: "2026-10-28"
     - dossier: "_evidence/smartdocs-web/data.md"
       observed: "2026-08-18"
     - dossier: "_evidence/smartdocs-web/security.md"
-      observed: "2026-08-18"
+      observed: "2026-10-28"
     - dossier: "_evidence/smartdocs-content/data.md"
       observed: "2026-08-18"
   open_gaps: 4
@@ -42,7 +42,6 @@ verification_stamp:
 - [🧾 Provenance](#-provenance)
 - [🕳️ Open questions](#-open-questions)
 - [🔗 Related](#-related)
-
 ## 🎯 Purpose
 
 `testmcdocs` is one of the two GitHub deployment environments the workflows name. ^[environment-01] It hosts the **docs app service** — the deployment serving the `diginsight.smartdocs` content space. It is targeted by the *02 · Deploy docs site* workflow ^[devops-06], and it is also the fixed environment of the *03 · Publish docs content* workflow ^[devops-21].
@@ -83,7 +82,7 @@ flowchart TB
 | `Site__MetricsSnapshotPath` | a path under the App Service data directory | the navigation metrics snapshot is written there ^[environment-12]; folder metrics persist between process lifetimes as that JSON snapshot ^[smartdocs-web/data-10] |
 | `Site__InvalidateApiKey` | written only when the optional secret is present | the publish workflow sends the matching `X-Invalidate-Key` header ^[devops-18] ^[devops-26] |
 
-The space this environment serves is declared in the public settings with `Id` `diginsight.smartdocs`, `RouteBase` `/`, title `SmartDocs`, `Source` `Blob` and a repository URL pointing at the public repository — with `Blob.AccountUri` and `Blob.ContainerName` deliberately empty. ^[configuration-07] Those two values arrive from the overlay, which the settings file states is where environment-specific storage identity comes from. ^[configuration-26]
+The public base file now has an empty `Site:Spaces` array; the environment overlay must declare complete space elements, including source and storage settings. ^[configuration-07] Environment-specific storage identity belongs in that external overlay. ^[configuration-26] This documentation refresh doesn't establish a deployed reader registration or restricted-space rollout.
 
 ## 🔗 Connections
 

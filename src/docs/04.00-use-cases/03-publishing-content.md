@@ -7,20 +7,23 @@ source_sets:
   - deployment-descriptor
   - settings-sources
   - entry-points
+  - authn-authz-surface
 ---
 
 <!--
 verification_stamp:
-  generated: "2026-08-18"
-  verified: "2026-08-18"
+  generated: "2026-10-28"
+  verified: "2026-10-28"
   gate_outcome: "pass-with-gaps"
   evidence:
     - dossier: "_evidence/smartdocs-web/devops.md"
       observed: "2026-08-18"
     - dossier: "_evidence/smartdocs-web/code.md"
-      observed: "2026-08-18"
+      observed: "2026-10-28"
     - dossier: "_evidence/smartdocs-content/data.md"
       observed: "2026-08-18"
+    - dossier: "_evidence/smartdocs-web/security.md"
+      observed: "2026-10-28"
   open_gaps: 2
 -->
 
@@ -35,7 +38,6 @@ verification_stamp:
 - [🧪 What proves it](#-what-proves-it)
 - [🕳️ Open questions](#-open-questions)
 - [🔗 Related](#-related)
-
 ## 🎯 Goal
 
 - **Actor**: an author, via a merge to `main`
@@ -58,7 +60,13 @@ verification_stamp:
 6. It ensures the container exists and uploads the staged content with `--overwrite true` and `--auth-mode login`; no storage key or connection string is used. ^[devops-24]
 7. **After a successful upload**, it removes blobs present in the container but absent from the source — a case-insensitive set difference, deleted one at a time. ^[devops-25] The result is a mirror, not an append. ^[data-14]
 8. It posts to `/_nav/invalidate` on the site, carrying `X-Invalidate-Key`, with a sixty-second timeout. ^[devops-26]
-9. That endpoint discards cached navigation for the path. ^[code-15] Content itself is resolved and rendered when it is requested — `PageLoader` walks its candidate ladder and Markdig renders the result per request. ^[code-20,code-21]
+9. That endpoint invalidates navigation. ^[code-15] Page reads authorize the exact content key selected by the rendered-page cache before returning it; shared cached content facts don't bypass per-reader filtering. ^[code-20,code-48]
+
+### Publishing a space's access policy
+
+The root `access.metadata.yml` is part of the content-space policy, not navigation metadata. The host reads it through the physical source but excludes it from public content reads and listings at every depth. A nested copy doesn't create folder permissions. ^[smartdocs-web/security-29] Its parsed facts have a default 30-second freshness; reader requirements and grants aren't cached as shared principal-specific results. ^[code-48]
+
+Treat access changes as a policy rollout: validate the root file before publishing, retain any deployment floor, and don't apply deployed restrictions until the [roles-and-permissions plan](../90.00-issues/202610/20261027.01-smartdocs-authentication/01-roles-permissions-support.plan.md) meets every exit criterion. Invalid or required-but-missing files hide the space. ^[smartdocs-web/security-25] See the [schema](../06.00-reference/07-access-file-schema.md) and [provisioning how-to](../90.00-issues/202610/20261027.01-smartdocs-authentication/02-reader-access-provisioning.md).
 
 ## 🔀 Alternate and failure paths
 
@@ -78,7 +86,7 @@ Two checks inside the workflow itself: the destination resolution refuses a misc
 
 > **Not established**: whether the invalidation call succeeds in the target environment. It is best-effort and its outcome is not asserted, so a silent failure would leave cached navigation in place with nothing in the run to signal it. ^[gap]
 
-> **Not established**: whether the environment configures `Site:InvalidateApiKey`. The deploy step writes it only when the corresponding optional secret is present, and secret presence is a repository-settings fact this repository does not carry. When the key is empty the endpoint's guard is skipped rather than failing closed. ^[gap]
+> **Not established**: whether the environment adequately configures management protection for invalidation. The deploy step depends on an optional secret whose presence isn't recorded by this repository. ^[gap]
 
 ## 🔗 Related
 

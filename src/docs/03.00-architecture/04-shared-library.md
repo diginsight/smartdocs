@@ -6,16 +6,17 @@ description: "The abstractions, models and rules that both the host and the brow
 source_sets:
   - domain-model
   - composition-root
+  - options-model
 ---
 
 <!--
 verification_stamp:
-  generated: "2026-08-18"
-  verified: "2026-08-18"
+  generated: "2026-10-28"
+  verified: "2026-10-28"
   gate_outcome: "pass-with-gaps"
   evidence:
     - dossier: "_evidence/smartdocs-web-shared/code.md"
-      observed: "2026-08-18"
+      observed: "2026-10-28"
   open_gaps: 3
 -->
 
@@ -31,7 +32,6 @@ verification_stamp:
 - [🏗️ Physical placement](#-physical-placement)
 - [🕳️ Open questions](#-open-questions)
 - [🔗 Related](#-related)
-
 ## 🎯 Purpose and context
 
 A Razor Class Library referenced by both the host and the browser client, which is what allows one component and one type set to run on both sides. ^[code-01] It declares no dependency on ASP.NET Core hosting, Azure Storage or SignalR server types, so nothing server-only leaks into the browser build. ^[code-02]
@@ -54,7 +54,9 @@ A Razor Class Library referenced by both the host and the browser client, which 
 
 ### Resolution
 
-`PageLoader` owns the candidate ladder described in the architecture overview and asks whichever `IContentSource` it was given. ^[code-21] It is identical code on both sides — only the source differs. ^[code-03]
+`PageLoader` accepts a handled rendered-page resolution before it considers raw content or its candidate ladder. ^[code-21] `RenderedPageResolution` carries the selected `ContentKey` and an explicit hidden state; handled hidden and missing results return without candidate fallback. ^[code-32,code-33] The host registers the renderer, while the browser resolves rendered pages over HTTP. ^[code-03]
+
+Navigation entries carry nonserialized `SourceFolder` provenance, separate from their display route. ^[code-30] Bootstrap state carries a nullable `Reader` with its name and sign-out antiforgery field/token; the shell's `SignInEnabled` flag is omitted from JSON when false. ^[code-35,code-36]
 
 ### The rules
 
@@ -73,6 +75,8 @@ A Razor Class Library referenced by both the host and the browser client, which 
 ### The site model
 
 `SpaceRegistry` validates that at least one space is declared, that every space has an identifier, and that every route base is a single segment. ^[code-23] Resolution is longest-route-base-wins, so a space mounted at a first segment takes precedence over the space mounted at the root. ^[code-24]
+
+`SiteAuthorizationOptions` defaults to an empty site requirement and an eight-hour session. Startup validation accepts only empty or `authenticated` for the default and space floors and rejects nonpositive session lifetimes. `SpaceOptions.AccessFileRequired` defaults to false. ^[code-37,code-38,code-39]
 
 ## 🔗 Dependencies
 

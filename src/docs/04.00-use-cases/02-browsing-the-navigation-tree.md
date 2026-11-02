@@ -7,22 +7,25 @@ source_sets:
   - entry-points
   - domain-model
   - composition-root
+  - authn-authz-surface
 ---
 
 <!--
 verification_stamp:
-  generated: "2026-08-18"
-  verified: "2026-09-04"
+  generated: "2026-10-28"
+  verified: "2026-10-28"
   gate_outcome: "pass-with-gaps"
   evidence:
     - dossier: "_evidence/smartdocs-web/code.md"
-      observed: "2026-09-04"
+      observed: "2026-10-28"
     - dossier: "_evidence/smartdocs-web/configuration.md"
-      observed: "2026-08-18"
+      observed: "2026-10-28"
     - dossier: "_evidence/smartdocs-web-client/code.md"
-      observed: "2026-08-18"
+      observed: "2026-10-28"
     - dossier: "_evidence/smartdocs-web-shared/code.md"
-      observed: "2026-09-04"
+      observed: "2026-10-28"
+    - dossier: "_evidence/smartdocs-web/security.md"
+      observed: "2026-10-28"
   open_gaps: 2
 -->
 
@@ -37,7 +40,6 @@ verification_stamp:
 - [🧪 What proves it](#-what-proves-it)
 - [🕳️ Open questions](#-open-questions)
 - [🔗 Related](#-related)
-
 ## 🎯 Goal
 
 - **Actor**: a reader with a browser
@@ -59,9 +61,9 @@ verification_stamp:
 6. Survivors are classified. A folder with subfolders, or with more than one article, becomes a section. A folder with exactly one article — or with only an index or readme — collapses into a leaf. Anything else yields nothing. ^[smartdocs-web/code-25] When a folder holds an index *and* exactly one other article, the article represents it and the index does not appear. ^[smartdocs-web/code-43]
 7. The level is sorted into three groups: numeric-prefixed names ascending, dated names newest first, then everything else alphabetically. ^[smartdocs-web/code-29] A folder that declares `order` in its `metadata.yml` uses that value in place of its name-derived key and joins the numeric group. ^[smartdocs-web/code-39]
 8. At the root only, a Home entry is inserted at index 0. ^[smartdocs-web/code-31]
-9. The server returns the level, then starts a fire-and-forget warm of two levels deeper without waiting for it. ^[smartdocs-web/code-11]
+9. `ReaderAccess` filters nodes by `SourceFolder` ownership, not display route. The endpoint returns the filtered level and reader-visible folder records, evaluates its ETag over that response, and queues warming at depth 3. ^[smartdocs-web/code-11,smartdocs-web/code-49]
 10. The client caches the level per prefix, so a level is fetched at most once per prefix per session. ^[smartdocs-web-client/code-06]
-11. Counts arrive separately. The hub at `/_nav/hub` pushes `MetadataChanged` and `CountsReady`, and sends the current root counts on connect ^[smartdocs-web/code-18]; the client folds the pushed aggregates into its cached counts without issuing an HTTP request ^[smartdocs-web-client/code-07].
+11. Counts arrive separately. The hub joins a server-derived signed-in/role-set group and sends absolute records filtered for that group, including a root composed only from visible spaces. Hidden-only changes don't trigger a metadata frame for an unaffected reader. ^[smartdocs-web/code-18,smartdocs-web/code-50,smartdocs-web/code-52] The client folds the records into cached counts. ^[smartdocs-web-client/code-07]
 
 ## 🔀 Alternate and failure paths
 
@@ -73,10 +75,11 @@ verification_stamp:
 | The reader abandons the request | Cancellation on the request token maps to HTTP 499. ^[smartdocs-web/code-19] |
 | A flat list is wanted instead of a tree | `GET /_nav/index` returns the flattened article index. ^[smartdocs-web/code-14] |
 | A caller needs to detect staleness | `GET /_nav/version` returns a monotonically increasing version value. ^[smartdocs-web/code-12] |
+| The requested folder is hidden | Its folder-record response is the unknown-folder representation, not a protected aggregate. ^[smartdocs-web/security-26] |
 
 ## 🧪 What proves it
 
-Nothing executes this flow automatically. Every step is readable in the source, and the navigation endpoints sit under the same declared activity sources as the rest of the host. ^[configuration-13]
+Existing sequences 01 and 02 record passing anonymous filtering, visible-only root totals, hidden-change suppression, visible-change control pushes and restart/snapshot handling. ^[smartdocs-web/code-57,smartdocs-web/code-58] Signed-in cross-group pushes and cookie-expiry closure are still unproven; sequence 04 didn't execute those scenarios. ^[smartdocs-web/code-60]
 
 ## 🕳️ Open questions
 

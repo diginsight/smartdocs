@@ -8,16 +8,17 @@ source_sets:
   - entry-points
   - domain-model
   - pipeline-definition
+  - authn-authz-surface
 ---
 
 <!--
 verification_stamp:
-  generated: "2026-08-18"
-  verified: "2026-08-18"
+  generated: "2026-10-28"
+  verified: "2026-10-28"
   gate_outcome: "pass-with-gaps"
   evidence:
     - dossier: "_evidence/smartdocs-web-client/code.md"
-      observed: "2026-08-18"
+      observed: "2026-10-28"
     - dossier: "_evidence/smartdocs-web-client/configuration.md"
       observed: "2026-08-18"
     - dossier: "_evidence/smartdocs-web/devops.md"
@@ -37,12 +38,11 @@ verification_stamp:
 - [🏗️ Physical placement](#-physical-placement)
 - [🕳️ Open questions](#-open-questions)
 - [🔗 Related](#-related)
-
 ## 🎯 Purpose and context
 
 The client is the same application, running in a different place. It is not deployed on its own: it ships inside the host's published output, and its routes become reachable only because the host adds its assembly to the router. ^[code-10]
 
-Its defining property is that it implements the *same shared abstractions* as the server, over HTTP instead of over a filesystem or a blob container. ^[code-03,code-04,code-06] A component written against `IContentSource` does not know, and cannot tell, which side it is running on.
+The client implements shared content and navigation abstractions over HTTP. ^[code-03,code-06] For pages, `HttpContentSource` also implements `IRenderedPageResolver` and requests server-rendered page responses; the browser doesn't independently decide which protected file to render. ^[code-04]
 
 ## 🧱 Structure
 
@@ -56,7 +56,7 @@ Its defining property is that it implements the *same shared abstractions* as th
 | `Layout/` | `MainLayout`, `DynNav`, `DynNavNode`, `NotificationPanel`, `AboutMenu` | ^[code-15] |
 | `Marker.cs` | The type the host uses to locate this assembly | ^[code-10] |
 
-Every layout component is split into a `.razor` markup file and a `.razor.cs` code-behind. ^[code-15]
+The shell includes the space switcher, account menu, navigation, page body, table of contents, and footer. ^[code-15]
 
 ## 🔀 Key flows
 
@@ -67,6 +67,12 @@ A scoped `HttpClient` is registered with its base address set to the host enviro
 ### Routing
 
 The router is pointed at this assembly, given `MainLayout` as the default layout, and told to move focus to the page's `h1` on navigation. ^[code-08] `ContentPage` claims both `/` and a catch-all `/{*path}`, which is what allows an arbitrary content path to resolve to a page. ^[code-09] ^[code-10]
+
+### Restoring account display
+
+Startup restores the bootstrap reader and registers `BootstrapAuthenticationStateProvider`. Its principal contains display identity, not reconstructed role grants; the server remains the authorization authority. ^[code-19] `SignInMenu` is absent when sign-in isn't enabled. Otherwise it offers **Sign in** or an account menu, with accessible icon-only presentation at narrow widths. ^[code-20,code-23]
+
+Sign-in preserves the current path and query through a full-page challenge. Sign-out submits a native antiforgery-protected POST and navigates away from the client session. ^[code-21,code-22]
 
 ### Navigation, lazily
 
@@ -92,7 +98,7 @@ Compiled to WebAssembly ^[code-01] and carried inside the host's published outpu
 
 ## 🕳️ Open questions
 
-> **Not established**: the `.razor` markup files were not read, so what these components render — as opposed to what they hold and how they obtain it — is not described here. ^[gap]
+> **Not established**: the remaining layout markup beyond the changed shell and sign-in menu wasn't inspected in this scoped refresh. Its complete rendered presentation isn't described here. ^[gap]
 
 > **Not established**: whether the published client is trimmed or ahead-of-time compiled. No trimming or AOT property was found in the project file or in the shared build properties. ^[gap]
 

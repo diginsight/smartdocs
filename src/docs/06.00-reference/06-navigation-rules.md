@@ -6,18 +6,19 @@ description: "How a folder tree becomes a menu: labels, ordering, exclusions and
 source_sets:
   - domain-model
   - composition-root
+  - authn-authz-surface
 ---
 
 <!--
 verification_stamp:
-  generated: "2026-08-18"
-  verified: "2026-09-04"
+  generated: "2026-10-28"
+  verified: "2026-10-28"
   gate_outcome: "pass-with-gaps"
   evidence:
     - dossier: "_evidence/smartdocs-web-shared/code.md"
-      observed: "2026-09-04"
+      observed: "2026-10-28"
     - dossier: "_evidence/smartdocs-web/code.md"
-      observed: "2026-09-04"
+      observed: "2026-10-28"
   open_gaps: 1
 -->
 
@@ -31,7 +32,6 @@ verification_stamp:
 - [🔗 Used by](#-used-by)
 - [🕳️ Open questions](#-open-questions)
 - [🔗 Related](#-related)
-
 ## 🎯 Purpose
 
 - **Kind**: rule set
@@ -74,6 +74,7 @@ At the root, and only at the root, a Home entry is inserted at index 0. ^[smartd
 | Root level only | `99.00-temp` ^[smartdocs-web/code-24] |
 | Folder metadata | folders whose `metadata.yml` declares `hidden` ^[smartdocs-web/code-26] |
 | Document front matter | documents whose `Hidden` is true, that is `publish: false` or `draft: true` ^[smartdocs-web/code-22] |
+| Access files | `access.metadata.yml` omitted from mounted reads and listings at every depth ^[smartdocs-web/code-56] |
 
 ### Recognised kinds
 
@@ -113,6 +114,8 @@ A name excluded at step 1 is never read, so neither its metadata nor its front m
 **A single sibling article displaces the folder's index.** A collapsed folder is represented by its one article whenever it has exactly one, and by its index or readme only when it has none — so a folder holding both an index and one other article does not surface that index in the level. ^[smartdocs-web/code-43]
 
 **A collapsed folder's link follows its representative.** The emitted route is the folder's own path when the index or readme represents it, and the article's path with the extension stripped when an article does. ^[smartdocs-web/code-44]
+
+**Authorization follows provenance, not that link.** `NavChild` and `NavLeaf` retain nonserialized `SourceFolder`; the server uses it to find the owning space and removes unplaceable entries when filtering is required. The shared unfiltered tree remains reusable, but every reader response filters its level/index and composes visible counts. ^[smartdocs-web-shared/code-30,smartdocs-web/code-49,smartdocs-web/code-50]
 
 **A hidden single article falls back to the index.** When the one article is hidden by front matter, the folder still yields a link to the folder path if an index or readme exists, and yields nothing otherwise. ^[smartdocs-web/code-45]
 

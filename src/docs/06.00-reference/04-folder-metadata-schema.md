@@ -9,14 +9,14 @@ source_sets:
 
 <!--
 verification_stamp:
-  generated: "2026-08-18"
-  verified: "2026-09-04"
+  generated: "2026-10-28"
+  verified: "2026-10-28"
   gate_outcome: "pass"
   evidence:
     - dossier: "_evidence/smartdocs-web-shared/code.md"
-      observed: "2026-09-04"
+      observed: "2026-10-28"
     - dossier: "_evidence/smartdocs-web/code.md"
-      observed: "2026-09-04"
+      observed: "2026-10-28"
   open_gaps: 0
 -->
 
@@ -29,7 +29,6 @@ verification_stamp:
 - [🔑 Keys and constraints](#-keys-and-constraints)
 - [🔗 Used by](#-used-by)
 - [🔗 Related](#-related)
-
 ## 🎯 Purpose
 
 - **Kind**: file schema

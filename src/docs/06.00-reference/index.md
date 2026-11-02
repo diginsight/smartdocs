@@ -7,20 +7,21 @@ source_sets:
   - settings-sources
   - entry-points
   - domain-model
+  - authn-authz-surface
 ---
 
 <!--
 verification_stamp:
-  generated: "2026-08-18"
-  verified: "2026-08-18"
+  generated: "2026-10-28"
+  verified: "2026-10-28"
   gate_outcome: "pass"
   evidence:
     - dossier: "_evidence/smartdocs-web/configuration.md"
-      observed: "2026-08-18"
+      observed: "2026-10-28"
     - dossier: "_evidence/smartdocs-web/code.md"
-      observed: "2026-08-18"
+      observed: "2026-10-28"
     - dossier: "_evidence/smartdocs-web-shared/code.md"
-      observed: "2026-08-18"
+      observed: "2026-10-28"
   open_gaps: 0
 -->
 
@@ -40,12 +41,13 @@ The exact surface: every setting, every route, every contract member, every sche
 | [Folder metadata schema](04-folder-metadata-schema.md) | The optional `metadata.yml` beside a folder |
 | [Article front matter](05-article-front-matter.md) | The YAML block at the head of a document |
 | [Navigation rules](06-navigation-rules.md) | Labels, ordering, exclusions and classification |
+| [Access-file schema](07-access-file-schema.md) | Root space requirements, role grants, strict validation and failure policy |
 
 ## 🔑 Key points
 
-- **An empty declared value is a placeholder, not a default.** `Site:InvalidateApiKey` ^[configuration-05], the space's `Blob.AccountUri` and `Blob.ContainerName` ^[configuration-07] and `Redis:Configuration` ^[configuration-10] are all declared empty here; the settings file states that environment-specific storage identity is deliberately absent and arrives from the external overlay ^[configuration-26].
-- **Two configuration keys change the route table.** `Testing:ContentMutationEnabled` decides whether the mutation and metrics routes are mapped at all ^[smartdocs-web/code-17] ^[configuration-21]; an empty `Site:InvalidateApiKey` removes the header check on the invalidation endpoint ^[smartdocs-web/code-16] ^[configuration-22].
-- **Hub values are absolute despite the type name.** `NavAggregateDelta` carries counts, not increments. ^[smartdocs-web-shared/code-09]
+- **Spaces come from the environment.** The base space array is empty; provide complete elements in the overlay. ^[configuration-07]
+- **Sign-in is optional, requirements aren't.** Nonblank `AzureAd:ClientId` enables identity; per-space permission evaluation still protects content when no reader can sign in. ^[configuration-28,smartdocs-web/code-47]
+- **Hub values are absolute.** The publisher sends `FolderRecord` arrays filtered for role-set groups, not the legacy delta shape. ^[smartdocs-web/code-33,smartdocs-web/code-52]
 - **Names are normalised before they are displayed.** A date prefix becomes `YYYYMMDD - REST`, a numeric prefix is dropped, and what remains is titleized. ^[smartdocs-web-shared/code-13]
 - **Some names never reach the level at all.** Names beginning `_` or `.`, `*.changelog.md` files, and — at the root only — `99.00-temp` are excluded during level construction. ^[smartdocs-web/code-24]
 

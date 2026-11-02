@@ -9,24 +9,25 @@ source_sets:
   - settings-sources
   - pipeline-definition
   - authn-authz-surface
+  - options-model
 ---
 
 <!--
 verification_stamp:
-  generated: "2026-08-18"
-  verified: "2026-08-18"
+  generated: "2026-10-28"
+  verified: "2026-10-28"
   gate_outcome: "pass-with-gaps"
   evidence:
     - dossier: "_evidence/smartdocs-web/code.md"
-      observed: "2026-08-18"
+      observed: "2026-10-28"
     - dossier: "_evidence/smartdocs-web/configuration.md"
-      observed: "2026-08-18"
+      observed: "2026-10-28"
     - dossier: "_evidence/smartdocs-web/data.md"
       observed: "2026-08-18"
     - dossier: "_evidence/smartdocs-web/devops.md"
       observed: "2026-08-18"
     - dossier: "_evidence/smartdocs-web/security.md"
-      observed: "2026-08-18"
+      observed: "2026-10-28"
   open_gaps: 1
 -->
 
@@ -42,7 +43,6 @@ verification_stamp:
 - [🏗️ Physical placement](#-physical-placement)
 - [🕳️ Open questions](#-open-questions)
 - [🔗 Related](#-related)
-
 ## 🎯 Purpose and context
 
 The host is where every decision in this system is made concrete. It reads configuration, decides which content sources exist, wires the cache, exposes the HTTP and SignalR surfaces, renders the first paint server-side and then hands the page to WebAssembly. It is the only project the pipeline publishes and deploys. ^[devops-10]
@@ -55,6 +55,7 @@ The host is where every decision in this system is made concrete. It reads confi
 | `ContentSources/` | The per-space source factory and the cache wrapper around it | ^[code-08,code-09] |
 | `Navigation/` | `DynamicNavBuilder`, `CachedDynamicNavBuilder`, `NavChangePublisher`, `NavHub` | ^[code-18,code-23,code-34,code-35] |
 | `Endpoints/` | `ContentEndpoints`, `NavEndpoints`, `TestContentEndpoints` | ^[code-10,code-11,code-17] |
+| `Authorization/` | Access-file facts, effective requirements, per-space role expansion, and request-scoped filtering | ^[code-46,code-47,code-48] |
 | `Caching/` | `ContentPathCacheKey`, the value type keying the content cache by space and path | ^[data-12] |
 | `Observability.cs`, `ObservabilityManager.cs` | Diginsight, OpenTelemetry and log4net setup | ^[code-02] |
 
@@ -66,11 +67,13 @@ Observability comes first — before the builder exists — so that the composit
 
 Then, in sequence: the observability and telemetry registrations; Razor components with interactive WebAssembly; the `Site` options bound and eagerly resolved; the space registry; one cached content source per space; the SignalR hub; the navigation change publisher. ^[code-04,code-05,code-06,code-07,code-09,code-18,code-35]
 
-The middleware pipeline is deliberately thin. Outside `Development` it adds an exception handler at `/error` with a fresh scope for errors, HSTS and HTTPS redirection; in every environment it adds antiforgery and static assets. ^[code-38] No authentication or authorisation middleware is registered, and no endpoint or component carries an authorisation attribute. ^[security-02,security-03]
+Outside `Development`, the pipeline adds an exception handler at `/error`, HSTS, and HTTPS redirection; antiforgery and static assets apply in every environment. ^[code-38] When `AzureAd:ClientId` is nonblank, Microsoft Identity Web registers reader sign-in and authentication runs immediately before `ReaderAccess` initialization. Authorization then happens through that scoped service rather than a blanket fallback policy. ^[code-46,code-54]
+
+The server checks the exact file selected by the shared rendered-page cache, filters navigation and shell responses, and composes visible totals before returning them. ^[code-20,code-49,code-50] Sign-in and sign-out are full-page transitions; the bootstrap carries display and sign-out-form state, not permission authority. ^[code-54,code-55]
 
 ### Warm-up
 
-After the application is built a background warm-up runs: it seeds folder metrics from a snapshot, discovers root branches, warms the index and every level, then pushes the ready counts to connected clients. ^[code-36] The snapshot itself is written to `Site:MetricsSnapshotPath` when that is declared, and otherwise beside the application binaries. ^[code-37] The pipeline sets that setting as an App Service application setting on both deployments. ^[devops-18]
+After the application is built a background warm-up runs: it seeds folder metrics from a snapshot, discovers root branches, warms the index and every level, then pushes reader-filtered ready counts. ^[code-36,code-52] Snapshot format 2 includes per-space-compatible cells and `rootOwn`; incompatible snapshots are ignored and rebuilt. ^[code-51] The snapshot path comes from `Site:MetricsSnapshotPath`, or falls back beside the binaries. ^[code-37]
 
 ### Cancellation
 
@@ -96,7 +99,7 @@ Published self-contained for a Windows runtime identifier ^[devops-10], zipped a
 
 ## 🕳️ Open questions
 
-When `Site:InvalidateApiKey` is empty the guard on the invalidation endpoint is skipped entirely rather than failing closed. ^[code-16,security-06]
+The invalidation endpoint has a configuration-dependent management guard. ^[security-05,security-06] Whether it is adequately configured in a deployed instance remains an operational verification question.
 
 > **Not established**: whether either deployed environment supplies an invalidation key. The pipeline writes `Site__InvalidateApiKey` only when the corresponding optional secret is present, and whether it is configured is a repository-settings fact this repository does not carry. ^[gap]
 

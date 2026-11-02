@@ -9,28 +9,29 @@ source_sets:
   - options-model
   - pipeline-definition
   - deployment-descriptor
+  - authn-authz-surface
 ---
 
 <!--
 verification_stamp:
-  generated: "2026-08-18"
-  verified: "2026-08-18"
+  generated: "2026-10-28"
+  verified: "2026-10-28"
   gate_outcome: "pass-with-gaps"
   evidence:
     - dossier: "_evidence/smartdocs-web/configuration.md"
-      observed: "2026-08-18"
+      observed: "2026-10-28"
     - dossier: "_evidence/smartdocs-web/code.md"
-      observed: "2026-08-18"
+      observed: "2026-10-28"
     - dossier: "_evidence/smartdocs-web/devops.md"
       observed: "2026-08-18"
     - dossier: "_evidence/smartdocs-web/environment.md"
       observed: "2026-08-18"
     - dossier: "_evidence/smartdocs-web-client/code.md"
-      observed: "2026-08-18"
+      observed: "2026-10-28"
     - dossier: "_evidence/smartdocs-web-client/configuration.md"
       observed: "2026-08-18"
     - dossier: "_evidence/smartdocs-web-shared/code.md"
-      observed: "2026-08-18"
+      observed: "2026-10-28"
   open_gaps: 2
 -->
 
@@ -47,10 +48,9 @@ verification_stamp:
 - [🧭 What you will see](#-what-you-will-see)
 - [🔗 Related](#-related)
 - [🕳️ Open questions](#-open-questions)
-
 ## 🎯 Introduction
 
-How to get Diginsight SmartDocs building and running on your own machine, and what the three run profiles differ in.
+Build and run Diginsight SmartDocs locally, then choose a public-content or reader-access profile.
 
 ## 🧰 What you need
 
@@ -84,15 +84,24 @@ Two things are worth knowing before you do.
 
 ## 🎚️ Run profiles
 
-Three profiles are declared. They differ in which settings overlay the host loads.
+The profiles below select different settings overlays; the access profile is local validation, not a deployed-environment access configuration. ^[smartdocs-web/configuration-23,smartdocs-web/configuration-24,smartdocs-web/configuration-39]
 
 | Profile | `ASPNETCORE_ENVIRONMENT` | `AppsettingsEnvironmentName` | Content comes from |
 |---|---|---|---|
 | `http` | `Development` | `Development` | the local filesystem ^[smartdocs-web/configuration-23] ^[environment-11] |
 | `https` | `Development` | `Development` | the local filesystem ^[smartdocs-web/configuration-23] ^[environment-11] |
-| `https - Testmc` | *(unset here)* | `Testmc` | whatever the private overlay declares ^[smartdocs-web/configuration-24] |
+| `https - Testmc` | `Development` | `Testmc` | whatever the private overlay declares ^[smartdocs-web/configuration-24] |
+| `https - access` | `Development` | `access` | the private fixture overlay, using the repository's access-tree content ^[smartdocs-web/configuration-39] |
 
 The third profile also sets `ExternalConfigurationFolder` to `..\..\..\smartdocs.internal`, meaning it expects the private peer repository checked out **beside** this one. ^[smartdocs-web/configuration-24] Without that checkout the profile will not find its overlay.
+
+The access profile uses the same external-root convention. ^[smartdocs-web/configuration-39] Run it from the host project in a visible console, rebuilding rather than using `--no-build`:
+
+```powershell
+dotnet run --launch-profile "https - access"
+```
+
+Nonblank `AzureAd:ClientId` enables sign-in; an empty value leaves the host anonymous-only. Requirements still apply when sign-in is off, so a restricted space can be invisible to everyone until sign-in is configured. ^[smartdocs-web/configuration-28,smartdocs-web/code-47] See the [reader-access provisioning guide](../90.00-issues/202610/20261027.01-smartdocs-authentication/02-reader-access-provisioning.md).
 
 ## 📂 Where your content goes
 
@@ -102,7 +111,7 @@ A file becomes a page when it is Markdown — `.md` and `.qmd` are both accepted
 
 ## 🧭 What you will see
 
-The path you request is resolved to a document by trying a fixed list of candidates — `{path}.md`, then `{path}/index.md`, then `{path}/overview.md`, then a readme — so a folder URL lands on that folder's index without you writing the filename. ^[smartdocs-web/code-20]
+`PageLoader` accepts a handled rendered-page resolution first. Its fallback candidate ladder applies only when resolution is unhandled; a hidden result doesn't trigger another candidate. ^[smartdocs-web-shared/code-21,smartdocs-web-shared/code-33] The host authorizes the exact selected content key before returning the page. ^[smartdocs-web/code-20]
 
 The sidebar is built from whatever is on disk, one level at a time. ^[smartdocs-web/code-23] Numeric prefixes on folder names are stripped from the displayed label ^[smartdocs-web/code-28]; dated names sort newest-first and everything else sorts alphabetically ^[smartdocs-web/code-29].
 
