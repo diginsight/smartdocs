@@ -18,6 +18,20 @@ on:
     branches: [main]
     paths:
       - "src/docs/**"
+      - "eng/metadata-checks/**"
+      - "src/Diginsight.SmartDocs.Web/Metadata/**"
+      - "src/Diginsight.SmartDocs.Web/Authorization/AccessFile.cs"
+      - "src/Diginsight.SmartDocs.Web.Shared/Navigation/FolderMeta.cs"
+      - "src/Diginsight.SmartDocs.Web/Diginsight.SmartDocs.Web.csproj"
+      - "src/Diginsight.SmartDocs.Web.Shared/Diginsight.SmartDocs.Web.Shared.csproj"
+      - "src/Diginsight.SmartDocs.Web.Client/Diginsight.SmartDocs.Web.Client.csproj"
+      - "src/Diginsight.SmartDocs.Web*/packages.lock.json"
+      - "eng/Download-PackageRelease.ps1"
+      - "eng/Publish-Packages.ps1"
+      - "eng/upstream-releases.json"
+      - "src/Directory.Build.props"
+      - "global.json"
+      - "nuget.config"
       - .github/workflows/03.PublishDocsContent.yml
   workflow_dispatch:
     inputs:
@@ -172,6 +186,28 @@ jobs:
           if ($mdCount -eq 0) { Write-Error "No markdown staged - aborting"; exit 1 }
 
           "CONTENT_STAGE=$stage" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Verify .NET SDK
+        shell: pwsh
+        run: |
+          $v = dotnet --version
+          if ($LASTEXITCODE -ne 0) { Write-Error "dotnet SDK not available on runner"; exit 1 }
+          Write-Host "Using pre-installed .NET SDK: $v"
+          if (-not ($v -like '10.*')) { Write-Error "Expected .NET 10 SDK, found $v"; exit 1 }
+
+      - name: Download upstream Diginsight releases
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: ./eng/Download-PackageRelease.ps1
+
+      - name: Validate staged metadata
+        shell: pwsh
+        env:
+          NUGET_PACKAGES: ${{ runner.workspace }}\.nuget\packages
+        run: |
+          dotnet run --project eng\metadata-checks\MetadataChecks.csproj -c Release -- validate-tree "$env:CONTENT_STAGE"
+          if ($LASTEXITCODE -ne 0) { Write-Error "Staged metadata validation failed"; exit 1 }
 
       - name: Azure login (OIDC)
         shell: pwsh

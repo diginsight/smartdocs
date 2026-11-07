@@ -1,5 +1,6 @@
 using Diginsight.Diagnostics;
 using Diginsight.SmartDocs.Web.Authorization;
+using Diginsight.SmartDocs.Web.Metadata;
 using Diginsight.SmartDocs.Web.Shared.Navigation;
 using Diginsight.SmartDocs.Web.Shared.Sites;
 using Microsoft.AspNetCore.SignalR;
@@ -27,9 +28,11 @@ public sealed class NavChangePublisher(
     AccessRequirementResolver requirements,
     ReaderCountComposer counts,
     SpaceRegistry spaces,
+    VisibleMetadataFingerprint fingerprints,
     ILogger<NavChangePublisher> logger)
 {
     private int _wired;
+    private readonly SemaphoreSlim _refreshGate = new(1, 1);
 
     // The root-own value the previous drain left, to tell a change among the root-mounted space's own
     // articles from a change in any other space. Written only by the drain's handler, which never overlaps itself.
@@ -56,7 +59,7 @@ public sealed class NavChangePublisher(
     /// needing a refold. Synchronous, O(depth), no I/O — the drain is scheduled and debounced.
     /// An empty path is a whole-site change, handled by <see cref="RediscoverInBackground"/>.
     /// </summary>
-    public void PublishChangeAsync(string path)
+    public async Task PublishChangeAsync(string path)
     {
         string normalized = (path ?? string.Empty).Replace('\\', '/').Trim('/');
         if (normalized.Length == 0)
@@ -67,10 +70,84 @@ public sealed class NavChangePublisher(
             // walked again so folders created by the publish get cells of their own.
             metrics.InvalidateAll();
             RediscoverInBackground();
-            return;
+        }
+        else
+        {
+            metrics.Invalidate(FolderOf(normalized));
         }
 
-        metrics.Invalidate(FolderOf(normalized));
+        if (normalized.Length == 0 || MetadataFiles.IsCarrierKey(normalized))
+        {
+            await PublishMetadataRefreshAsync(normalized);
+        }
+    }
+
+    private async Task PublishMetadataRefreshAsync(string path)
+    {
+        string? changedSpace = null;
+        if (path.Length > 0)
+        {
+            if (!spaces.TryResolve(path, out SpaceOptions space, out _))
+            {
+                return;
+            }
+
+            changedSpace = space.Id;
+        }
+
+        await _refreshGate.WaitAsync();
+        try
+        {
+            var snapshots = new Dictionary<string, Task<string>>(StringComparer.OrdinalIgnoreCase);
+            foreach (RoleSet roles in activeRoleSets.Snapshot())
+            {
+                try
+                {
+                    ReaderVisibility visibility = await evaluator.EvaluateAsync(roles);
+                    IReadOnlyDictionary<string, string> current =
+                        await VisibleMetadataAsync(visibility, snapshots, changedSpace);
+                    if (!activeRoleSets.NeedsRefresh(roles, current, changedSpace))
+                    {
+                        continue;
+                    }
+
+                    await hub.Clients.Group(ActiveRoleSets.GroupOf(roles)).SendAsync(NavHubContract.RefreshRequired);
+                    activeRoleSets.Refreshed(roles, current, changedSpace);
+                }
+                catch (Exception ex)
+                {
+                    logger.LogWarning(ex, "Metadata refresh publish failed for a role set");
+                }
+            }
+        }
+        finally
+        {
+            _refreshGate.Release();
+        }
+    }
+
+    private async Task<IReadOnlyDictionary<string, string>> VisibleMetadataAsync(
+        ReaderVisibility visibility, Dictionary<string, Task<string>>? snapshots = null, string? onlySpace = null)
+    {
+        var visible = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        snapshots ??= new Dictionary<string, Task<string>>(StringComparer.OrdinalIgnoreCase);
+        foreach (string id in visibility.VisibleSpaceIds)
+        {
+            if (onlySpace is not null && !string.Equals(id, onlySpace, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            if (!snapshots.TryGetValue(id, out Task<string>? snapshot))
+            {
+                SpaceOptions space = spaces.ById(id)
+                    ?? throw new InvalidOperationException($"Visible space '{id}' is not registered.");
+                snapshots[id] = snapshot = fingerprints.ForSpaceAsync(space);
+            }
+            visible[id] = await snapshot;
+        }
+
+        return visible;
     }
 
     private void RediscoverInBackground()
@@ -231,8 +308,10 @@ public sealed class NavChangePublisher(
 
         try
         {
-            FolderRecord[] records = await BuildRootRecordsAsync();
             ReaderVisibility visibility = await evaluator.EvaluateAsync(roles);
+            activeRoleSets.RememberVisibility(roles, await VisibleMetadataAsync(visibility));
+            await caller.SendAsync(NavHubContract.VisibleSpaces, visibility.VisibleSpaceIds.ToArray());
+            FolderRecord[] records = await BuildRootRecordsAsync();
             (FolderRecord[] visible, _) = await RecordsForAsync(visibility, records);
             if (visible.Length > 0)
             {

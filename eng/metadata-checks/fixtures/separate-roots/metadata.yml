@@ -1,0 +1,4 @@
+schema: smartdocs-metadata/v1
+repository:
+  id: example/separate
+  visibility: public

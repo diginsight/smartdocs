@@ -1,5 +1,7 @@
 using Diginsight.SmartCache;
 using Diginsight.SmartCache.Externalization;
+using Diginsight.SmartDocs.Web.Metadata;
+using Newtonsoft.Json;
 using System.Collections.Concurrent;
 
 namespace Diginsight.SmartDocs.Web.Caching;
@@ -44,7 +46,7 @@ public sealed record ContentPathCacheKey(string Kind, string Path) : IInvalidata
     /// the other. An empty path is the root and matches everything (so the index and root level always
     /// rebuild). Siblings on different branches do not match, so they stay cached.
     /// </summary>
-    private static bool OnSameBranch(string a, string b)
+    internal static bool OnSameBranch(string a, string b)
     {
         a = Normalize(a);
         b = Normalize(b);
@@ -75,17 +77,26 @@ public sealed record ContentPathInvalidationRule : IInvalidationRule
     {
     }
 
-    public ContentPathInvalidationRule(IEnumerable<string> paths, string? Kind = null)
+    [JsonConstructor]
+    public ContentPathInvalidationRule(
+        IEnumerable<string> paths, string? Kind = null, IEnumerable<string>? changedPaths = null)
     {
+        string[] original = paths.Select(ContentPathCacheKey.Normalize).ToArray();
         Paths = new HashSet<string>(
-            paths.Select(ContentPathCacheKey.Normalize),
+            original.Select(MetadataFiles.InvalidationScope),
             StringComparer.OrdinalIgnoreCase);
         this.Kind = Kind;
+        ChangedPaths = new HashSet<string>(
+            (changedPaths ?? original).Select(ContentPathCacheKey.Normalize),
+            StringComparer.OrdinalIgnoreCase);
     }
 
     public IReadOnlySet<string> Paths { get; }
 
     public string? Kind { get; }
+
+    /// <summary>Original changed paths, before metadata file names are broadened to their folder scope.</summary>
+    public IReadOnlySet<string> ChangedPaths { get; }
 }
 
 internal static class FolderInvalidationCallbacks

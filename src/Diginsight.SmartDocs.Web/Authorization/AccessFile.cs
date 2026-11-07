@@ -56,11 +56,13 @@ public sealed partial class AccessFile
 
     private AccessFile(
         ImmutableSortedSet<string> permissions,
+        ImmutableSortedDictionary<string, string?> permissionDescriptions,
         ImmutableSortedSet<string> requires,
         ImmutableSortedDictionary<string, ImmutableSortedSet<string>> roles,
         string fingerprint)
     {
         Permissions = permissions;
+        PermissionDescriptions = permissionDescriptions;
         Requires = requires;
         Roles = roles;
         Fingerprint = fingerprint;
@@ -68,6 +70,9 @@ public sealed partial class AccessFile
 
     /// <summary>The permission names the space declares, case-insensitive.</summary>
     public ImmutableSortedSet<string> Permissions { get; }
+
+    /// <summary>Optional descriptions retained with the declared permission names.</summary>
+    public ImmutableSortedDictionary<string, string?> PermissionDescriptions { get; }
 
     /// <summary>The permissions a reader needs to see the space, all of them. May contain <c>authenticated</c>.</summary>
     public ImmutableSortedSet<string> Requires { get; }
@@ -144,8 +149,11 @@ public sealed partial class AccessFile
     /// to the same file, and the exclusion must hold for every spelling that reaches it.
     /// </summary>
     public static bool IsAccessFileKey(string? key) =>
+        IsKeyNamed(key, FileName);
+
+    internal static bool IsKeyNamed(string? key, string fileName) =>
         CanonicalSegments(key) is { Count: > 0 } segments
-        && string.Equals(segments[^1], FileName, StringComparison.OrdinalIgnoreCase);
+        && string.Equals(segments[^1], fileName, StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
     /// True when <paramref name="innerKey"/>, a key inside one space, names an access file below the
@@ -160,15 +168,35 @@ public sealed partial class AccessFile
         IEnumerable<string> permissions,
         IEnumerable<string> requires,
         IEnumerable<KeyValuePair<string, IEnumerable<string>>> roles,
-        string fingerprint) =>
-        new(
-            ToSet(permissions),
+        string fingerprint,
+        IEnumerable<KeyValuePair<string, string?>>? descriptions = null)
+    {
+        ImmutableSortedSet<string> declared = ToSet(permissions);
+        return new(
+            declared,
+            (descriptions ?? declared.Select(static name => new KeyValuePair<string, string?>(name, null)))
+                .ToImmutableSortedDictionary(static pair => pair.Key, static pair => pair.Value, StringComparer.OrdinalIgnoreCase),
             ToSet(requires),
             roles.ToImmutableSortedDictionary(
                 static pair => pair.Key,
                 static pair => ToSet(pair.Value),
                 StringComparer.OrdinalIgnoreCase),
             fingerprint);
+    }
+
+    /// <summary>Validates an already-parsed unified access section using the legacy policy rules.</summary>
+    internal static AccessFileOutcome ValidatePolicy(
+        Dictionary<string, string?>? permissions,
+        List<string?>? requires,
+        Dictionary<string, List<string?>?>? roles,
+        string fingerprint) =>
+        Validate(new Document
+        {
+            Schema = SupportedSchema,
+            Permissions = permissions,
+            Requires = requires,
+            Roles = roles,
+        }, fingerprint);
 
     private static ImmutableSortedSet<string> ToSet(IEnumerable<string> names) =>
         ImmutableSortedSet.CreateRange(StringComparer.OrdinalIgnoreCase, names);
@@ -273,7 +301,7 @@ public sealed partial class AccessFile
             roles.Add(new(role, permissions));
         }
 
-        return AccessFileOutcome.Valid(Restore(declared, requires, roles, fingerprint));
+        return AccessFileOutcome.Valid(Restore(declared, requires, roles, fingerprint, document.Permissions));
     }
 
     private static bool IsAuthenticated(string name) =>

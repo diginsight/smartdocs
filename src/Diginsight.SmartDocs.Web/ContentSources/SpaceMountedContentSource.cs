@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using Diginsight.Diagnostics;
 using Diginsight.SmartDocs.Web.Authorization;
+using Diginsight.SmartDocs.Web.Metadata;
 using Diginsight.SmartDocs.Web.Shared;
 using Diginsight.SmartDocs.Web.Shared.Navigation;
 using Diginsight.SmartDocs.Web.Shared.Sites;
@@ -37,9 +38,8 @@ public sealed class SpaceMountedContentSource : IContentSource, IContentLister
     {
         using var activity = Observability.HotPathActivitySource.StartMethodActivity(logger, () => new { contentKey });
 
-        // An access file reveals which permissions and roles open its space, so no content surface
-        // ever serves one, at any depth. AccessFileProvider reads it from the physical source instead.
-        if (AccessFile.IsAccessFileKey(contentKey))
+        // Metadata is read internally from the physical source, never delivered as raw content.
+        if (MetadataFiles.IsCarrierKey(contentKey))
         {
             return Task.FromResult<ContentResult?>(null);
         }
@@ -64,7 +64,7 @@ public sealed class SpaceMountedContentSource : IContentSource, IContentLister
             return [];
         }
 
-        IReadOnlyList<ChildEntry> children = WithoutAccessFiles(access.Space, await access.Lister.ListChildrenAsync(inner, ct) ?? []);
+        IReadOnlyList<ChildEntry> children = WithoutPrivateCarriers(access.Space, await access.Lister.ListChildrenAsync(inner, ct) ?? []);
         if (access.Space.IsRootMounted)
         {
             return children;
@@ -80,7 +80,7 @@ public sealed class SpaceMountedContentSource : IContentSource, IContentLister
     {
         using var activity = Observability.HotPathActivitySource.StartMethodActivity(logger, () => new { key });
 
-        if (AccessFile.IsAccessFileKey(key))
+        if (MetadataFiles.IsCarrierKey(key))
         {
             return Task.FromResult<string?>(null);
         }
@@ -100,7 +100,7 @@ public sealed class SpaceMountedContentSource : IContentSource, IContentLister
 
         if (registry.Root is { } root && bySpaceId.TryGetValue(root.Id, out SpaceContentAccess? rootAccess))
         {
-            IReadOnlyList<ChildEntry> own = WithoutAccessFiles(root, await rootAccess.Lister.ListChildrenAsync(string.Empty, ct) ?? []);
+            IReadOnlyList<ChildEntry> own = WithoutPrivateCarriers(root, await rootAccess.Lister.ListChildrenAsync(string.Empty, ct) ?? []);
             items.AddRange(own.Where(c => registry.MountedAt(c.Name) is null));
         }
 
@@ -119,13 +119,14 @@ public sealed class SpaceMountedContentSource : IContentSource, IContentLister
     /// as if it restricted its folder. Only listings warn — they report files that exist — so request
     /// traffic for invented keys can't flood the log.
     /// </summary>
-    private IReadOnlyList<ChildEntry> WithoutAccessFiles(SpaceOptions space, IReadOnlyList<ChildEntry> children)
+    private IReadOnlyList<ChildEntry> WithoutPrivateCarriers(SpaceOptions space, IReadOnlyList<ChildEntry> children)
     {
         List<ChildEntry>? kept = null;
         for (int i = 0; i < children.Count; i++)
         {
             ChildEntry child = children[i];
-            if (!AccessFile.IsAccessFileKey(child.Name))
+            bool accessFile = AccessFile.IsAccessFileKey(child.Name);
+            if (!accessFile && !MetadataFiles.IsLegacyRepositoryKey(child.Name))
             {
                 kept?.Add(child);
                 continue;
@@ -133,7 +134,7 @@ public sealed class SpaceMountedContentSource : IContentSource, IContentLister
 
             kept ??= children.Take(i).ToList();
             string inner = Normalize(child.Path);
-            if (AccessFile.IsNestedAccessFileKey(inner)
+            if (accessFile && AccessFile.IsNestedAccessFileKey(inner)
                 && warnedNestedAccessFiles.TryAdd($"{space.Id}/{inner}".ToLowerInvariant(), 0))
             {
                 logger.LogWarning(

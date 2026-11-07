@@ -1,0 +1,22 @@
+schema: smartdocs-metadata/v1
+label: Example documentation
+repository:
+  id: example/docs
+  visibility: public
+  internal_peer:
+    id: example/docs-internal
+    path_env: EXAMPLE_INTERNAL_FOLDER
+    default_relative_path: "../docs-internal"
+    mirror_strategy: path-parallel
+    suffix: ".internal.md"
+    on_missing: fail-closed
+    alias_registry: "_aliases/{environment}.internal.md"
+  deliberately_public: ["The project name"]
+access:
+  requires: [Read]
+  permissions:
+    Read: Read documentation
+    Write: Contribute documentation
+  roles:
+    Reader: [Read]
+    Contributor: [Read, Write]

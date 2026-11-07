@@ -70,7 +70,7 @@ Non-Markdown internal assets cannot carry a suffix meaningfully. They go in an `
 
 ### C — two-repository mirror
 
-Internal content is versioned in the paired private repository, at the **identical repository-relative path**, resolved through the declaration in `repository.metadata.yml`.
+Internal content is versioned in the paired private repository, at the **identical repository-relative path**, resolved through the repository-root `metadata.yml` declaration.
 
 ```text
 public repo     src/docs/90.00-issues/202608/20260817.01-deployfail/03-incident-b.md
@@ -109,7 +109,7 @@ The classification test is owned by 📖 `10.00-application-development/03-evide
 
 When in doubt, classify sensitive. An over-classified fact costs one redirection; an under-classified one is a disclosure.
 
-Values listed under `deliberately_public` in `repository.metadata.yml` are exempt. Aliasing them costs readability and buys nothing.
+Values listed under the resolved `repository.deliberately_public` are exempt. Aliasing them costs readability and buys nothing.
 
 ---
 
@@ -147,7 +147,7 @@ The same four principles apply to every file in them, with one addition specific
 
 In a private repository this entire model is overhead. There is no public surface, so aliasing costs readability and buys nothing, and a second repository adds a synchronisation step protecting content from an audience that does not exist.
 
-An artifact therefore reads `repository.metadata.yml` **first** and behaves accordingly:
+An artifact therefore resolves the repository-root `metadata.yml` **first** and behaves accordingly. The transition procedure accepts the old `repository.metadata.yml` only as a fallback and stops on conflicting or unreadable declarations; nested metadata never changes this classification.
 
 | `visibility` | Behaviour |
 |---|---|
@@ -177,4 +177,10 @@ Stating the limits plainly, because each of these has been mistaken for protecti
 - **📖** `.github/prompt-snippets/content-classification-and-split.md` — the procedure artifacts run
 - **📖** `10.00-application-development/03-evidence-access-policy.md` — the sensitive-material taxonomy this file reuses
 - **📖** `10.00-application-development/02-evidence-dossier-schema.md` — the equivalent split inside evidence dossiers
-- **📖** `repository.metadata.yml` — visibility and internal-peer declaration for this repository
+- **📖** `metadata.yml` — repository-root visibility and internal-peer declaration for this repository
+
+<!--
+context_metadata:
+  version: "1.0.0"
+  last_updated: "2026-11-06"
+-->

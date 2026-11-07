@@ -38,6 +38,7 @@ public partial class DynNav
     // every content change.
     private NavHubClient? _hub;
     private bool _hubInitialized;
+    private bool _refreshing;
 
     protected override async Task OnInitializedAsync()
     {
@@ -97,10 +98,31 @@ public partial class DynNav
         {
             _hub.MetadataChanged += OnAggregatesPushed;
             _hub.CountsReady += OnAggregatesPushed;
+            _hub.RefreshRequired += OnMetadataRefreshRequired;
+            _hub.VisibleSpaces += OnVisibleSpaces;
             _hub.Reconnected += OnHubReconnected;
             await _hub.StartAsync();
         }
     }
+
+    private void OnVisibleSpaces(IReadOnlyList<string> visible)
+    {
+        var shellSpaces = new HashSet<string>(Site.Spaces.Select(static space => space.Id), StringComparer.OrdinalIgnoreCase);
+        if (!shellSpaces.SetEquals(visible))
+        {
+            OnMetadataRefreshRequired();
+        }
+    }
+
+    private void OnMetadataRefreshRequired()
+        => _ = InvokeAsync(() =>
+        {
+            if (!_refreshing)
+            {
+                _refreshing = true;
+                NavMgr.NavigateTo(NavMgr.Uri, forceLoad: true, replace: true);
+            }
+        });
 
     // The footer total is the sum of the roots' own server-computed counts — never a sum of the
     // nodes the client happens to have rendered. One unknown root makes the total a lower bound.
@@ -145,21 +167,9 @@ public partial class DynNav
             StateHasChanged();
         });
 
-    // Reconnected after a drop → messages may have been missed while offline, so re-pull the root
-    // level fresh from the origin and re-sync open sections. This is the only remaining fallback
-    // (no interval polling).
-    private void OnHubReconnected()
-        => _ = InvokeAsync(async () =>
-        {
-            if (await Provider.GetTotalAsync() is { } total)
-            {
-                Stats.SetTotal(total);
-            }
-            _root = await SpaceScope.LoadRootAsync(Provider, Site, _scope, refresh: true);
-            PublishRootStats();
-            Sidebar.RequestCountsRefresh();
-            StateHasChanged();
-        });
+    // A disconnected client may have missed metadata and access changes even when its visible
+    // space membership is unchanged.
+    private void OnHubReconnected() => OnMetadataRefreshRequired();
 
     private bool IsActiveRail(NavChild n) =>
         n.Prefix is not null && !string.IsNullOrEmpty(_current) &&
@@ -332,6 +342,8 @@ public partial class DynNav
         {
             _hub.MetadataChanged -= OnAggregatesPushed;
             _hub.CountsReady -= OnAggregatesPushed;
+            _hub.RefreshRequired -= OnMetadataRefreshRequired;
+            _hub.VisibleSpaces -= OnVisibleSpaces;
             _hub.Reconnected -= OnHubReconnected;
         }
     }

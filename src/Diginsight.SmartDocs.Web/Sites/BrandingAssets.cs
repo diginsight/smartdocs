@@ -1,5 +1,5 @@
-using Diginsight.SmartDocs.Web.Authorization;
 using Diginsight.SmartDocs.Web.ContentSources;
+using Diginsight.SmartDocs.Web.Metadata;
 using Diginsight.SmartDocs.Web.Shared;
 using Diginsight.SmartDocs.Web.Shared.Sites;
 using Microsoft.Extensions.Options;
@@ -91,10 +91,10 @@ public static class BrandingAssetResolver
 
         // The mark is read from a space's physical source, below the mounted view that refuses access
         // files, and served without authorization. A LogoPath naming an access file would publish it.
-        if (AccessFile.IsAccessFileKey(key))
+        if (MetadataFiles.IsCarrierKey(key))
         {
             logger.LogError(
-                "Site:Branding:LogoPath '{Path}' names an access file, which is never served; "
+                "Site:Branding:LogoPath '{Path}' names a metadata file, which is never served; "
                 + "the shell falls back to the built-in icon '{IconClass}'.",
                 configured, site.Branding.IconClass);
             return;

@@ -2,6 +2,7 @@ using Diginsight.Diagnostics;
 using Diginsight.Runtime;
 using Diginsight.SmartCache;
 using Diginsight.SmartDocs.Web.Caching;
+using Diginsight.SmartDocs.Web.Metadata;
 using Diginsight.SmartDocs.Web.Shared;
 using Diginsight.SmartDocs.Web.Shared.Navigation;
 
@@ -25,6 +26,7 @@ public sealed class CachedContentSource(
     ISmartCache smartCache,
     BackgroundRevalidationCache revalidation,
     ContentFreshnessOptions freshness,
+    ContentMetadataProvider metadata,
     ILogger<CachedContentSource> logger) : IContentSource, IContentLister
 {
     public async Task<ContentResult?> GetAsync(string contentKey, CancellationToken ct = default)
@@ -134,19 +136,11 @@ public sealed class CachedContentSource(
         return envelope.Head;
     }
 
-    /// <summary>Cached, parsed <c>metadata.yml</c> overrides, on the same tolerance as the listing.</summary>
+    /// <summary>Navigation-only projection of the shared metadata snapshot.</summary>
     public async Task<FolderMeta> ReadFolderMetaAsync(string key, CancellationToken ct = default)
     {
-        var cacheKey = new ContentPathCacheKey("folder-meta", ContentPathCacheKey.Normalize(key));
-
-        CachedFolderMeta envelope = await smartCache.GetAsync(
-            cacheKey,
-            async innerCt => new CachedFolderMeta(FolderMeta.Parse(await innerLister.ReadHeadAsync(key, innerCt))),
-            StructureOptions(),
-            callerType: typeof(CachedContentSource),
-            cancellationToken: ct);
-
-        return envelope.Meta;
+        MetadataOutcome outcome = await metadata.GetForMetadataKeyAsync(key, ct);
+        return outcome.Document?.Navigation ?? FolderMeta.None;
     }
 
     private SmartCacheOperationOptions StructureOptions() => new()
@@ -202,15 +196,4 @@ public sealed class CachedContentSource(
                 (Head.Author?.Length ?? 0)));
     }
 
-    /// <summary>Serializable envelope for parsed <c>metadata.yml</c> overrides; an absent file parses to <see cref="FolderMeta.None"/>.</summary>
-    public sealed record CachedFolderMeta(FolderMeta Meta) : ISizeableHeuristically
-    {
-        public HeuristicSizeResult GetSizeHeuristically(HeuristicSizeGetter innerGet) =>
-            new(192L + 2L * (
-                (Meta.Label?.Length ?? 0) +
-                (Meta.Short?.Length ?? 0) +
-                (Meta.Icon?.Length ?? 0) +
-                (Meta.TopbarAlign?.Length ?? 0) +
-                (Meta.Values?.Sum(static pair => pair.Key.Length + pair.Value.Length) ?? 0)));
-    }
 }

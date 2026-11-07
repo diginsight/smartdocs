@@ -20,4 +20,10 @@ public static class NavHubContract
 
     /// <summary>Server→client: all root sections' aggregates, sent once the startup warm-up finishes.</summary>
     public const string CountsReady = "CountsReady";
+
+    /// <summary>Server→client: a visible metadata scope changed; refresh the current view.</summary>
+    public const string RefreshRequired = "RefreshRequired";
+
+    /// <summary>Server→client: the space ids currently visible to this connection.</summary>
+    public const string VisibleSpaces = "VisibleSpaces";
 }

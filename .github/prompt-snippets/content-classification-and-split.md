@@ -1,3 +1,4 @@
+<!-- Reusable pre-write classification procedure for documentation and issue authors. -->
 # Content classification and split — procedure
 
 > Included by documentation and issue-analysis artifacts. Run this **before** writing any document.
@@ -5,17 +6,19 @@
 
 ## Step 1 — resolve the repository declaration
 
-Read `repository.metadata.yml` at the repository root.
+Read the repository-root `metadata.yml`; use its `repository` mapping when present under `schema: smartdocs-metadata/v1`. Never use a nested folder declaration.
+
+During transition, read root `repository.metadata.yml` as a fallback when the canonical file has no `repository` mapping. Normalize its `repository` fields plus its top-level `internal_peer` and `deliberately_public` into the canonical mapping. If both declarations exist, compare every field after normalization (mapping order is immaterial; `deliberately_public` is a set). Stop on any conflict, invalid declaration, unsupported schema, or failed read; only a genuinely absent file or section counts as absent.
 
 | Outcome | Action |
 |---|---|
 | `visibility: private` | **Stop here.** Write one document with real names. No companion, no sync. |
 | `visibility: public` | Continue to step 2. |
-| file absent, or field missing/unrecognised | Treat as **public**. Continue to step 2. |
+| both declarations absent, or visibility missing/unrecognised | Diagnose and treat as **public**. Continue to step 2. |
 
 ## Step 2 — resolve the internal peer
 
-Resolve `internal_peer` in this order, first hit wins:
+Resolve the selected declaration's `internal_peer` in this order, first hit wins:
 
 1. the environment variable named by `path_env`, when set
 2. `default_relative_path`, resolved from the repository root
@@ -50,11 +53,11 @@ For each fact you intend to record, test it against the four classes:
 | `exploit-enabling` | a weakness stated precisely enough for a reader to act on |
 | `internal-surface` | internal hostnames, private endpoints, management URLs, tenant/subscription identifiers, resource names, address ranges |
 
-Exempt: anything listed under `deliberately_public` in `repository.metadata.yml`.
+Exempt: anything listed under the resolved `repository.deliberately_public`.
 
 **When in doubt, classify sensitive.**
 
-For every sensitive fact, choose the **role name** the public document will use — readable (`the docs app service`), never an opaque token (`RESOURCE_1`). Record the role-to-identifier mapping in the registry named by `internal_peer.alias_registry` in `repository.metadata.yml`, **before** using the alias publicly.
+For every sensitive fact, choose the **role name** the public document will use — readable (`the docs app service`), never an opaque token (`RESOURCE_1`). Record the role-to-identifier mapping in the registry named by the resolved `repository.internal_peer.alias_registry`, **before** using the alias publicly.
 
 ## Step 5 — write the internal companion first
 

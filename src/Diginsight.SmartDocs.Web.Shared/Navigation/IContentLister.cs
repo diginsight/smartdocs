@@ -25,9 +25,9 @@ public interface IContentLister
     async Task<ArticleHead> ReadArticleHeadAsync(string key, CancellationToken ct = default) =>
         FrontMatter.ParseHead(await ReadHeadAsync(key, ct));
 
-    /// <summary>Reads a folder's <c>metadata.yml</c> and parses its overrides.</summary>
-    async Task<FolderMeta> ReadFolderMetaAsync(string key, CancellationToken ct = default) =>
-        FolderMeta.Parse(await ReadHeadAsync(key, ct));
+    /// <summary>Reads a folder's navigation projection through the server metadata provider.</summary>
+    Task<FolderMeta> ReadFolderMetaAsync(string key, CancellationToken ct = default) =>
+        throw new NotSupportedException("Folder metadata requires a metadata-aware server lister.");
 }
 
 /// <summary>One built menu node returned by the nav API for a single level.</summary>

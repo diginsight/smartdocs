@@ -50,7 +50,7 @@ You are deliberately blind. You cannot open source, run anything, query anything
 | `.copilot/context/05.00-content-classification/00-classification-and-split-model.md` | what is public, what splits to a companion, and where the companion goes |
 | `.copilot/context/10.00-application-development/00-stream-contract.md` | escalation format |
 
-Before writing any page, run 📖 `.github/prompt-snippets/content-classification-and-split.md`. It resolves `repository.metadata.yml`, decides whether a split applies at all, and fixes the role names the page will use. Classification precedes authoring — a fact aliased after it is written was already written.
+Before writing any page, run 📖 `.github/prompt-snippets/content-classification-and-split.md`. It resolves the repository-root `metadata.yml` declaration and its transitional fallback, decides whether a split applies, and fixes the role names the page will use. Classification precedes authoring — a fact aliased after it is written was already written.
 
 ## 🚨 Critical boundaries
 
@@ -127,7 +127,7 @@ Before writing any page, run 📖 `.github/prompt-snippets/content-classificatio
 
 <!--
 agent_metadata:
-  version: "1.0.0"
-  last_updated: "2026-08-16"
+  version: "1.1.0"
+  last_updated: "2026-11-06"
   created: "2026-08-16"
 -->

@@ -46,14 +46,17 @@ public sealed class SiteOptions
 
     public IList<SpaceOptions> Spaces { get; set; } = new List<SpaceOptions>();
 
+    /// <summary>Temporarily read legacy access files alongside canonical metadata during migration.</summary>
+    public bool LegacyMetadataCompatibility { get; set; } = true;
+
     /// <summary>Site-wide reader authorization: the default requirement and the session lifetime.</summary>
     public SiteAuthorizationOptions Authorization { get; set; } = new();
 }
 
 /// <summary>
 /// Site-wide authorization settings, bound from <c>Site:Authorization</c>. Roles aren't configured
-/// here: each space's repository maps them in its own <c>access.metadata.yml</c>, and no setting
-/// grants every space, because a permission that opens every space would belong to no repository.
+/// here: each space maps them in its content-root metadata, and no setting grants every space,
+/// because a permission that opens every space would belong to no repository.
 /// </summary>
 public sealed class SiteAuthorizationOptions
 {
@@ -327,10 +330,9 @@ public sealed class SpaceOptions
     public string Access { get; set; } = string.Empty;
 
     /// <summary>
-    /// When true, the space is hidden while its <c>access.metadata.yml</c> is missing, and the host
-    /// logs an error. It closes the window in which a first publish uploads pages before the access
-    /// file, and the one in which deleting the file from the repository would turn the space public.
-    /// Off by default, so a space without an access file stays public. Set only by an environment overlay.
+    /// When true, the space is hidden unless a valid logical access policy is present. During
+    /// compatibility migration that policy may come from the legacy access file; otherwise it is
+    /// the <c>access</c> section of root <c>metadata.yml</c>. Off by default.
     /// </summary>
     public bool AccessFileRequired { get; set; }
 

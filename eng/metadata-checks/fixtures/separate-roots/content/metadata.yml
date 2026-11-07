@@ -1,0 +1,4 @@
+schema: smartdocs-metadata/v1
+label: Separate content root
+access:
+  requires: [authenticated]

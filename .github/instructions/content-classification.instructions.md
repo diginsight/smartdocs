@@ -1,8 +1,8 @@
 ---
 description: Classification rules for every authored Markdown file — when content must be split into a public document and an internal companion, how the companion is named and located, and the repository-visibility conditional that switches the split off
 applyTo: '**/*.md'
-version: "1.1.0"
-last_updated: "2026-08-21"
+version: "1.2.0"
+last_updated: "2026-11-06"
 domain: "content-classification"
 context_dependencies:
   - ".copilot/context/05.00-content-classification/"
@@ -18,19 +18,20 @@ Ensure that no authored Markdown file discloses sensitive material, and that the
 
 - These rules apply to **every** authored Markdown file, including files in intermediate folders such as `_validation/`, `_analysis/` and `_evidence/`, which are versioned in the public repository.
 - `repository-docs.instructions.md` layers additional rules on generated pages and dossiers under `src/docs/`. Where both apply, both apply; neither relaxes the other.
-- These rules do NOT apply when `repository.metadata.yml` declares `visibility: private`. See the conditional below.
+- These rules do NOT apply when the repository-root declaration has `repository.visibility: private`. See the conditional below.
 
 ## Rule 0 — read the repository declaration first
 
-- An artifact that creates or updates a document MUST read `repository.metadata.yml` **before writing**.
+- Before writing, an artifact MUST resolve the repository-root `metadata.yml` `repository` mapping using 📖 `.github/prompt-snippets/content-classification-and-split.md`. A nested folder MUST NOT change repository classification.
+- The legacy `repository.metadata.yml` is a transitional fallback. If both files declare repository metadata, their normalized declarations MUST agree; a conflict, invalid file, or failed read MUST stop authoring.
 - When `visibility: private`, the split MUST be skipped entirely: real names, one document, no companion, no sync.
-- When the file is absent, or `visibility` is missing or unrecognised, the repository MUST be treated as **`public`**. It MUST NEVER be assumed private.
+- When both declarations are absent, or `visibility` is missing or unrecognised, the repository MUST be treated as **`public`** with a diagnostic. It MUST NEVER be assumed private.
 
 ## Rules — public documents
 
 - A sensitive value MUST NEVER be written into a public document, at any point, including as a placeholder to be removed later.
 - A public document MUST name resources by **role** (`the docs app service`). It MUST NEVER use opaque tokens (`RESOURCE_1`) — an unreadable document cannot be reviewed.
-- A value listed under `deliberately_public` in `repository.metadata.yml` MUST NOT be aliased.
+- A value listed under the resolved `repository.deliberately_public` MUST NOT be aliased.
 - A public document MUST NEVER quote content from an internal companion.
 - A public document MAY state that a companion exists, what it adds, and its path. Until the rendering application enforces authorization, that pointer MUST be written as a **backticked path, not a Markdown link**.
 - The companion pointer MUST be placed in the document's **References section** (or its terminal provenance section). It MUST NEVER occupy a heading, a table-of-contents entry, a section of its own, or any position before the document's substantive content.
@@ -42,7 +43,7 @@ Ensure that no authored Markdown file discloses sensitive material, and that the
 ## Rules — internal companions
 
 - An internal companion MUST be named for its public sibling with `.internal.md` replacing `.md`.
-- It MUST be written at the **same repository-relative path** in the internal peer declared by `repository.metadata.yml`.
+- It MUST be written at the **same repository-relative path** in the resolved `repository.internal_peer`.
 - It MUST carry `classification: internal` and `publish: false` in its metadata. Neither is an access control; both are declarations.
 - It MUST be **complete**, not a list of redactions: real identifiers, the as-built diagrams, the commands as executed, and the date any state was verified.
 - A correction to an earlier internal statement MUST be recorded **as a correction**, never applied silently.
@@ -63,7 +64,7 @@ Ensure that no authored Markdown file discloses sensitive material, and that the
 
 ## Quality checklist
 
-- [ ] `repository.metadata.yml` read before writing; `visibility` honoured
+- [ ] Repository-root declaration resolved before writing; `visibility` honoured
 - [ ] No sensitive value present in any public file, at any revision of this change
 - [ ] Resources named by role, readably
 - [ ] Internal companion written first, at the path-parallel location, and complete

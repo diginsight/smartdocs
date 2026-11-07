@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using Diginsight.SmartCache;
 using Diginsight.SmartDocs.Web.Caching;
+using Diginsight.SmartDocs.Web.Metadata;
 using Diginsight.SmartDocs.Web.Shared.Navigation;
 using Diginsight.SmartDocs.Web.Shared.Sites;
 using Diginsight.Runtime;
@@ -17,10 +18,7 @@ public sealed class FolderRecordProvider(
     SiteOptions site,
     ILogger<FolderRecordProvider> logger)
 {
-    /// <summary>The folder metadata key that would carry a folder requirement once folder requirements exist.</summary>
-    private const string AccessKey = "access";
-
-    private readonly ConcurrentDictionary<string, byte> warnedAccessFolders = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<string, byte> warnedReservedFolders = new(StringComparer.OrdinalIgnoreCase);
 
     public Task<FolderRecord> GetAsync(string prefix, CancellationToken cancellationToken = default)
     {
@@ -128,36 +126,33 @@ public sealed class FolderRecordProvider(
             aggregate.Count,
             aggregate.Latest,
             aggregate.Coverage,
-            WithoutAccess(prefix, meta.Values));
+            WithoutReservedFields(prefix, meta.Values));
     }
 
     /// <summary>
-    /// Removes an <c>access</c> line from the metadata sent to browsers. Version 1 restricts whole
-    /// spaces only, so the line restricts nothing; sending it would advertise a restriction that
-    /// isn't enforced. Logged once per folder so the author learns it has no effect yet.
+    /// Defends the browser projection if a nonstandard lister supplies reserved metadata fields.
     /// </summary>
-    private IReadOnlyDictionary<string, string> WithoutAccess(string prefix, IReadOnlyDictionary<string, string>? values)
+    private IReadOnlyDictionary<string, string> WithoutReservedFields(string prefix, IReadOnlyDictionary<string, string>? values)
     {
         if (values is null)
         {
             return new Dictionary<string, string>();
         }
 
-        if (!values.Keys.Any(static k => string.Equals(k, AccessKey, StringComparison.OrdinalIgnoreCase)))
+        if (!values.Keys.Any(MetadataParser.IsReservedNavigationKey))
         {
             return values;
         }
 
-        if (warnedAccessFolders.TryAdd(prefix, 0))
+        if (warnedReservedFolders.TryAdd(prefix, 0))
         {
             logger.LogWarning(
-                "Folder '{Prefix}' declares '{Key}' in metadata.yml. Version 1 restricts whole spaces only, so the line restricts nothing; it is left out of the folder record.",
-                prefix,
-                AccessKey);
+                "Folder '{Prefix}' supplied reserved metadata fields; they are excluded from the browser record.",
+                prefix);
         }
 
         return values
-            .Where(static pair => !string.Equals(pair.Key, AccessKey, StringComparison.OrdinalIgnoreCase))
+            .Where(static pair => !MetadataParser.IsReservedNavigationKey(pair.Key))
             .ToDictionary(static pair => pair.Key, static pair => pair.Value, StringComparer.OrdinalIgnoreCase);
     }
 

@@ -20,6 +20,12 @@ public sealed class NavHubClient(NavigationManager nav) : IAsyncDisposable
     /// <summary>Raised once the server's startup warm-up has computed the root counts.</summary>
     public event Action<IReadOnlyList<FolderRecord>>? CountsReady;
 
+    /// <summary>Raised when a visible metadata scope changed and the view must be refreshed.</summary>
+    public event Action? RefreshRequired;
+
+    /// <summary>Raised with the space ids currently visible to this connection.</summary>
+    public event Action<IReadOnlyList<string>>? VisibleSpaces;
+
     /// <summary>Raised after the connection is re-established, so consumers can re-sync missed changes.</summary>
     public event Action? Reconnected;
 
@@ -40,6 +46,9 @@ public sealed class NavHubClient(NavigationManager nav) : IAsyncDisposable
             NavHubContract.MetadataChanged, records => MetadataChanged?.Invoke(records));
         _connection.On<IReadOnlyList<FolderRecord>>(
             NavHubContract.CountsReady, records => CountsReady?.Invoke(records));
+        _connection.On(NavHubContract.RefreshRequired, () => RefreshRequired?.Invoke());
+        _connection.On<IReadOnlyList<string>>(
+            NavHubContract.VisibleSpaces, spaces => VisibleSpaces?.Invoke(spaces));
         _connection.Reconnected += _ =>
         {
             Reconnected?.Invoke();

@@ -44,6 +44,26 @@ public sealed record FolderMeta(
             return None;
         }
 
+        var values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var ordered = new List<KeyValuePair<string, string>>();
+        foreach (Match m in KeyRx.Matches(yaml))
+        {
+            string key = m.Groups["k"].Value.ToLowerInvariant();
+            string value = Unquote(m.Groups["v"].Value);
+            values[key] = value;
+            ordered.Add(new(key, value));
+        }
+
+        return FromValues(ordered, values);
+    }
+
+    /// <summary>Projects already-parsed navigation values without parsing the source document again.</summary>
+    public static FolderMeta FromValues(IReadOnlyDictionary<string, string> values) => FromValues(values, values);
+
+    private static FolderMeta FromValues(
+        IEnumerable<KeyValuePair<string, string>> orderedValues,
+        IReadOnlyDictionary<string, string> values)
+    {
         string? label = null, shortLabel = null, icon = null;
         double? order = null;
         bool hidden = false;
@@ -51,15 +71,10 @@ public sealed record FolderMeta(
         string? topbarAlign = null;
         int? articleCount = null;
         DateTimeOffset? latestArticle = null;
-        var values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
-        foreach (Match m in KeyRx.Matches(yaml))
+        foreach ((string key, string value) in orderedValues)
         {
-            string key = m.Groups["k"].Value.ToLowerInvariant();
-            string value = Unquote(m.Groups["v"].Value);
-            values[key] = value;
-
-            switch (key)
+            switch (key.ToLowerInvariant())
             {
                 case "label" or "nav-label":
                     label = NullIfEmpty(value);

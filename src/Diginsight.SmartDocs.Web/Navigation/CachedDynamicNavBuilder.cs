@@ -2,6 +2,7 @@ using Diginsight.Components;
 using Diginsight.Diagnostics;
 using Diginsight.SmartCache;
 using Diginsight.SmartDocs.Web.Caching;
+using Diginsight.SmartDocs.Web.Metadata;
 using Diginsight.SmartDocs.Web.Shared.Navigation;
 using Microsoft.Extensions.Logging;
 using Diginsight.Runtime;
@@ -54,8 +55,12 @@ public sealed class CachedDynamicNavBuilder(
 
     public void Invalidate(IEnumerable<string> paths)
     {
-        string[] normalized = paths
+        string[] changed = paths
             .Select(ContentPathCacheKey.Normalize)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        string[] normalized = changed
+            .Select(MetadataFiles.InvalidationScope)
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();
         using var activity = Observability.ActivitySource.StartMethodActivity(
@@ -63,9 +68,16 @@ public sealed class CachedDynamicNavBuilder(
             () => new { paths = normalized });
 
         Interlocked.Increment(ref _version);
-        var rule = new ContentPathInvalidationRule(normalized);
+        var rule = new ContentPathInvalidationRule(normalized, changedPaths: changed);
         revalidation.Invalidate(rule);
         smartCache.Invalidate(rule);
+    }
+
+    /// <summary>Clears local background projections after a companion invalidates the shared cache.</summary>
+    public void ReceiveInvalidation(ContentPathInvalidationRule rule)
+    {
+        Interlocked.Increment(ref _version);
+        revalidation.Invalidate(rule);
     }
 
     public async Task<IReadOnlyList<NavChild>> GetChildrenAsync(string prefix, CancellationToken ct = default)

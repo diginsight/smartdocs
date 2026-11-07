@@ -1,0 +1,135 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://diginsight.github.io/smartdocs/metadata.schema.json",
+  "title": "SmartDocs directory metadata",
+  "description": "One metadata.yml for a directory. Structured sections require the versioned envelope.",
+  "$comment": "The host also enforces a 65536-byte UTF-8 limit, one YAML document, case-insensitive duplicate and alias checks, permission semantics, and root-only repository/access placement. JSON Schema cannot express those file and scope rules.",
+  "type": "object",
+  "if": { "required": ["schema"] },
+  "then": {
+    "required": ["schema"],
+    "properties": {
+      "schema": { "const": "smartdocs-metadata/v1" },
+      "label": { "$ref": "#/$defs/scalar" },
+      "nav-label": { "$ref": "#/$defs/scalar" },
+      "short": { "$ref": "#/$defs/scalar" },
+      "nav-short": { "$ref": "#/$defs/scalar" },
+      "icon": { "$ref": "#/$defs/scalar" },
+      "nav-icon": { "$ref": "#/$defs/scalar" },
+      "order": { "$ref": "#/$defs/number" },
+      "nav-order": { "$ref": "#/$defs/number" },
+      "hidden": { "$ref": "#/$defs/boolean" },
+      "nav-hidden": { "$ref": "#/$defs/boolean" },
+      "topbar-hidden": { "$ref": "#/$defs/boolean" },
+      "nav-topbar-hidden": { "$ref": "#/$defs/boolean" },
+      "hidden-topbar": { "$ref": "#/$defs/boolean" },
+      "topbar-align": { "$ref": "#/$defs/alignment" },
+      "nav-topbar-align": { "$ref": "#/$defs/alignment" },
+      "article-count": { "$ref": "#/$defs/integer" },
+      "nav-article-count": { "$ref": "#/$defs/integer" },
+      "articles": { "$ref": "#/$defs/integer" },
+      "latest-article": { "type": ["string", "null"] },
+      "nav-latest-article": { "type": ["string", "null"] },
+      "updated": { "type": ["string", "null"] },
+      "repository": { "$ref": "#/$defs/repository" },
+      "access": { "$ref": "#/$defs/access" }
+    },
+    "additionalProperties": false,
+    "allOf": [
+      { "not": { "required": ["label", "nav-label"] } },
+      { "not": { "required": ["short", "nav-short"] } },
+      { "not": { "required": ["icon", "nav-icon"] } },
+      { "not": { "required": ["order", "nav-order"] } },
+      { "not": { "required": ["hidden", "nav-hidden"] } },
+      { "not": { "required": ["topbar-hidden", "nav-topbar-hidden"] } },
+      { "not": { "required": ["topbar-hidden", "hidden-topbar"] } },
+      { "not": { "required": ["nav-topbar-hidden", "hidden-topbar"] } },
+      { "not": { "required": ["topbar-align", "nav-topbar-align"] } },
+      { "not": { "required": ["article-count", "nav-article-count"] } },
+      { "not": { "required": ["article-count", "articles"] } },
+      { "not": { "required": ["nav-article-count", "articles"] } },
+      { "not": { "required": ["latest-article", "nav-latest-article"] } },
+      { "not": { "required": ["latest-article", "updated"] } },
+      { "not": { "required": ["nav-latest-article", "updated"] } }
+    ]
+  },
+  "else": {
+    "$comment": "Legacy documents are flat navigation only; reserved access/repository scalar values are ignored and reported.",
+    "additionalProperties": { "$ref": "#/$defs/scalar" }
+  },
+  "$defs": {
+    "scalar": { "type": ["string", "number", "boolean", "null"] },
+    "number": {
+      "anyOf": [
+        { "type": ["number", "null"] },
+        { "type": "string", "pattern": "^[+-]?([0-9]+(\\.[0-9]*)?|\\.[0-9]+)([eE][+-]?[0-9]+)?$" }
+      ]
+    },
+    "integer": {
+      "anyOf": [
+        { "type": ["integer", "null"] },
+        { "type": "string", "pattern": "^[+-]?[0-9]+$" }
+      ]
+    },
+    "boolean": {
+      "anyOf": [
+        { "type": ["boolean", "null"] },
+        { "type": "string", "pattern": "^([Tt][Rr][Uu][Ee]|[Ff][Aa][Ll][Ss][Ee])$" }
+      ]
+    },
+    "alignment": {
+      "anyOf": [
+        { "type": "null" },
+        { "type": "string", "pattern": "^([Ll][Ee][Ff][Tt]|[Rr][Ii][Gg][Hh][Tt])$" }
+      ]
+    },
+    "repository": {
+      "type": "object",
+      "properties": {
+        "id": { "$ref": "#/$defs/scalar" },
+        "visibility": { "$ref": "#/$defs/scalar" },
+        "internal_peer": {
+          "type": "object",
+          "properties": {
+            "id": { "$ref": "#/$defs/scalar" },
+            "path_env": { "$ref": "#/$defs/scalar" },
+            "default_relative_path": { "$ref": "#/$defs/scalar" },
+            "mirror_strategy": { "$ref": "#/$defs/scalar" },
+            "suffix": { "$ref": "#/$defs/scalar" },
+            "on_missing": { "$ref": "#/$defs/scalar" },
+            "alias_registry": { "$ref": "#/$defs/scalar" }
+          },
+          "additionalProperties": false
+        },
+        "deliberately_public": {
+          "type": "array",
+          "items": { "type": ["string", "number", "boolean"] }
+        }
+      },
+      "additionalProperties": false
+    },
+    "access": {
+      "type": "object",
+      "properties": {
+        "permissions": {
+          "type": ["object", "null"],
+          "propertyNames": { "pattern": "^[A-Za-z][A-Za-z0-9._-]*$" },
+          "additionalProperties": { "$ref": "#/$defs/scalar" }
+        },
+        "requires": {
+          "type": ["array", "null"],
+          "items": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9._-]*$" }
+        },
+        "roles": {
+          "type": ["object", "null"],
+          "propertyNames": { "pattern": "^[A-Za-z][A-Za-z0-9._-]*$" },
+          "additionalProperties": {
+            "type": ["array", "null"],
+            "items": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9._-]*$" }
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

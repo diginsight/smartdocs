@@ -79,7 +79,7 @@ public static class TestContentEndpoints
         CachedDynamicNavBuilder nav, FolderMetricsIndex metrics, NavChangePublisher publisher, string relative)
     {
         nav.Invalidate(relative);                 // structural: the parent level gained/lost a child
-        publisher.PublishChangeAsync(relative);   // metrics: stamp the ancestor spine
+        await publisher.PublishChangeAsync(relative); // metrics: stamp the ancestor spine
         await metrics.DrainAsync();               // fold + publish now (bypasses the debounce)
 
         return Results.Ok(new

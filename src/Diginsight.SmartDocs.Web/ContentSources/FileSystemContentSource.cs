@@ -2,7 +2,7 @@ using System.Security.Cryptography;
 using Diginsight.Diagnostics;
 using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.Extensions.Logging;
-using Diginsight.SmartDocs.Web.Authorization;
+using Diginsight.SmartDocs.Web.Metadata;
 using Diginsight.SmartDocs.Web.Shared;
 using Diginsight.SmartDocs.Web.Shared.Navigation;
 
@@ -39,17 +39,24 @@ public sealed class FileSystemContentSource : IContentSource, IContentLister
             return null;
         }
 
-        if (!File.Exists(full))
+        if (IsMetadataFileAlias(relative, full))
         {
             return null;
         }
 
-        if (IsAccessFileAlias(relative, full))
+        byte[] bytes;
+        try
+        {
+            bytes = await File.ReadAllBytesAsync(full, ct);
+        }
+        catch (FileNotFoundException)
         {
             return null;
         }
-
-        byte[] bytes = await File.ReadAllBytesAsync(full, ct);
+        catch (DirectoryNotFoundException)
+        {
+            return null;
+        }
         string contentType = ContentTypes.TryGetContentType(full, out string? mime) && mime is not null
             ? mime
             : "text/plain; charset=utf-8";
@@ -103,7 +110,7 @@ public sealed class FileSystemContentSource : IContentSource, IContentLister
 
         string boundary = _root + Path.DirectorySeparatorChar;
         if (!full.StartsWith(boundary, StringComparison.OrdinalIgnoreCase) || !File.Exists(full)
-            || IsAccessFileAlias(rel, full))
+            || IsMetadataFileAlias(rel, full))
         {
             return null;
         }
@@ -115,12 +122,33 @@ public sealed class FileSystemContentSource : IContentSource, IContentLister
     }
 
     /// <summary>
-    /// True when a key that doesn't name an access file still resolved to one. On Windows,
-    /// <see cref="Path.GetFullPath(string)"/> expands 8.3 short names, so <c>ACCESS~1.YML</c> opens
-    /// <c>access.metadata.yml</c> although no check on the requested key can recognize it. Judging
-    /// the resolved name closes every such alias, while a request that names the file — the
-    /// access-file provider's own read — still reaches it.
+    /// Blocks a filesystem alias that resolves to a metadata carrier while allowing the provider's
+    /// direct, canonical lookup of the carrier.
     /// </summary>
-    private static bool IsAccessFileAlias(string requested, string full) =>
-        AccessFile.IsAccessFileKey(Path.GetFileName(full)) && !AccessFile.IsAccessFileKey(requested);
+    private static bool IsMetadataFileAlias(string requested, string full)
+    {
+        if (MetadataFiles.IsCarrierKey(requested))
+        {
+            return false;
+        }
+
+        if (MetadataFiles.IsCarrierKey(Path.GetFileName(full)))
+        {
+            return true;
+        }
+
+        try
+        {
+            FileSystemInfo? target = new FileInfo(full).ResolveLinkTarget(returnFinalTarget: true);
+            return target is not null && MetadataFiles.IsCarrierKey(target.Name);
+        }
+        catch (FileNotFoundException)
+        {
+            return false;
+        }
+        catch (DirectoryNotFoundException)
+        {
+            return false;
+        }
+    }
 }

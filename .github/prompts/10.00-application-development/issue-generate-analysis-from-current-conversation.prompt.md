@@ -20,7 +20,7 @@ Generate a comprehensive issue analysis from the current conversation, split int
 
 Run 📖 `.github/prompt-snippets/content-classification-and-split.md` in full **before** creating any file.
 
-That procedure resolves `repository.metadata.yml`, decides whether a split is needed at all, resolves and reads the internal peer, and fixes the role names this analysis will use. It is not a review step afterwards — an identifier written into a public draft has already been written.
+That procedure resolves the repository-root `metadata.yml` declaration and its transitional fallback, decides whether a split is needed, resolves and reads the internal peer, and fixes the role names this analysis will use. It is not a review step afterwards — an identifier written into a public draft has already been written.
 
 **Do not proceed to step 1 until it has completed or explicitly determined that `visibility: private` makes the split unnecessary.**
 
@@ -141,6 +141,6 @@ Report `artifact-defect` signals **first and separately**, naming the governing 
 
 <!--
 prompt_metadata:
-  version: "1.3.0"
-  last_updated: "2026-09-04"
+  version: "1.4.0"
+  last_updated: "2026-11-06"
 -->

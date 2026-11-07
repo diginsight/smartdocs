@@ -143,7 +143,7 @@ public static class NavEndpoints
         return Results.Json(leaves);
     }
 
-    private static IResult InvalidateNavCache(
+    private static async Task<IResult> InvalidateNavCache(
         HttpContext http, string? path,
         IOptions<SiteOptions> siteOptions,
         CachedDynamicNavBuilder nav, NavChangePublisher publisher, INavigationWarmupQueue warmup)
@@ -177,7 +177,7 @@ public static class NavEndpoints
 
         // Recompute the affected folder aggregates and push them to connected clients (debounced),
         // so sidebar counts and the footer total update live without polling.
-        publisher.PublishChangeAsync(path ?? string.Empty);
+        await publisher.PublishChangeAsync(path ?? string.Empty);
 
         // Rebuild what was just dropped before a reader asks for it. The caller is a publish
         // pipeline waiting on this response, so the warm runs behind it rather than inside it.

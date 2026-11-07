@@ -1,0 +1,20 @@
+# Repository-level authoring classification. Content roots may have their own metadata.yml;
+# repository classification is read only from this repository root.
+schema: smartdocs-metadata/v1
+repository:
+  id: diginsight/smartdocs
+  # Missing or unrecognized visibility defaults to public.
+  visibility: public
+  internal_peer:
+    id: diginsight/smartdocs.internal
+    path_env: SMARTDOCS_INTERNAL_FOLDER
+    default_relative_path: "../smartdocs.internal"
+    mirror_strategy: path-parallel
+    suffix: ".internal.md"
+    on_missing: fail-closed
+    alias_registry: "src/docs/_aliases/{environment}.aliases.internal.md"
+  deliberately_public:
+    - "Environment short names used in public workflows (testmc, testmcdocs)"
+    - "The internal peer repository name itself (diginsight/smartdocs.internal)"
+    - "Secret NAMES as referenced in workflows, never their values"
+    - "GitHub Actions run identifiers and public error codes (for example AADSTS codes)"

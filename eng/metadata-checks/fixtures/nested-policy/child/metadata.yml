@@ -1,0 +1,3 @@
+schema: smartdocs-metadata/v1
+access:
+  requires: [authenticated]

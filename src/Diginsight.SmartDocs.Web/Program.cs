@@ -12,6 +12,7 @@ using Diginsight.SmartDocs.Web.Caching;
 using Diginsight.SmartDocs.Web.Components;
 using Diginsight.SmartDocs.Web.ContentSources;
 using Diginsight.SmartDocs.Web.Endpoints;
+using Diginsight.SmartDocs.Web.Metadata;
 using Diginsight.SmartDocs.Web.Navigation;
 using Diginsight.SmartDocs.Web.Rendering;
 using Diginsight.SmartDocs.Web.Shared;
@@ -208,6 +209,8 @@ public class Program
                 });
             }
 
+            SmartCacheCoordination.Register(services);
+
             // One physical source per space, joined into a single path namespace by the mounted
             // source (each prefixed space under its route-base segment), with one SmartCache
             // decorator in front of the whole namespace. Every cache key, nav level, metrics cell and
@@ -226,6 +229,16 @@ public class Program
                     IContentSource physical = CreatePhysicalContentSource(sp, space);
                     return new SpaceContentAccess(space, physical, (IContentLister)physical);
                 })));
+            services.AddSingleton<IMetadataDocumentParser, MetadataParser>();
+            services.AddSingleton(sp => new ContentMetadataProvider(
+                sp.GetRequiredService<SpaceContentRegistry>(),
+                spaceRegistry,
+                sp.GetRequiredService<ISmartCache>(),
+                sp.GetRequiredService<MetadataInvalidationTracker>(),
+                sp.GetRequiredService<IMetadataDocumentParser>(),
+                freshness,
+                siteOptions,
+                sp.GetRequiredService<ILogger<ContentMetadataProvider>>()));
             services.AddSingleton(sp => new SpaceMountedContentSource(
                 spaceRegistry,
                 sp.GetRequiredService<SpaceContentRegistry>(),
@@ -239,13 +252,13 @@ public class Program
                     sp.GetRequiredService<ISmartCache>(),
                     sp.GetRequiredService<BackgroundRevalidationCache>(),
                     freshness,
+                    sp.GetRequiredService<ContentMetadataProvider>(),
                     sp.GetRequiredService<ILogger<CachedContentSource>>());
             });
             services.AddSingleton<IContentSource>(sp => sp.GetRequiredService<CachedContentSource>());
             services.AddSingleton<IContentLister>(sp => sp.GetRequiredService<CachedContentSource>());
 
-            // Each space's access.metadata.yml, read from its physical source and cached as a content
-            // fact keyed by the space's mount, so navigation's invalidation clears it too.
+            // Authorization and navigation project the same cached root metadata snapshot.
             services.AddSingleton<AccessFileProvider>();
             // Effective requirements: the site default, a space's floor, and its access file, combined
             // per check so no cache entry ever holds one.
@@ -259,6 +272,14 @@ public class Program
             services.AddSingleton<SpaceVisibilityEvaluator>();
             services.AddSingleton<ReaderCountComposer>();
             services.AddSingleton<ActiveRoleSets>();
+            services.AddSingleton(sp => new VisibleMetadataFingerprint(
+                sp.GetRequiredService<IContentLister>(),
+                sp.GetRequiredService<ContentMetadataProvider>(),
+                spaceRegistry,
+                siteOptions,
+                sp.GetRequiredService<MetadataInvalidationTracker>(),
+                freshness,
+                TimeProvider.System));
             services.AddScoped<ReaderAccess>();
 
             services.AddSingleton<IMarkdownRenderer, MarkdigMarkdownRenderer>();
@@ -317,6 +338,7 @@ public class Program
                 sp => sp.GetRequiredService<NavigationWarmupService>());
             services.AddHostedService(
                 sp => sp.GetRequiredService<NavigationWarmupService>());
+            services.AddHostedService<RemoteNavigationInvalidationService>();
 
             builder.UseDiginsightServiceProvider(true);
 

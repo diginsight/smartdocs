@@ -1,9 +1,0 @@
-schema: 1
-requires: [ProductA.Read]
-permissions:
-  ProductA.Read: Read the product A documentation
-  ProductA.Write: Edit the product A documentation
-roles:
-  Reader: [ProductA.Read]
-  Contributor: [ProductA.Read, ProductA.Write]
-  Admin: [ProductA.Read, ProductA.Write]
