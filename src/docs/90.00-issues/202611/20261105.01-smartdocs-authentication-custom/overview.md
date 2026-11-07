@@ -18,13 +18,25 @@ The existing implementation requests an ID token without a client secret. Config
 
 Set `Access: authenticated` on each space that requires sign-in. The generated index can remain public while withholding those spaces from anonymous readers.
 
-For sign-in-only protection, use a content-root `access.metadata.yml` with `schema: 1`, `requires: [authenticated]`, and empty `permissions` and `roles` maps. Set `AccessFileRequired: true` on protected spaces. Leave public spaces' `Access` empty and `AccessFileRequired: false`, and remove any named permission requirements from their access files. An optional access file still contributes requirements when present.
+For sign-in-only protection, put an `access` mapping in the space's content-root `metadata.yml`:
+
+```yaml
+schema: smartdocs-metadata/v1
+access:
+  requires: [authenticated]
+```
+
+Set `AccessFileRequired: true` on protected spaces. Leave public spaces' `Access` empty and `AccessFileRequired: false`, and remove any named permission requirements from their policies. An optional policy still contributes requirements when present.
+
+Existing `access.metadata.yml` files remain supported while `Site:LegacyMetadataCompatibility` is enabled, which is the default. Inventory and convert each participating content root before switching that setting off; conflicting canonical and legacy policies fail closed.
+
+For the complete schema, cache behavior, and migration and rollback procedure, see the [unified metadata contract](../../../06.00-reference/08-unified-metadata-contract.md).
 
 ## 🔐 Optional role authorization
 
 Authentication identifies the reader; it doesn't establish permission to read a particular space. For role-gated documentation, define approved app roles and assign users or groups on the enterprise application.
 
-Each source repository maps the exact role values to its own permissions in a content-root `access.metadata.yml`. Set `AccessFileRequired: true` on that space so a missing or invalid file keeps it hidden. Don't copy assignments from another tenant. Skip role definitions and mappings when the policy requires sign-in only.
+Each space maps the exact role values to its own permissions in the content-root `metadata.yml` under `access`. Set `AccessFileRequired: true` on that space so a missing or invalid logical policy keeps it hidden. Don't copy assignments from another tenant. Skip role definitions and mappings when the policy requires sign-in only.
 
 ## 🧪 Validation outcome
 
@@ -33,6 +45,8 @@ Each source repository maps the exact role values to its own permissions in a co
 A rebuilt, visible-browser run confirmed public pages render anonymously, protected pages and raw assets are denied, and the index and navigation exclude protected spaces. Sign-in is offered, and the challenge requests an ID token for the verified client.
 
 The callback-only Entra registration update was denied with insufficient privileges. An administrator must configure Web callback URLs and ID-token issuance; no app roles are needed for this policy. Successful sign-in, callbacks, sign-out, and authenticated browser access remain unverified.
+
+These observations describe the earlier profile and legacy policy files; they don't establish that this profile has been migrated to canonical metadata or that its registration has since changed.
 
 ## 💡 Conclusion
 

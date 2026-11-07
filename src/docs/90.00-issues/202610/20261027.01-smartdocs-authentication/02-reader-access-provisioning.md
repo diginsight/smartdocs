@@ -10,7 +10,7 @@ publish: false
 
 # Provision reader access for a SmartDocs deployment
 
-Use this how-to to prepare reader access for one deployment. Microsoft Entra ID decides which app roles a reader holds. Each repository's `access.metadata.yml` decides what those roles grant in that repository's space. SmartDocs combines all of a reader's roles by union, separately in each space.
+Use this how-to to prepare reader access for one deployment. Microsoft Entra ID decides which app roles a reader holds. The `access` section of each space's root `metadata.yml` decides what those roles grant in that space. SmartDocs combines all of a reader's roles by union, separately in each space.
 
 This is a provisioning procedure, not a deployment-completion record. **Don't enable restrictions in deployed overlays or publish access files to deployed spaces until every exit criterion of the [implementation plan](01-roles-permissions-support.plan.md) is met.** Every criterion was met locally on 2026-11-02, as [sequence 04](_validation/20261102.04-validation-sequence.md) records. A deployment still validates its own sign-in flow before it enables restrictions, as [Validate before rollout](#-validate-before-rollout) describes.
 
@@ -82,29 +82,32 @@ In the enterprise application's **Properties**, keep **Assignment required** set
 
 If you set **Assignment required** to **Yes**, explicitly assign everyone allowed to sign in, including readers who only need a baseline role. Define that baseline role on the registration; map it in repository files only where it should grant a permission. This setting governs sign-in admission, not SmartDocs' space requirements, and anonymous public reading remains a separate application behavior.
 
-### 6. Write each repository's access file
+### 6. Write each space's access policy
 
-Place `access.metadata.yml` directly inside the space's published content root, beside its root index. Don't put it beside the repository metadata outside that content root or in a subfolder.
+Place the `access` mapping in `metadata.yml` directly inside the space's published content root, beside its root index. Keep any existing navigation fields in the same file. If the repository root and content root differ, the repository classification remains at the repository root; the space policy belongs at the content root.
 
 For example, a product space can declare:
 
 ```yaml
-schema: 1
-permissions:
-  ProductA.Read: Read the product A documentation
-  ProductA.Write: Describe the product A contributor capability
-requires: [ProductA.Read]
-roles:
-  Reader: [ProductA.Read]
-  Contributor: [ProductA.Read, ProductA.Write]
-  Admin: [ProductA.Read, ProductA.Write]
+schema: smartdocs-metadata/v1
+access:
+  permissions:
+    ProductA.Read: Read the product A documentation
+    ProductA.Write: Describe the product A contributor capability
+  requires: [ProductA.Read]
+  roles:
+    Reader: [ProductA.Read]
+    Contributor: [ProductA.Read, ProductA.Write]
+    Admin: [ProductA.Read, ProductA.Write]
 ```
 
 `requires` is an all-of requirement. Permission names belong to this space only, even when another repository uses the same spelling. `ProductA.Write` is just a declared permission name: it doesn't create an editing API or grant access to management endpoints.
 
-Use schema `1`. Unknown keys, case-insensitive duplicate names, undeclared permission references, and invalid names invalidate the file. Names start with a letter and continue with letters, digits, `.`, `-`, or `_`. The reserved `authenticated` may appear in `requires`, but not in `permissions` or a role's grant list. A nested access file doesn't restrict its folder in this version; SmartDocs ignores it and warns.
+Use schema `smartdocs-metadata/v1`. Unknown versioned keys, case-insensitive duplicate names, undeclared permission references, and invalid names invalidate the file. Names start with an ASCII letter and continue with ASCII letters, digits, `.`, `-`, or `_`. The reserved `authenticated` may appear in `requires`, but not in `permissions` or a role's grant list. Folder-level access policies aren't supported; staged-tree validation rejects a nested `access` section.
 
-See the [access-file schema](../../../06.00-reference/07-access-file-schema.md) for field types, size limits and failure outcomes.
+Existing `access.metadata.yml` policies remain supported while `Site:LegacyMetadataCompatibility` is enabled, which is the default. Convert every participating root before disabling compatibility. Equivalent canonical and legacy policies are accepted with a warning; conflicting or invalid selected policies fail closed.
+
+See the [unified metadata contract](../../../06.00-reference/08-unified-metadata-contract.md) for field types, size limits, failure outcomes, and migration and rollback steps.
 
 ### 7. Configure the private overlay
 
@@ -138,7 +141,7 @@ Merge the following settings into the deployment's existing configuration. The e
 
 A nonempty `AzureAd:ClientId` enables sign-in. `DefaultRequirement` and the per-space `Access` floor accept only empty or `authenticated`. Set the default to `authenticated` for a fully private site, or use a space floor to require sign-in for just that space. Each requirement adds to, rather than replaces, the access file's requirement.
 
-`AccessFileRequired: true` keeps a space hidden while its root access file is missing. Without it, a missing access file contributes no requirement. Invalid or unreadable access files fail closed in the implementation. Role maps belong in repository access files, not in `Site:Authorization`.
+`AccessFileRequired: true` keeps a space hidden while its logical root policy is missing. An explicit `access: {}` is a valid policy, while navigation-only metadata doesn't satisfy this setting. Without it, a missing policy contributes no requirement. Invalid or unreadable selected policies fail closed. Role maps belong in each space's access policy, not in `Site:Authorization`.
 
 ### Space colors (optional)
 
@@ -163,7 +166,7 @@ Verify the **deployed binary** enforces authorization before mounting protected 
 These six operating rules apply after rollout is authorized:
 
 1. **Protect the first publish.** Publish a restricted space's access file with or before its first content, or set `AccessFileRequired` before publishing. Retain the required-file setting when a later deletion must not make the space public.
-2. **Protect every publication of the same content.** Exclude `access.metadata.yml` from any other generator that builds that content root. For MkDocs, add the pattern below to `exclude_docs`. Restrict that other site to the same readers, or stop publishing the restricted space there; hiding the access file alone doesn't protect its pages.
+2. **Protect every publication of the same content.** Exclude `metadata.yml`, `access.metadata.yml`, and `repository.metadata.yml` from any other generator that builds that content root. For MkDocs, add the patterns below to `exclude_docs`. Restrict that other site to the same readers, or stop publishing the restricted space there; hiding metadata alone doesn't protect its pages.
 3. **Use direct user membership.** App role assignments to groups don't cascade through nested groups. Adding a group inside a role group doesn't grant its users the app role.
 4. **Separate shared caches by deployment.** When Redis is enabled, give every deployment its own `Diginsight:SmartCache:Redis:KeyPrefix`; don't reuse another deployment's namespace.
 5. **Revoke actual grants.** Remove a user's group membership, direct app-role assignment, or repository mapping. Disabling an app role isn't a substitute for removing existing assignments. Membership changes need a new sign-in to update the cookie's roles, and an open session keeps its roles until `Site:Authorization:SessionLifetime` ends it. Entra may also take a minute or more to reflect a membership change in new tokens: in the development tenant, an added role appeared about 75 seconds after the change, and a removal 38 seconds after. Mapping changes take effect on subsequent server checks after invalidation or expiry of the access-file cache.
@@ -173,7 +176,9 @@ For MkDocs, merge this into its configuration without replacing other exclusions
 
 ```yaml
 exclude_docs: |
+  metadata.yml
   access.metadata.yml
+  repository.metadata.yml
 ```
 
 After an access-file change, call the deployment's `POST /_nav/invalidate`, with its configured invalidation credential. A path-scoped invalidation is appropriate for a changed subtree; a global invalidation refreshes the whole navigation view. This isn't an app-only permission grant: invalidation keeps its existing shared-secret mechanism. **Set `Site:InvalidateApiKey` on every deployed host.** The endpoint checks the `X-Invalidate-Key` header only when a key is configured, so a host without one lets anyone trigger an invalidation.
@@ -222,6 +227,9 @@ Defines exclusion patterns for files that must not enter the built site. Excludi
 **[SmartDocs implementation plan](01-roles-permissions-support.plan.md)** 📘 [Official repository source]  
 Defines the rollout boundary, discovery branches, session rules, and exit criteria, with the evidence that met each criterion. Its park lot holds the deployment work, `PL-7-deployed-registrations`.
 
+**[Unified metadata contract](../../../06.00-reference/08-unified-metadata-contract.md)** 📘 [Repository documentation]
+Defines the canonical policy, compatibility behavior, exposure boundaries, and migration procedure.
+
 **[Recorded anonymous validation](./_validation/20261028.01-validation-sequence.md)**, **[counts and push validation](./_validation/20261028.02-validation-sequence.md)**, **[sign-in validation](./_validation/20261028.03-validation-sequence.md)**, **[blocked end-to-end preflight](./_validation/20261028.04-validation-sequence.md)**, and **[end-to-end validation](./_validation/20261102.04-validation-sequence.md)** 📘 [Official repository evidence]  
 These records show which scenarios passed locally, and the preflight that first blocked the end-to-end run. They aren't evidence of a deployed rollout.
 
@@ -231,10 +239,11 @@ validations:
   readability: {status: "not_run", last_run: null}
   structure: {status: "pass", last_run: "2026-10-28"}
   facts: {status: "pass", last_run: "2026-10-28"}
+  metadata_contract: {status: "passed", last_run: "2026-11-07", notes: "Canonical policy validated by the production parser; MkDocs exclusion patterns checked at root and nested paths."}
 
 article_metadata:
   filename: "02-reader-access-provisioning.md"
   created: "2026-10-28"
-  last_updated: "2026-11-02"
+  last_updated: "2026-11-07"
   version: "1.1"
 -->

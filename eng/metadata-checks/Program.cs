@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using Diginsight.SmartDocs.Web.Authorization;
 using Diginsight.SmartDocs.Web.Metadata;
 using Diginsight.SmartDocs.Web.Shared.Navigation;
@@ -180,7 +181,56 @@ internal static class MetadataChecks
         using JsonDocument schema = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(
             "src", "Diginsight.SmartDocs.Web", "Metadata", "metadata.schema.json")));
         Assert(schema.RootElement.GetProperty("$defs").GetProperty("access").GetProperty("type").GetString() == "object", "machine schema");
+        SchemaStringPatterns(schema.RootElement);
         await ProviderChecks.RunAsync(Assert);
+    }
+
+    private static void SchemaStringPatterns(JsonElement schema)
+    {
+        JsonElement definitions = schema.GetProperty("$defs");
+        (string Definition, string Key, string Value, bool Valid)[] cases =
+        [
+            ("number", "order", " 1.5e+2\t", true),
+            ("number", "order", "1\0", true),
+            ("number", "order", "\u00a01\u00a0", false),
+            ("number", "order", "1\0 ", false),
+            ("integer", "article-count", "\t-12 \0", true),
+            ("integer", "article-count", "\u00a03\u00a0", false),
+            ("integer", "article-count", "1.5", false),
+            ("boolean", "hidden", " \tTRUE\r", true),
+            ("boolean", "hidden", "\u00a0true\u0085", true),
+            ("boolean", "hidden", "\0 false\0", true),
+            ("boolean", "hidden", "\u200btrue\u200b", false),
+            ("boolean", "hidden", "perhaps", false),
+        ];
+
+        void Check(string definition, string key, string value, bool valid, string label)
+        {
+            string pattern = definitions.GetProperty(definition).GetProperty("anyOf")[1].GetProperty("pattern").GetString()
+                ?? throw new InvalidOperationException($"Missing schema string pattern for '{definition}'.");
+            bool matches = Regex.IsMatch(value, pattern, RegexOptions.CultureInvariant | RegexOptions.ECMAScript, TimeSpan.FromSeconds(1));
+            bool parsed = Parse($"schema: smartdocs-metadata/v1\n{key}: {JsonSerializer.Serialize(value)}").Status == MetadataStatus.Valid;
+            Assert(parsed == valid, $"parser string value for {key}: {label}");
+            Assert(matches == parsed, $"schema string pattern agrees with parser for {key}: {label}");
+        }
+
+        foreach (var (definition, key, value, valid) in cases)
+        {
+            Check(definition, key, value, valid, "representative case");
+        }
+
+        foreach (char whitespace in Enumerable.Range(char.MinValue, char.MaxValue + 1)
+                     .Select(static value => (char)value)
+                     .Where(char.IsWhiteSpace))
+        {
+            Check("boolean", "hidden", $"{whitespace}true{whitespace}", true, $"U+{(int)whitespace:X4}");
+        }
+
+        foreach (char whitespace in "\t\n\v\f\r ")
+        {
+            Check("number", "order", $"{whitespace}1.5{whitespace}", true, $"U+{(int)whitespace:X4}");
+            Check("integer", "article-count", $"{whitespace}12{whitespace}", true, $"U+{(int)whitespace:X4}");
+        }
     }
 
     private static async Task ExistingNavigationParityAsync()

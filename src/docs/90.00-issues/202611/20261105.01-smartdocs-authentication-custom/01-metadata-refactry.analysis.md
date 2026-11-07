@@ -13,7 +13,7 @@ description: "A scoped metadata.yml contract, its migration boundaries, and meas
 
 The request is clear in intent: reduce metadata-file proliferation, document the supported schema carefully, and share acquisition and caching. It wasn't initially unambiguous about physical location, folder authorization, or migration. Those choices have now been resolved for the [implementation plan](01-metadata-refactry.plan.md).
 
-This hand-authored analysis preserves the pre-refactor baseline and selected design. Implementation is in progress: the shared provider, owned fixtures, and repository declaration have been converted, and the [implementation reference](../../../../Diginsight.SmartDocs.Web/Metadata/metadata-reference.md) records the current contract. Anonymous browser scenarios and deterministic checks passed; authenticated browser coverage and evidence-backed reference regeneration remain blocked.
+This hand-authored analysis preserves the pre-refactor baseline and selected design. Implementation is in progress: the shared provider, owned fixtures, and repository declaration have been converted, and the [unified metadata contract](../../../06.00-reference/08-unified-metadata-contract.md) records the current contract. Anonymous scenarios, deterministic checks, and one genuine signed-in session passed; the remaining role-assigned browser cases and evidence-backed reference regeneration are incomplete.
 
 ## 📚 Table of contents
 
@@ -296,8 +296,8 @@ Previous: [Authentication configuration context](overview.md). Next: [Metadata r
 - **[Folder cache](../../../../Diginsight.SmartDocs.Web/ContentSources/CachedContentSource.cs)**, **[access provider](../../../../Diginsight.SmartDocs.Web/Authorization/AccessFileProvider.cs)**, and **[freshness options](../../../../Diginsight.SmartDocs.Web/Caching/ContentFreshnessOptions.cs)** 📘 [Repository source]. Define shared-provider delegation and the configured freshness bounds.
 - **[Access parser](../../../../Diginsight.SmartDocs.Web/Authorization/AccessFile.cs)** and **[requirement resolver](../../../../Diginsight.SmartDocs.Web/Authorization/AccessRequirementResolver.cs)** 📘 [Repository source]. Establish strict policy validation, required-file behavior, and additive space-level requirements.
 - **[Content-path invalidation](../../../../Diginsight.SmartDocs.Web/Caching/ContentPathCacheKey.cs)** 📘 [Repository source]. Defines ancestor/descendant invalidation. Metadata changes must invalidate the containing scope, not assume a literal metadata-file path reaches every descendant cache.
-- **[Unified metadata reference](../../../../Diginsight.SmartDocs.Web/Metadata/metadata-reference.md)** 📘 [Repository documentation]. Documents the implemented fields, migration, cache trade-offs, and current validation limits.
-- **[Folder schema reference](../../../06.00-reference/04-folder-metadata-schema.md)** and **[access schema reference](../../../06.00-reference/07-access-file-schema.md)** 📘 [Repository documentation]. These generated pages describe the baseline and remain stale until their owning investigators regenerate the evidence.
+- **[Unified metadata contract](../../../06.00-reference/08-unified-metadata-contract.md)** 📘 [Repository documentation]. Documents the implemented fields, migration, cache trade-offs, and current validation limits.
+- **[Folder schema reference](../../../06.00-reference/04-folder-metadata-schema.md)** and **[access schema reference](../../../06.00-reference/07-access-file-schema.md)** 📘 [Repository documentation]. These refreshed drafts use locally regenerated evidence and remain unverified pending the documented gates.
 
 <!--
 validations:

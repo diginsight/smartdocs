@@ -3,7 +3,7 @@
   "$id": "https://diginsight.github.io/smartdocs/metadata.schema.json",
   "title": "SmartDocs directory metadata",
   "description": "One metadata.yml for a directory. Structured sections require the versioned envelope.",
-  "$comment": "The host also enforces a 65536-byte UTF-8 limit, one YAML document, case-insensitive duplicate and alias checks, permission semantics, and root-only repository/access placement. JSON Schema cannot express those file and scope rules.",
+  "$comment": "The host separately enforces a 65536-byte UTF-8 limit, one YAML document, case-insensitive duplicate and alias checks, permission semantics, root-only repository/access placement, finite order values, 32-bit article counts, and parseable date/time values. These file, scope, and semantic checks aren't fully expressed by this structural schema.",
   "type": "object",
   "if": { "required": ["schema"] },
   "then": {
@@ -62,19 +62,19 @@
     "number": {
       "anyOf": [
         { "type": ["number", "null"] },
-        { "type": "string", "pattern": "^[+-]?([0-9]+(\\.[0-9]*)?|\\.[0-9]+)([eE][+-]?[0-9]+)?$" }
+        { "type": "string", "pattern": "^[\\u0009-\\u000D\\u0020]*[+-]?([0-9]+(\\.[0-9]*)?|\\.[0-9]+)([eE][+-]?[0-9]+)?[\\u0009-\\u000D\\u0020]*\\u0000*$" }
       ]
     },
     "integer": {
       "anyOf": [
         { "type": ["integer", "null"] },
-        { "type": "string", "pattern": "^[+-]?[0-9]+$" }
+        { "type": "string", "pattern": "^[\\u0009-\\u000D\\u0020]*[+-]?[0-9]+[\\u0009-\\u000D\\u0020]*\\u0000*$" }
       ]
     },
     "boolean": {
       "anyOf": [
         { "type": ["boolean", "null"] },
-        { "type": "string", "pattern": "^([Tt][Rr][Uu][Ee]|[Ff][Aa][Ll][Ss][Ee])$" }
+        { "type": "string", "pattern": "^[\\u0000\\u0009-\\u000D\\u0020\\u0085\\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000]*([Tt][Rr][Uu][Ee]|[Ff][Aa][Ll][Ss][Ee])[\\u0000\\u0009-\\u000D\\u0020\\u0085\\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000]*$" }
       ]
     },
     "alignment": {
