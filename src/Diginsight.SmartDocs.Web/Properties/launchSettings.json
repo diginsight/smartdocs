@@ -31,12 +31,13 @@
       "applicationUrl": "https://localhost:7280;http://localhost:5280",
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development",
-        "AppsettingsEnvironmentName": "devdocs"
+        "AppsettingsEnvironmentName": "devdocs",
+        "ExternalConfigurationFolder": "..\\..\\..\\smartdocs.internal"
       }
     },
     // Serves the public Learning Hub at /learn and the internal one, for signed-in readers with a
     // Learning Hub role, at /learn-internal. The reader app registration and the internal content
-    // root come from smartdocs.internal\src\Diginsight.SmartDocs.Web\appsettings.devlearn.json.
+    // root come from the private devlearn environment overlay and its Development-only .local.json.
     "https - devlearn": {
       "commandName": "Project",
       "dotnetRunMessages": true,
@@ -73,9 +74,23 @@
         "ExternalConfigurationFolder": "..\\..\\..\\smartdocs.internal"
       }
     },
+    // Serves only the AICM documentation at /aicm, for signed-in readers holding the Reader,
+    // Contributor or Admin role. The private TestmcAicm overlay names the container and reader
+    // registration; its Development-only .local.json reads the AICM repository's src/docs folder.
+    "https - TestmcAicm": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "launchBrowser": true,
+      "applicationUrl": "https://localhost:7280;http://localhost:5280",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "AppsettingsEnvironmentName": "TestmcAicm",
+        "ExternalConfigurationFolder": "..\\..\\..\\smartdocs.internal"
+      }
+    },
     // Serves the access fixture under eng/fixtures/access-tree: four prefixed spaces whose access
     // files, floors and AccessFileRequired settings exercise reader authorization. The overlay lives
-    // in smartdocs.internal\src\Diginsight.SmartDocs.Web\appsettings.access.json. Comments stay
+    // in smartdocs.internal\src\Diginsight.SmartDocs.Web\appsettings.access.local.json. Comments stay
     // outside the profile: dotnet run reads the selected profile with a parser that rejects them.
     "https - access": {
       "commandName": "Project",

@@ -18,8 +18,8 @@
          tooling clutter. Files above -MaxFileSizeMB are skipped and reported, because the host
          buffers a whole blob in memory to serve it.
       2. Compare: list the container and upload only new or changed files (Content-MD5).
-      3. Upload: the root access.metadata.yml goes first, so new content is never published under
-         an older access policy. Uploads are authenticated with your Azure CLI sign-in (Entra ID);
+      3. Upload: the root access policy (metadata.yml with an access section, or the legacy
+         access.metadata.yml) goes first, so new content is never published under an older policy. Uploads are authenticated with your Azure CLI sign-in (Entra ID);
          no storage keys or SAS tokens are used.
       4. Prune: only after every upload succeeded, delete blobs that no longer exist locally, then
          empty directories. A failed prune leaves the site complete rather than gapped.
@@ -36,8 +36,8 @@
 
 .PARAMETER SourcePath
     Local content root. When omitted, it is the space's FileSystem:RootPath in the
-    -SourceEnvironment overlays (public half first, then the private half, as configuration
-    binds them).
+    -SourceEnvironment overlays, including Development's generic and environment-local files
+    (public half first, then private half at each level, as configuration binds them).
 
 .PARAMETER SourceEnvironment
     Local profile used to resolve -SourcePath when it isn't given. Defaults to devlearn.
@@ -139,6 +139,8 @@ $env:PYTHONWARNINGS = 'ignore'
 
 $StorageApiVersion = '2023-11-03'
 $AccessFileName = 'access.metadata.yml'
+$MetadataFileName = 'metadata.yml'
+$PolicyFileNames = @($MetadataFileName, $AccessFileName)
 $RepositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 $WebProjectRelative = 'src\Diginsight.SmartDocs.Web'
 
@@ -218,16 +220,20 @@ function Resolve-InternalFolder {
     return $null
 }
 
-function Find-Overlay([string]$Name, [string]$PrivateRoot) {
-    $file = "appsettings.$Name.json"
+function Find-Overlay([string]$Name, [string]$PrivateRoot, [switch]$Local) {
+    $files = @("appsettings.$Name.json")
+    if ($Local) { $files += @('appsettings.local.json', "appsettings.$Name.local.json") }
     $found = @()
-    if ($PrivateRoot) {
-        $private = Join-Path $PrivateRoot (Join-Path $WebProjectRelative $file)
-        if (Test-Path -LiteralPath $private) { $found += $private }
+    foreach ($file in $files) {
+        $public = Join-Path $RepositoryRoot (Join-Path $WebProjectRelative $file)
+        if (Test-Path -LiteralPath $public) { $found += $public }
+        if ($PrivateRoot) {
+            $private = Join-Path $PrivateRoot (Join-Path $WebProjectRelative $file)
+            if (Test-Path -LiteralPath $private) { $found += $private }
+        }
     }
-    $public = Join-Path $RepositoryRoot (Join-Path $WebProjectRelative $file)
-    if (Test-Path -LiteralPath $public) { $found += $public }
-    $found
+    # Destination resolution prefers the private environment; local source resolution uses load order.
+    if ($Local) { $found } else { [array]::Reverse($found); $found }
 }
 
 function Invoke-Az([string[]]$Arguments, [string]$Failure) {
@@ -481,27 +487,30 @@ $accessFloor = "$($space['Access'])"
 # --- Resolve the source -----------------------------------------------------------------------
 
 if (-not $SourcePath) {
-    $sourceOverlays = @(Find-Overlay $SourceEnvironment $privateRoot)
-    $publicOverlay = $sourceOverlays | Where-Object { $_.StartsWith($RepositoryRoot, [StringComparison]::OrdinalIgnoreCase) } | Select-Object -First 1
-    if (-not $publicOverlay) {
-        throw "-SourcePath wasn't given and appsettings.$SourceEnvironment.json isn't in this repository to resolve it from."
+    $sourceOverlays = @(Find-Overlay $SourceEnvironment $privateRoot -Local)
+    if ($sourceOverlays.Count -eq 0) {
+        throw "-SourcePath wasn't given and no $SourceEnvironment overlays were found to resolve it from."
     }
-    $publicSpaces = Get-SpacesNode (Read-JsonFile $publicOverlay)
-    $index = -1
-    if ($publicSpaces -is [System.Collections.IList]) {
-        for ($i = 0; $i -lt $publicSpaces.Count; $i++) {
-            if ($publicSpaces[$i]['Id'] -eq $SpaceId) { $index = $i; break }
+    $sourceSpaces = @{}
+    foreach ($overlayPath in $sourceOverlays) {
+        $node = Get-SpacesNode (Read-JsonFile $overlayPath)
+        if ($null -eq $node) { continue }
+        $indices = if ($node -is [System.Collections.IList]) { 0..($node.Count - 1) } else { $node.Keys }
+        if ($node -is [System.Collections.IList] -and $node.Count -eq 0) { continue }
+        foreach ($i in $indices) {
+            $element = Get-SpaceElement $node ([int]$i)
+            if (-not $sourceSpaces.ContainsKey("$i")) { $sourceSpaces["$i"] = @{} }
+            $id = Get-Value $element @('Id')
+            $root = Get-Value $element @('FileSystem', 'RootPath')
+            if ($null -ne $id) { $sourceSpaces["$i"]['Id'] = $id }
+            if ($null -ne $root) { $sourceSpaces["$i"]['RootPath'] = $root }
         }
     }
-    if ($index -lt 0) { throw "Space '$SpaceId' isn't declared in $publicOverlay; pass -SourcePath." }
-
-    # Site:Spaces binds by index: a later file's element overrides the earlier one's RootPath.
-    $rootPath = Get-Value $publicSpaces[$index] @('FileSystem', 'RootPath')
-    foreach ($overlayPath in $sourceOverlays | Where-Object { $_ -ne $publicOverlay }) {
-        $element = Get-SpaceElement (Get-SpacesNode (Read-JsonFile $overlayPath)) $index
-        $override = Get-Value $element @('FileSystem', 'RootPath')
-        if ($override) { $rootPath = $override }
+    $matchingSpaces = @($sourceSpaces.Values | Where-Object { $_['Id'] -eq $SpaceId })
+    if ($matchingSpaces.Count -ne 1) {
+        throw "Expected exactly one space '$SpaceId' in the $SourceEnvironment overlays; pass -SourcePath."
     }
+    $rootPath = $matchingSpaces[0]['RootPath']
     if (-not $rootPath) { throw "No FileSystem:RootPath for space '$SpaceId' in the $SourceEnvironment overlays; pass -SourcePath." }
     # Relative roots resolve against the web project folder, the host's content root.
     $SourcePath = if ([IO.Path]::IsPathRooted($rootPath)) { $rootPath } else { Join-Path (Join-Path $RepositoryRoot $WebProjectRelative) $rootPath }
@@ -522,16 +531,20 @@ $local = $content.Files
 $markdownCount = @($local | Where-Object { $_.Name -match '\.(md|qmd)$' }).Count
 if ($markdownCount -eq 0) { throw "No Markdown found under '$SourcePath'; refusing to publish (and prune) an empty space." }
 
+# Canonical policy: a root metadata.yml with a top-level access section. Legacy access.metadata.yml
+# is still accepted by the host while compatibility is enabled.
+$metadataFile = $local | Where-Object { $_.Name -ceq $MetadataFileName } | Select-Object -First 1
+$canonicalPolicy = $metadataFile -and ((Get-Content -LiteralPath $metadataFile.FullName -Raw) -match '(?m)^access\s*:')
 $accessFile = $local | Where-Object { $_.Name -ceq $AccessFileName } | Select-Object -First 1
-if (-not $accessFile) {
+if (-not $canonicalPolicy -and -not $accessFile) {
     if ($accessFileRequired) {
-        throw "Space '$SpaceId' requires $AccessFileName at its root (AccessFileRequired), and '$SourcePath' has none. Without it the host hides the space."
+        throw "Space '$SpaceId' requires a root access policy (AccessFileRequired): $MetadataFileName with an access section, or legacy $AccessFileName. '$SourcePath' has neither. Without it the host hides the space."
     }
     if ($accessFloor) {
-        Write-Warning "Space '$SpaceId' has access floor '$accessFloor' but no $AccessFileName; only the floor will apply."
+        Write-Warning "Space '$SpaceId' has access floor '$accessFloor' but no root access policy; only the floor will apply."
     }
 }
-elseif ($accessFile.Length -eq 0) {
+elseif ($accessFile -and $accessFile.Length -eq 0) {
     throw "$AccessFileName at '$SourcePath' is empty; the host would treat it as invalid."
 }
 
@@ -607,15 +620,15 @@ if ($uploads.Count -gt 0 -and $PSCmdlet.ShouldProcess($ContainerUri, "Upload $($
     $script:HttpClient.Timeout = [TimeSpan]::FromHours(2)
     try {
         # The access policy goes first so new content is never served under an older policy.
-        $accessUpload = @($uploads | Where-Object { $_.Name -ceq $AccessFileName })
-        $rest = @($uploads | Where-Object { $_.Name -cne $AccessFileName })
+        $accessUpload = @($uploads | Where-Object { $PolicyFileNames -ccontains $_.Name })
+        $rest = @($uploads | Where-Object { $PolicyFileNames -cnotcontains $_.Name })
         $done = 0
         if ($accessUpload.Count -gt 0) {
             $accessFailure = @(Send-Blobs $accessUpload)
             if ($accessFailure.Count -gt 0) {
-                throw "Uploading $AccessFileName failed ($($accessFailure[0].Error)); nothing else was uploaded."
+                throw "Uploading the root access policy failed ($($accessFailure[0].Error)); nothing else was uploaded."
             }
-            $done = 1
+            $done = $accessUpload.Count
         }
         # Batches refresh the storage token, which an hour-long first publish can outlive.
         for ($start = 0; $start -lt $rest.Count; $start += 200) {
@@ -649,8 +662,8 @@ elseif (-not $SkipPrune -and $containerExists -and $stale.Count -gt 0 -and
     $token = Get-StorageToken
     $deleted = 0
     foreach ($name in $stale) {
-        if ($name -ceq $AccessFileName -and $accessFileRequired) {
-            Write-Warning "Keeping $AccessFileName in storage: the space requires it. Remove it there deliberately if intended."
+        if (($PolicyFileNames -ccontains $name) -and $accessFileRequired) {
+            Write-Warning "Keeping $name in storage: the space requires a root access policy. Remove it there deliberately if intended."
             continue
         }
         if (Remove-Blob $name $token) { $deleted++ }
