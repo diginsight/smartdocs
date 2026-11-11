@@ -84,7 +84,8 @@ public static class ContentEndpoints
     /// <para>
     /// Pages are read through <see cref="IRenderedPageResolver"/>, which checks the reader's access,
     /// so whether a route answers depends on the reader: every answer is <c>private, no-cache</c>, and a
-    /// page the reader can't see answers <c>204</c>, exactly as a missing one does.
+    /// restricted route answers 403 and a missing route answers 404. A visible folder with no
+    /// page still answers 204 so the client can show its section landing page.
     /// </para>
     /// </summary>
     private static async Task<IResult> ResolvePageAsync(
@@ -97,7 +98,9 @@ public static class ContentEndpoints
         {
             activity?.SetOutput(new { found = false });
             http.Response.Headers.CacheControl = HttpValidators.RevalidatePrivate;
-            return Results.NoContent();
+            int status = await PageRouteGuard.GetStatusCodeAsync(http, new PathString(
+                "/" + (path ?? string.Empty).Trim('/')));
+            return status == StatusCodes.Status200OK ? Results.NoContent() : Results.StatusCode(status);
         }
 
         byte[] body = JsonSerializer.SerializeToUtf8Bytes(page);

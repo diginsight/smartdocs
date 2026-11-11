@@ -37,6 +37,102 @@
     box-sizing: border-box;
 }
 
+.route-status-page.page {
+    min-height: 100vh;
+    height: auto;
+    overflow: visible;
+}
+
+.route-status-page .brand {
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+
+.route-status-main {
+    display: grid;
+    place-items: center;
+    flex: 1;
+    padding: clamp(1.25rem, 5vw, 4rem);
+}
+
+.route-status-card {
+    width: 100%;
+    max-width: 46rem;
+    padding: clamp(1.5rem, 5vw, 3rem);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--bg);
+    box-shadow: 0 4px 20px rgb(0 0 0 / 6%);
+}
+
+.route-status-icon {
+    display: grid;
+    place-items: center;
+    width: 4.5rem;
+    height: 4.5rem;
+    border-radius: 16px;
+    background: var(--sidebar);
+    color: var(--brand);
+}
+
+.route-status-icon svg {
+    width: 3rem;
+    height: 3rem;
+}
+
+.route-status-code,
+.route-status-help {
+    color: var(--muted);
+}
+
+.route-status-code {
+    margin: 1.5rem 0 0.5rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+}
+
+.route-status-card h1 {
+    margin: 0 0 1rem;
+    font-size: clamp(1.75rem, 4vw, 2.5rem);
+    line-height: 1.2;
+}
+
+.route-status-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-top: 2rem;
+}
+
+.route-status-button {
+    padding: 0.65rem 1rem;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--fg);
+    background: var(--bg);
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.route-status-button:hover {
+    background: var(--hover);
+}
+
+.route-status-button.primary {
+    border-color: var(--brand);
+    color: var(--on-brand);
+    background: var(--brand);
+}
+
+.route-status-page a:focus-visible {
+    outline: 3px solid var(--brand);
+    outline-offset: 4px;
+}
+
+.route-status-page .brand:focus-visible {
+    outline-color: #ffffff;
+}
+
 body {
     margin: 0;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;

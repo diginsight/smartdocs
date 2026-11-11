@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using Microsoft.AspNetCore.Components;
 using Diginsight.SmartDocs.Web.Shared;
 using Diginsight.SmartDocs.Web.Shared.Rendering;
 
@@ -9,7 +10,7 @@ namespace Diginsight.SmartDocs.Web.Client;
 /// Client-side content source: fetches raw Markdown from the server's <c>/_content/{key}</c>
 /// endpoint. Storage credentials never reach the browser — the server owns them.
 /// </summary>
-public sealed class HttpContentSource(HttpClient http) :
+public sealed class HttpContentSource(HttpClient http, NavigationManager navigation) :
     IContentSource,
     IContentPathResolver,
     IRenderedPageResolver
@@ -31,9 +32,12 @@ public sealed class HttpContentSource(HttpClient http) :
             return RenderedPageResolution.Nothing;
         }
 
-        if (response.StatusCode == HttpStatusCode.NotFound)
+        if (response.StatusCode is HttpStatusCode.Forbidden or HttpStatusCode.NotFound)
         {
-            return RenderedPageResolution.Unhandled;
+            // A full document request uses the host's branded error page and real HTTP status,
+            // including when a Markdown link was followed through the interactive router.
+            navigation.NavigateTo(navigation.Uri, forceLoad: true);
+            return RenderedPageResolution.Nothing;
         }
 
         response.EnsureSuccessStatusCode();

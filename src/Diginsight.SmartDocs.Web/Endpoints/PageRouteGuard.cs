@@ -1,11 +1,11 @@
-using System.Text;
-using System.Text.Encodings.Web;
 using Diginsight.SmartDocs.Web.Authorization;
+using Diginsight.SmartDocs.Web.Components;
 using Diginsight.SmartDocs.Web.Shared.Navigation;
 using Diginsight.SmartDocs.Web.Shared.Rendering;
 using Diginsight.SmartDocs.Web.Shared.Sites;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Components.Endpoints;
+using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.Options;
@@ -13,6 +13,9 @@ using Microsoft.Extensions.Options;
 namespace Diginsight.SmartDocs.Web.Endpoints;
 
 /// <summary>
+/// Answers restricted page requests with 403 and missing page requests with 404, using a lightweight
+/// branded page without loading the interactive shell or exposing protected navigation.
+/// <para>
 /// Answers a page request for a route that names nothing in the content with a real 404, before the
 /// page router prerenders it. The router's catch-all route claims every path, so an unknown route
 /// used to cost a full prerender — the menus, the Markdown probes, the layout — and to come back as
@@ -20,6 +23,7 @@ namespace Diginsight.SmartDocs.Web.Endpoints;
 /// those links against the page's own URL instead of the document base turns every such page into
 /// dozens of new unknown routes: a trap with no end, which kept a deployed instance's only core busy
 /// around the clock. A 404 ends the trap at its first step, and costs a few cached listings.
+/// </para>
 /// <para>
 /// A route exists when every segment but the last is a folder and the last names a folder, an
 /// article (<c>name.md</c>), or a Markdown file itself — the same places the page loader looks, read
@@ -29,20 +33,6 @@ namespace Diginsight.SmartDocs.Web.Endpoints;
 public static class PageRouteGuard
 {
     private static readonly FileExtensionContentTypeProvider ContentTypes = new();
-
-    // Deliberately self-contained: no app shell, no menus, and one absolute link, so a crawler finds
-    // nothing on it to follow but the home page — and, when sign-in is enabled and the reader is
-    // anonymous, the sign-in endpoint, which robots.txt disallows.
-    private const string NotFoundHead =
-        "<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"utf-8\" />" +
-        "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" />" +
-        "<meta name=\"robots\" content=\"noindex\" /><title>Page not found</title>" +
-        "<style>body{font-family:system-ui,sans-serif;max-width:40rem;margin:4rem auto;padding:0 1rem;line-height:1.5}</style>" +
-        "</head><body><h1>Page not found</h1><p>Nothing is published at this address.</p>";
-
-    private const string NotFoundTail = "<p><a href=\"/\">Go to the home page</a></p></body></html>";
-
-    private static readonly byte[] NotFoundPage = Encoding.UTF8.GetBytes(NotFoundHead + NotFoundTail);
 
     public static IApplicationBuilder UsePageRouteGuard(this IApplicationBuilder app) =>
         app.Use(static async (context, next) =>
@@ -68,41 +58,34 @@ public static class PageRouteGuard
                 return;
             }
 
-            if (await IsServedAsync(context))
+            int statusCode = await GetStatusCodeAsync(context, context.Request.Path);
+            if (statusCode == StatusCodes.Status200OK)
             {
                 await next(context);
                 return;
             }
 
-            context.Response.StatusCode = StatusCodes.Status404NotFound;
+            context.Response.StatusCode = statusCode;
             // With sign-in, the page depends on the reader, so no shared cache may keep it.
             context.Response.Headers.CacheControl = signInEnabled ? HttpValidators.RevalidatePrivate : "no-cache";
 
             // A request for a file name — the browser's /favicon.ico, a mistyped image — wants no page.
-            if (!IsFileName(context.Request.Path))
+            if (!IsFileName(context.Request.Path) && !HttpMethods.IsHead(context.Request.Method))
             {
-                context.Response.ContentType = "text/html; charset=utf-8";
-                byte[] page = signInEnabled && anonymous ? BuildNotFoundPageWithSignIn(context.Request) : NotFoundPage;
-                await context.Response.Body.WriteAsync(page, context.RequestAborted);
+                string returnUrl = context.Request.PathBase.Add(context.Request.Path) + context.Request.QueryString;
+                await new RazorComponentResult<RouteStatusPage>(new
+                {
+                    AccessDenied = statusCode == StatusCodes.Status403Forbidden,
+                    SignInEnabled = signInEnabled,
+                    IsSignedIn = !anonymous,
+                    SignInUrl = QueryHelpers.AddQueryString(AuthEndpoints.SignInPath, "returnUrl", returnUrl),
+                })
+                {
+                    StatusCode = statusCode,
+                    PreventStreamingRendering = true,
+                }.ExecuteAsync(context);
             }
         });
-
-    /// <summary>
-    /// The 404 page with a <b>Sign in</b> link back to the requested path. The same link is offered
-    /// for a missing route and a hidden one, so it reveals nothing. The path is query-encoded into
-    /// the link, and the finished URL is HTML-encoded, so no part of the request reaches the markup
-    /// raw.
-    /// </summary>
-    private static byte[] BuildNotFoundPageWithSignIn(HttpRequest request)
-    {
-        string returnUrl = request.PathBase.Add(request.Path).Value ?? "/";
-        string href = HtmlEncoder.Default.Encode(
-            QueryHelpers.AddQueryString(AuthEndpoints.SignInPath, "returnUrl", returnUrl));
-        return Encoding.UTF8.GetBytes(
-            NotFoundHead +
-            "<p>Some pages are visible only to signed-in readers. <a href=\"" + href + "\">Sign in</a></p>" +
-            NotFoundTail);
-    }
 
     /// <summary>
     /// True when the last path segment ends in an extension a static file carries. Route segments
@@ -127,12 +110,13 @@ public static class PageRouteGuard
     }
 
     /// <summary>
-    /// True when the route exists and the reader may see what it shows, in three cases only: the route
+    /// Returns 404 for an absent route, 403 for a restricted one, and 200 when the reader may see
+    /// what it shows, in three cases only: the route
     /// renders a page, which the reader can therefore see; the route is the site root and the reader
     /// sees at least one space, whose generated index or root page the shell then shows; or the route
     /// renders no page, hidden or absent, and names a folder the reader can see. Everything else is
-    /// answered with the same 404 as a route that names nothing, so a hidden page can't be told
-    /// apart from a missing one.
+    /// answered with 403. Only the status distinguishes restricted content from missing content;
+    /// the response never includes the protected page's title, body, or navigation.
     /// <para>
     /// The page is the one the shared rendered-page cache rendered for the route, checked through the
     /// exact file rendered. At a mount route whose <c>&lt;mount&gt;.md</c> belongs to a space the reader
@@ -140,38 +124,38 @@ public static class PageRouteGuard
     /// page of its own.
     /// </para>
     /// </summary>
-    private static async Task<bool> IsServedAsync(HttpContext context)
+    internal static async Task<int> GetStatusCodeAsync(HttpContext context, PathString path)
     {
-        (bool exists, string folder) = await RouteExistsAsync(context);
+        (bool exists, string folder) = await RouteExistsAsync(context, path);
         if (!exists)
         {
-            return false;
+            return StatusCodes.Status404NotFound;
         }
 
         ReaderAccess reader = context.RequestServices.GetRequiredService<ReaderAccess>();
         if (reader.SeesEverything)
         {
-            return true;
+            return StatusCodes.Status200OK;
         }
 
-        string route = (context.Request.Path.Value ?? string.Empty).Trim('/');
+        string route = (path.Value ?? string.Empty).Trim('/');
         RenderedPageResolution resolution = await context.RequestServices
             .GetRequiredService<IRenderedPageResolver>()
             .ResolveRenderedAsync(route, context.RequestAborted);
         if (resolution.Page is not null)
         {
-            return true;
+            return StatusCodes.Status200OK;
         }
 
         if (route.Length == 0)
         {
-            return reader.VisibleSpaces.Count > 0;
+            return reader.VisibleSpaces.Count > 0 ? StatusCodes.Status200OK : StatusCodes.Status403Forbidden;
         }
 
         AccessRequirement requirement = await context.RequestServices
             .GetRequiredService<AccessRequirementResolver>()
             .ForFolderAsync(folder, context.RequestAborted);
-        return reader.IsVisible(requirement);
+        return reader.IsVisible(requirement) ? StatusCodes.Status200OK : StatusCodes.Status403Forbidden;
     }
 
     /// <summary>
@@ -180,9 +164,9 @@ public static class PageRouteGuard
     /// yields its folder: the folder the route names, which every mount route does, or else the folder
     /// that holds the file naming it.
     /// </summary>
-    private static async Task<(bool Exists, string Folder)> RouteExistsAsync(HttpContext context)
+    private static async Task<(bool Exists, string Folder)> RouteExistsAsync(HttpContext context, PathString path)
     {
-        string route = (context.Request.Path.Value ?? string.Empty).Trim('/');
+        string route = (path.Value ?? string.Empty).Trim('/');
         if (route.Length == 0)
         {
             return (true, string.Empty);

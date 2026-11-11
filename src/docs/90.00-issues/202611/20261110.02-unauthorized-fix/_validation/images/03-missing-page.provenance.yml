@@ -1,0 +1,5 @@
+source: "http://localhost:5281/restricted/no-such-page"
+environment: "Development, local access fixtures"
+observed: "2026-11-10"
+surface: application-ui
+classification: public

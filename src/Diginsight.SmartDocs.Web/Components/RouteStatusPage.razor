@@ -1,0 +1,93 @@
+@using Diginsight.SmartDocs.Web.Shared
+@using Diginsight.SmartDocs.Web.Shared.Sites
+@using Diginsight.SmartDocs.Web.Sites
+@using Microsoft.Extensions.Options
+@inject IOptions<SiteOptions> Site
+@inject BrandingAssets Branding
+@inject ThemeState Theme
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>@Heading - @Site.Value.Title</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
+    <link rel="stylesheet" href="/app.css" />
+    <style>@((MarkupString)ThemeCatalog.ToCss(Theme.Options))</style>
+</head>
+<body>
+    <div class="page route-status-page theme-@Theme.ThemeId">
+        <header class="topbar">
+            <a class="brand" href="/">
+                @if (!string.IsNullOrEmpty(Branding.LogoUrl))
+                {
+                    <img class="brand-logo" src="@Branding.LogoUrl" alt="" />
+                }
+                else
+                {
+                    <i class="bi @(string.IsNullOrWhiteSpace(Site.Value.Branding.IconClass) ? "bi-lightbulb-fill" : Site.Value.Branding.IconClass)" aria-hidden="true"></i>
+                }
+                <span>@Site.Value.Title</span>
+            </a>
+        </header>
+        <main class="route-status-main" aria-labelledby="status-heading">
+            <section class="route-status-card">
+                <div class="route-status-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        @if (AccessDenied)
+                        {
+                            <path d="M12 3 4 6v6c0 4 5 7 8 9 3-2 8-5 8-9V6l-8-3Z" />
+                            <rect x="9" y="10" width="6" height="6" rx="1" />
+                            <path d="M10 10V8a2 2 0 0 1 4 0v2" />
+                        }
+                        else
+                        {
+                            <circle cx="10" cy="10" r="6" />
+                            <path d="m15 15 6 6M8 10h4" />
+                        }
+                    </svg>
+                </div>
+                <p class="route-status-code">@(AccessDenied ? "403 - Access denied" : "404 - Page not found")</p>
+                <h1 id="status-heading">@Heading</h1>
+                @if (AccessDenied)
+                {
+                    <p>You don't have access to this item.</p>
+                    @if (SignInEnabled && !IsSignedIn)
+                    {
+                        <p class="route-status-help">Sign in with an account that has access. If you still can't open this item, contact the documentation owner to request access.</p>
+                    }
+                    else
+                    {
+                        <p class="route-status-help">Contact the documentation owner to request access.</p>
+                    }
+                }
+                else
+                {
+                    <p>We couldn't find a page at this address.</p>
+                    <p class="route-status-help">Check the address, or return to the home page to find the documentation you're looking for.</p>
+                }
+                <nav class="route-status-actions" aria-label="Next steps">
+                    @if (AccessDenied && SignInEnabled && !IsSignedIn)
+                    {
+                        <a class="route-status-button primary" href="@SignInUrl">Sign in</a>
+                    }
+                    <a class="route-status-button" href="/">Go to the home page</a>
+                </nav>
+            </section>
+        </main>
+    </div>
+</body>
+</html>
+
+@code {
+    [Parameter] public bool AccessDenied { get; set; }
+    [Parameter] public bool SignInEnabled { get; set; }
+    [Parameter] public bool IsSignedIn { get; set; }
+    [Parameter] public string SignInUrl { get; set; } = string.Empty;
+
+    private string Heading => AccessDenied ? "You need access" : "Page not found";
+
+    protected override void OnInitialized() => Theme.ApplyPreference(Site.Value.Branding.DefaultTheme);
+}
