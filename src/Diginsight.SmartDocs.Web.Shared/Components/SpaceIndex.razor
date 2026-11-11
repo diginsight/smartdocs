@@ -10,17 +10,19 @@
         @foreach (SpaceShellInfo space in Site.Spaces)
         {
             <li class="space-card">
-                <a class="space-card-title" href="@space.HomeRoute">
-                    @if (!string.IsNullOrWhiteSpace(space.IconUrl) || !string.IsNullOrWhiteSpace(space.Icon))
+                <div class="space-card-summary">
+                    <a class="space-card-title" href="@space.HomeRoute">
+                        @if (!string.IsNullOrWhiteSpace(space.IconUrl) || !string.IsNullOrWhiteSpace(space.Icon))
+                        {
+                            <span class="space-card-icon" aria-hidden="true"><SpaceIcon Space="space" /></span>
+                        }
+                        <span>@space.Title@(string.IsNullOrWhiteSpace(space.Description) ? null : ":")</span>
+                    </a>
+                    @if (!string.IsNullOrWhiteSpace(space.Description))
                     {
-                        <span class="space-card-icon" aria-hidden="true"><SpaceIcon Space="space" /></span>
+                        <span class="space-card-desc">@(" " + space.Description)</span>
                     }
-                    @space.Title
-                </a>
-                @if (!string.IsNullOrWhiteSpace(space.Description))
-                {
-                    <p class="space-card-desc">@space.Description</p>
-                }
+                </div>
                 <p class="space-card-meta">
                     <span>repository:
                         @if (string.IsNullOrWhiteSpace(space.RepositoryUrl))
