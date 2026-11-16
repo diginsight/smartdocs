@@ -115,6 +115,7 @@ public class Program
             SignInConfiguration signIn = SignInConfiguration.From(configuration);
             services.AddSingleton(signIn);
             services.AddReaderSignIn(configuration, signIn, siteOptions.Authorization);
+            services.AddRoleProvider(configuration, siteOptions, signIn, logger);
             logger.LogInformation("Reader sign-in is {State}", signIn.Enabled ? "enabled" : "disabled");
 
             // Populated after the container is built (see BrandingAssetResolver), so the scoped

@@ -859,6 +859,9 @@
           "System.Drawing.Common": "6.0.0"
         }
       },
+      "diginsight.smartdocs.authorization.abstractions": {
+        "type": "Project"
+      },
       "diginsight.smartdocs.web.client": {
         "type": "Project",
         "dependencies": {

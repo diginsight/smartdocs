@@ -183,6 +183,7 @@ internal static class MetadataChecks
         Assert(schema.RootElement.GetProperty("$defs").GetProperty("access").GetProperty("type").GetString() == "object", "machine schema");
         SchemaStringPatterns(schema.RootElement);
         await ProviderChecks.RunAsync(Assert);
+        await RoleProviderChecks.RunAsync(Assert);
     }
 
     private static void SchemaStringPatterns(JsonElement schema)

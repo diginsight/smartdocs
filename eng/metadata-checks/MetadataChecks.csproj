@@ -7,5 +7,17 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\Diginsight.SmartDocs.Web\Diginsight.SmartDocs.Web.csproj" />
+    <ProjectReference Include="..\sample-role-provider\SampleRoleProvider.csproj" ReferenceOutputAssembly="false" />
   </ItemGroup>
+  <Target Name="CopySampleProvider" AfterTargets="Build">
+    <MSBuild Projects="..\sample-role-provider\SampleRoleProvider.csproj" Targets="GetTargetPath"
+             Properties="Configuration=$(Configuration)">
+      <Output TaskParameter="TargetOutputs" ItemName="SampleProviderTarget" />
+    </MSBuild>
+    <ItemGroup>
+      <SampleProviderFiles Include="%(SampleProviderTarget.RootDir)%(SampleProviderTarget.Directory)**\*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(SampleProviderFiles)"
+          DestinationFiles="@(SampleProviderFiles->'$(OutDir)plugins\sample\%(RecursiveDir)%(Filename)%(Extension)')" />
+  </Target>
 </Project>

@@ -388,6 +388,9 @@ public sealed partial class AccessFile
         return segments;
     }
 
+    /// <summary>Whether a provider role uses the same grammar as a policy role.</summary>
+    public static bool IsValidRoleName(string? name) => name is not null && NamePattern().IsMatch(name);
+
     [GeneratedRegex(@"\A[A-Za-z][A-Za-z0-9._-]*\z", RegexOptions.CultureInvariant)]
     private static partial Regex NamePattern();
 

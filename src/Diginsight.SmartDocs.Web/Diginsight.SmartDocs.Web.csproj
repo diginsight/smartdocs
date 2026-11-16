@@ -74,6 +74,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Diginsight.SmartDocs.Authorization.Abstractions\Diginsight.SmartDocs.Authorization.Abstractions.csproj" />
     <ProjectReference Include="..\Diginsight.SmartDocs.Web.Client\Diginsight.SmartDocs.Web.Client.csproj" />
     <ProjectReference Include="..\Diginsight.SmartDocs.Web.Shared\Diginsight.SmartDocs.Web.Shared.csproj" />
   </ItemGroup>

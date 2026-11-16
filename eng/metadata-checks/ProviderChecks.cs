@@ -67,6 +67,7 @@ internal static class ProviderChecks
         await FingerprintInvalidationRaceAsync(assert);
         await HubRefreshAsync(assert);
         await ScopeIsolationAsync(assert);
+        await ScopedRoleEvaluationAsync(assert);
         await ConsumersAsync(assert);
         await DeliveryBoundariesAsync(assert);
         await FileSystemAliasesAsync(assert);
@@ -941,6 +942,34 @@ internal static class ProviderChecks
             assert((await fixture.Provider.GetForSpaceAsync("alpha")).Status == MetadataStatus.Invalid &&
                 fixture.Source.Reads == 1 && fixture.Source.Listings == 1, "misnamed canonical file is rejected");
         }
+    }
+
+    private static async Task ScopedRoleEvaluationAsync(Action<bool, string> assert)
+    {
+        using var fixture = new Fixture(compatibility: false);
+        fixture.Source.Set("metadata.yml", Policy + "\n    Contributor: [Read]\n");
+        SpaceOptions[] spaces =
+        [
+            new() { Id = "a", RouteBase = "/a", Source = "FileSystem", RoleScope = " repo-a ", AccessFileRequired = true },
+            new() { Id = "a2", RouteBase = "/a2", Source = "FileSystem", RoleScope = "REPO-A", AccessFileRequired = true },
+            new() { Id = "b", RouteBase = "/b", Source = "FileSystem", RoleScope = "repo-b", AccessFileRequired = true },
+            new() { Id = "unscoped", RouteBase = "/unscoped", Source = "FileSystem", AccessFileRequired = true },
+        ];
+        var registry = new SpaceRegistry(spaces);
+        SpaceContentAccess[] entries = spaces.Select(space => new SpaceContentAccess(space, fixture.Source, fixture.Source)).ToArray();
+        var site = new SiteOptions { LegacyMetadataCompatibility = false };
+        ContentMetadataProvider metadata = NewProvider(entries, fixture.Cache, fixture.Parser, new(), site);
+        var policies = new AccessFileProvider(new(entries), metadata, NullLogger<AccessFileProvider>.Instance);
+        var resolver = new AccessRequirementResolver(registry, policies, site.Authorization, NullLogger<AccessRequirementResolver>.Instance);
+        var evaluator = new SpaceVisibilityEvaluator(registry, resolver, NullLogger<SpaceVisibilityEvaluator>.Instance);
+        ReaderVisibility scoped = await evaluator.EvaluateAsync(RoleSet.SignedIn([], [new("Contributor", " REPO-A ")]));
+        assert(scoped.VisibleSpaceIds.Order().SequenceEqual(new[] { "a", "a2" }),
+            "scoped roles apply to matching scopes only, including shared scopes and whitespace/case normalization");
+        ReaderVisibility global = await evaluator.EvaluateAsync(RoleSet.SignedIn(["Reader"]));
+        assert(global.VisibleSpaceIds.Count() == 4, "global roles still apply to every space");
+        ReaderVisibility none = await evaluator.EvaluateAsync(RoleSet.SignedIn([]));
+        assert(!none.VisibleSpaceIds.Any() && none.Spaces.Values.All(static s => s.Permissions.SetEquals(["authenticated"])),
+            "signed-in readers without roles retain authenticated only");
     }
 
     private static SpaceOptions NewSpace(string id, string route) =>

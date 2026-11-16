@@ -68,55 +68,59 @@ public sealed class SpaceVisibilityEvaluator(
         // One read of the access file yields both the requirement and the role map, so a file that
         // changes between two reads can never pair one version's requirement with another's grants.
         SpaceAccessState state = await resolver.ResolveSpaceAsync(space.Id, cancellationToken);
-        ImmutableSortedSet<string> permissions = PermissionsIn(state.File, roles);
+        ImmutableSortedSet<string> permissions = PermissionsIn(state.File, roles.IsSignedIn, roles.RolesIn(space.RoleScope));
         return (new SpaceVisibility(space.Id, state.Requirement, permissions, state.Requirement.IsCoveredBy(permissions)), state.File);
     }
 
     /// <summary>
     /// Logs, once per value per process, a role value that no space with a valid access file maps.
     /// Such a value grants nothing anywhere, and the reader's other values still count. Role values
-    /// come only from tokens Entra issued for this application, so the set of logged values is
-    /// bounded by its app roles; the cap only guards against a misconfigured issuer.
+    /// come from Entra or a provider; scoped values are bounded by configured scopes and
+    /// MaxScopedRoles per session. This process-wide cap bounds warnings across all sessions.
     /// </summary>
     private void WarnUnmappedRoles(RoleSet roles, (SpaceVisibility Visibility, AccessFile? File)[] evaluated)
     {
-        if (!roles.IsSignedIn || roles.Roles.IsEmpty)
+        if (!roles.IsSignedIn)
         {
             return;
         }
 
-        foreach (string role in roles.Roles)
+        IEnumerable<(string Role, string? Scope)> values = roles.Roles.Select(static r => (r, (string?)null))
+            .Concat(roles.ScopedRoles.SelectMany(static s => s.Value.Select(r => (r, (string?)s.Key))));
+        foreach ((string role, string? scope) in values)
         {
-            if (warnedUnmappedRoles.ContainsKey(role) || warnedUnmappedRoles.Count >= MaxWarnedUnmappedRoles)
+            string display = scope is null ? role : $"{role}@{scope}";
+            if (warnedUnmappedRoles.ContainsKey(display) || warnedUnmappedRoles.Count >= MaxWarnedUnmappedRoles)
             {
                 continue;
             }
 
-            if (evaluated.Any(e => e.File is not null && e.File.Roles.ContainsKey(role)))
+            if (evaluated.Any(e => e.File is not null && e.File.Roles.ContainsKey(role) &&
+                (scope is null || string.Equals(spaces.ById(e.Visibility.SpaceId)?.RoleScope?.Trim(), scope, StringComparison.OrdinalIgnoreCase))))
             {
                 continue;
             }
 
-            if (warnedUnmappedRoles.TryAdd(role, 0))
+            if (warnedUnmappedRoles.TryAdd(display, 0))
             {
                 logger.LogWarning(
                     "The role '{Role}' is mapped by no space with a valid access file, so it grants nothing; the reader's other roles still count",
-                    role);
+                    display);
             }
         }
     }
 
-    /// <summary>What <paramref name="roles"/> hold in a space whose valid access file is <paramref name="file"/>.</summary>
-    private static ImmutableSortedSet<string> PermissionsIn(AccessFile? file, RoleSet roles)
+    /// <summary>Permissions from this space's policy and its effective role values.</summary>
+    private static ImmutableSortedSet<string> PermissionsIn(AccessFile? file, bool isSignedIn, ImmutableSortedSet<string> roles)
     {
-        ImmutableSortedSet<string> held = BasePermissions(roles);
-        if (file is null || !roles.IsSignedIn || roles.Roles.IsEmpty)
+        ImmutableSortedSet<string> held = isSignedIn ? AuthenticatedOnly : NoPermissions;
+        if (file is null || !isSignedIn || roles.IsEmpty)
         {
             return held;
         }
 
         ImmutableSortedSet<string>.Builder builder = held.ToBuilder();
-        foreach (string role in roles.Roles)
+        foreach (string role in roles)
         {
             builder.UnionWith(file.Grants(role));
         }

@@ -336,6 +336,9 @@ public sealed class SpaceOptions
     /// </summary>
     public bool AccessFileRequired { get; set; }
 
+    /// <summary>Optional provider scope whose roles apply here, matched case-insensitively after trimming. Not sent to the shell.</summary>
+    public string? RoleScope { get; set; }
+
     /// <summary>Active content source for this space: <c>Blob</c> or <c>FileSystem</c>.</summary>
     public string Source { get; set; } = "Blob";
 
