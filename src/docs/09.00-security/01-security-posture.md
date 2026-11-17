@@ -10,18 +10,22 @@ source_sets:
   - entry-points
   - pipeline-definition
   - settings-sources
+  - composition-root
+  - domain-model
 ---
 
 <!--
 verification_stamp:
-  generated: "2026-11-02"
-  verified: "2026-11-02"
+  generated: "2026-11-17"
+  verified: "2026-11-17"
   gate_outcome: "pass-with-gaps"
   evidence:
     - dossier: "_evidence/smartdocs-web/security.md"
       observed: "2026-11-02"
     - dossier: "_evidence/smartdocs-web/configuration.md"
-      observed: "2026-10-28"
+      observed: "2026-11-17"
+    - dossier: "_evidence/smartdocs-web/code.md"
+      observed: "2026-11-17"
     - dossier: "_evidence/smartdocs-web/devops.md"
       observed: "2026-08-18"
   open_gaps: 9
@@ -52,6 +56,7 @@ A manual run on a local host on 2026-11-02 exercised these protections end to en
 | Browser ↔ application HTTP | Paths, cookies, validators and forms inward; content and status outward | Reader filtering, concealment, antiforgery and private response policies ^[security-26,security-27,security-28,security-35] |
 | Browser ↔ bootstrap and hub | Page/connection identity inward; display state, filtered navigation/counts outward | Server-derived role groups; client display state isn't permission authority ^[security-30,security-35] |
 | Host ↔ Entra | Challenge outward; returned identity claims inward | Optional Microsoft Identity Web sign-in; deployed policy still needs verification ^[security-02,security-35] |
+| Host ↔ configured role module | Replacement role results at fresh sign-in | Trusted in-process code, confined assembly path, validated module, exactly one resolver, startup failure without fallback ^[code-106,code-107] |
 | Application → content storage | Every content read | `DefaultAzureCredential`; no account key, shared-access signature or connection string is accepted ^[security-08] |
 | Pipeline → Azure | Every deployment | An OIDC federated credential; no client secret is stored ^[security-09] |
 | Pipeline → private overlay | Every deployment | A repository read token; the step fails when the secret is absent ^[devops-13] |
@@ -63,7 +68,9 @@ A manual run on a local host on 2026-11-02 exercised these protections end to en
 
 Invalid, unreadable or required-but-missing access files deny visibility. The host checks exact selected content keys, conceals denials as missing content, and excludes access-file bytes from all mounted reads. ^[security-25,security-26,security-29] A private-site default challenges unsigned page requests before existence lookup. ^[security-26] Navigation filtering keeps the root's generated Home link whenever the reader sees the space mounted at the root or anything outside spaces, so a hidden root-mounted space doesn't reveal itself by removing that link. ^[security-45]
 
-**Session.** The cookie is HttpOnly, always Secure and SameSite=Lax. Its configured positive lifetime defaults to eight hours without sliding or token-lifetime substitution. Sign-in accepts local return targets only; sign-out is an antiforgery-validated POST. ^[security-28] Roles come from the claims issued at sign-in, so an open session keeps a removed role until the session expires, and a membership change shows only at a later sign-in once the identity provider issues it. ^[security-38,security-41]
+**Role source.** Blank effective provider `Assembly` preserves Entra roles without a plugin hook. Configured plugin roles replace prior global/scoped claims across identities at fresh sign-in. Unknown scopes and invalid role values are dropped. A resolver failure doesn't restore stale roles: it logs a warning, retains authentication only, and shortens the session without extending an earlier expiry. The plugin isn't a security sandbox; deployment must trust its code and configuration. ^[code-106,code-107] Permissions still come exclusively from each space's own policy using global plus matching-scoped roles. A role-free signed-in reader can still open content requiring only `authenticated`. ^[code-108]
+
+**Session.** The cookie is HttpOnly, always Secure and SameSite=Lax. Its configured positive lifetime defaults to eight hours without sliding or token-lifetime substitution. Sign-in accepts local return targets only; sign-out is an antiforgery-validated POST. ^[security-28] An open session retains its sign-in-time roles until expiry; assignment or provider changes require a fresh sign-in to observe the new role source. Restarting alone doesn't rerun role resolution for an existing cookie. ^[security-38,security-41,code-107]
 
 **Management.** The invalidation guard is opt-in by configuration. With `Site:InvalidateApiKey` set, the endpoint requires a matching `X-Invalidate-Key` header and otherwise answers 401; with no key configured, it's open to any caller. Reader roles don't grant management access. ^[security-05,security-06]
 

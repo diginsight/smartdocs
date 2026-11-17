@@ -9,18 +9,19 @@ source_sets:
   - domain-model
   - settings-sources
   - authn-authz-surface
+  - options-model
 ---
 
 <!--
 verification_stamp:
-  generated: "2026-10-28"
-  verified: "2026-10-28"
+  generated: "2026-11-17"
+  verified: "2026-11-17"
   gate_outcome: "pass"
   evidence:
     - dossier: "_evidence/smartdocs-web/code.md"
-      observed: "2026-10-28"
+      observed: "2026-11-17"
     - dossier: "_evidence/smartdocs-web/configuration.md"
-      observed: "2026-10-28"
+      observed: "2026-11-17"
     - dossier: "_evidence/smartdocs-web-client/code.md"
       observed: "2026-10-28"
     - dossier: "_evidence/smartdocs-web-shared/code.md"
@@ -46,7 +47,8 @@ What the parts are, how a request travels through them, and why the system is sh
 
 ## 🔑 Key points
 
-- **Three projects, two execution contexts, shared contracts.** The host renders and authorizes pages; the browser resolves rendered pages over HTTP. ^[smartdocs-web-shared/code-03,smartdocs-web-client/code-04] Both use shared content/navigation abstractions. ^[smartdocs-web-shared/code-04,smartdocs-web-shared/code-06,smartdocs-web-shared/code-07]
+- **Four application projects, two execution contexts.** The host renders and authorizes pages; the browser resolves rendered pages over HTTP. ^[smartdocs-web-shared/code-03,smartdocs-web-client/code-04] Both use shared content/navigation abstractions. ^[smartdocs-web-shared/code-04,smartdocs-web-shared/code-06,smartdocs-web-shared/code-07] A separate authorization contracts library lets independently built providers integrate without a host dependency on their implementation. ^[smartdocs-web/code-105]
+- **One selected role source, unchanged policy authority.** Blank provider `Assembly` preserves Entra roles; a configured module replaces roles at fresh sign-in. A space evaluates global roles plus its matching scoped roles, then its own policy grants permissions. ^[smartdocs-web/code-106,smartdocs-web/code-107,smartdocs-web/code-108]
 - **The server is the authorization authority.** Request-scoped visibility filters shared facts; exact content keys and source-folder provenance prevent display routes or candidate fallback from bypassing the owning space. ^[smartdocs-web/code-46,smartdocs-web/code-20,smartdocs-web/code-49]
 - **Nothing is pre-built.** A document is resolved and rendered when its path is requested ^[smartdocs-web/code-20,smartdocs-web/code-21], and navigation is discovered one level at a time ^[smartdocs-web/code-23].
 - **Unknown is a first-class value.** An article count that has not been computed renders as `…` or `≥ N`, never as `0`. ^[smartdocs-web-shared/code-11,smartdocs-web-shared/code-12]

@@ -136,6 +136,16 @@ Permission and role names begin with an ASCII letter and contain only ASCII lett
 
 The deployment's site default and space floor are additive to file requirements. They accept only an empty value or `authenticated`. A permission named `Write` doesn't create an editing API. Grants are scoped to one space, even when two spaces use the same permission name.
 
+### Role sources and explicit space scopes
+
+The role source doesn't change this policy format. With the default Entra ID path, roles are global. An opt-in provider can instead supply global roles and `(role, scope)` assignments. Each space's effective roles are its reader's global roles **plus** scoped roles matching `Site:Spaces[]:RoleScope`, using trimmed, case-insensitive scope matching. A space without `RoleScope` receives only global roles; its ID, route, and metadata don't supply an implicit scope.
+
+For example, a `Contributor` assignment scoped to `product-guide` participates only in spaces configured with `RoleScope: product-guide`. It doesn't participate in a space scoped to `product-reference`. A global `Reader` participates in either space. Two spaces sharing one scope receive the same scoped roles but still compute grants independently from their own policies.
+
+**SmartDocs remains the only role-to-permission authority.** Providers supply roles, not effective permissions; an external catalog or external mapping doesn't override this `access` section. A scoped role whose name this policy doesn't map grants nothing here. Removing all roles still leaves a signed-in reader with the built-in `authenticated` permission, so removal alone won't block a space requiring only `authenticated`. Require a declared, role-mapped permission such as `Read` when that distinction is intended.
+
+See [provider configuration](01-configuration-settings.md#siteauthorizationroleprovider) for the trusted `plugins` directory, module selection, scope validation, and sign-in failure behavior. Provider roles are captured at fresh sign-in; metadata invalidation doesn't rewrite existing session cookies.
+
 `access: {}` is a valid, explicit policy with no additional requirements. It satisfies `AccessFileRequired`. A missing `access` section doesn't satisfy that setting; `access: null` and a bare `access:` are invalid. Versioned access below a content root is rejected by staged-tree validation and doesn't protect a folder at runtime.
 
 ## 🧪 Validation and failure
@@ -158,6 +168,7 @@ The following configuration controls how the host selects and evaluates policies
 | `Site:Spaces[]:AccessFileRequired` | `false` | Requires a valid logical access policy when `true`, not merely a navigation file |
 | `Site:Authorization:DefaultRequirement` | Empty | Adds a site-wide floor; only empty or `authenticated` is accepted |
 | `Site:Spaces[]:Access` | Empty | Adds a space-specific floor; only empty or `authenticated` is accepted |
+| `Site:Spaces[]:RoleScope` | Null | Selects matching scoped roles in addition to global roles; doesn't itself grant a permission or require a role |
 | `Diginsight:SmartCache:SmartDocs:Access` | `00:00:30` | Sets root metadata freshness for subsequent reads |
 
 Run the same parser and publication checks from the repository root:
@@ -204,7 +215,7 @@ access:
 
 Both files may coexist temporarily in compatibility mode when their normalized policies agree. A disagreement, invalid selected policy, or failed read closes the space; don't treat it as a migration success.
 
-Folder-level authorization and fleet-wide legacy-reader removal are separate future work. The visible run covers anonymous behavior and one genuine signed-in session on the current parser. A role-free identity, Reader, Contributor, multiple-role, and unmapped-role browser sessions, and live distributed-service behavior remain unverified.
+Folder-level authorization and fleet-wide legacy-reader removal are separate future work. The original metadata-migration run covered anonymous behavior and one genuine signed-in session on the current parser. Later [provider validation](../90.00-issues/202611/20261110.01-authorization-support-custom/_validation/20261113.04-validation-sequence.md) exercised sequential Admin, Contributor, Reader, removal, and restoration on isolated role-protected fixtures; it didn't modify the real authenticated-only policies. Additional accounts, simultaneous different-role combinations, hosted application-token acceptance, and live distributed-service behavior aren't established by those local runs.
 
 ## 💡 Conclusion
 
@@ -215,15 +226,16 @@ The canonical filename reduces authored carriers and the shared snapshot removes
 - **[Structural JSON Schema](https://github.com/diginsight/smartdocs/blob/main/src/Diginsight.SmartDocs.Web/Metadata/metadata.schema.json)** 📘 [Repository source]. Defines versioned fields and structural shapes; the parser adds file, scope, and policy checks.
 - **[Metadata parser](https://github.com/diginsight/smartdocs/blob/main/src/Diginsight.SmartDocs.Web/Metadata/MetadataParser.cs)** and **[metadata provider](https://github.com/diginsight/smartdocs/blob/main/src/Diginsight.SmartDocs.Web/Metadata/ContentMetadataProvider.cs)** 📘 [Repository source]. Define parsing, acquisition, freshness, and compatibility behavior.
 - **[Access policy validator](https://github.com/diginsight/smartdocs/blob/main/src/Diginsight.SmartDocs.Web/Authorization/AccessFile.cs)** 📘 [Repository source]. Defines permission, role, and reserved-name validation.
+- **[Role selection](https://github.com/diginsight/smartdocs/blob/main/src/Diginsight.SmartDocs.Web/Authorization/RoleSet.cs)** and **[space evaluation](https://github.com/diginsight/smartdocs/blob/main/src/Diginsight.SmartDocs.Web/Authorization/SpaceVisibilityEvaluator.cs)** 📘 [Repository source]. Define global-plus-matching-scoped roles and policy-owned permission expansion.
 - **[Classification procedure](https://github.com/diginsight/smartdocs/blob/main/.github/prompt-snippets/content-classification-and-split.md)** 📘 [Repository authority]. Defines repository declaration resolution and companion handling.
 
 <!--
 validations:
-  structure: {status: "passed", last_run: "2026-11-07", notes: "Frontmatter, local links, and four YAML examples checked; examples passed the production tree validator."}
-  sources: {status: "reviewed", last_run: "2026-11-07", notes: "Field and alias tables match the structural schema; parser, policy, provider, and freshness behavior checked against implementation and regression harness."}
+  structure: {status: "passed", last_run: "2026-11-17", notes: "Local links/anchors and scope-configuration cross-reference checked. Existing policy YAML examples unchanged; their production-validator result remains the November7 observation."}
+  sources: {status: "reviewed", last_run: "2026-11-17", notes: "Added global-plus-matching-scoped role selection and SmartDocs policy authority from RoleSet.RolesIn and SpaceVisibilityEvaluator; reconciled later local provider validation without claiming hosted or distributed acceptance."}
   rendering: {status: "passed", last_run: "2026-11-07", notes: "A rebuilt local host rendered the contract in a visible browser; the authentication overview link opened it."}
 article_metadata:
   filename: "08-unified-metadata-contract.md"
   created: "2026-11-06"
-  last_updated: "2026-11-07"
+  last_updated: "2026-11-17"
 -->

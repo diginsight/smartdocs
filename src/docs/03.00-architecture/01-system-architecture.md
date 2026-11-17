@@ -10,18 +10,19 @@ source_sets:
   - settings-sources
   - deployment-descriptor
   - authn-authz-surface
+  - options-model
 ---
 
 <!--
 verification_stamp:
-  generated: "2026-11-02"
-  verified: "2026-11-02"
+  generated: "2026-11-17"
+  verified: "2026-11-17"
   gate_outcome: "pass-with-gaps"
   evidence:
     - dossier: "_evidence/smartdocs-web/code.md"
-      observed: "2026-11-02"
+      observed: "2026-11-17"
     - dossier: "_evidence/smartdocs-web/configuration.md"
-      observed: "2026-10-28"
+      observed: "2026-11-17"
     - dossier: "_evidence/smartdocs-web/data.md"
       observed: "2026-08-18"
     - dossier: "_evidence/smartdocs-web/environment.md"
@@ -68,6 +69,7 @@ flowchart LR
 | `Diginsight.SmartDocs.Web` | Hosts everything: composes services, exposes the HTTP and SignalR surfaces, renders server-side | composition root and hub mapping ^[smartdocs-web/code-01,smartdocs-web/code-05,smartdocs-web/code-18] |
 | `Diginsight.SmartDocs.Web.Client` | Runs the interactive shell in the browser under WebAssembly | client project kind ^[smartdocs-web-client/code-01] |
 | `Diginsight.SmartDocs.Web.Shared` | Holds every type both sides use — abstractions, the navigation model, the rendering model, the site model | project references from both other projects ^[smartdocs-web-shared/code-01,smartdocs-web-shared/code-03] |
+| `Diginsight.SmartDocs.Authorization.Abstractions` | Defines the role resolver, global/scoped result, and module-registration contracts shared by the host and separately built providers | ^[smartdocs-web/code-105] |
 | Content store | Supplies document bytes through a per-space filesystem or Blob source | per-space source factory ^[smartdocs-web/code-08] |
 
 The shared library holds `IContentSource`, `IMarkdownRenderer`, `INavProvider` and `PageLoader`. ^[smartdocs-web-shared/code-04,smartdocs-web-shared/code-06,smartdocs-web-shared/code-07,smartdocs-web-shared/code-21] The host registers rendering; the browser resolves rendered pages over HTTP rather than registering the renderer independently. ^[smartdocs-web-shared/code-03,smartdocs-web-client/code-04]
@@ -109,6 +111,8 @@ The shared loader retains its ordered candidate ladder, but a handled rendered-p
 ### Reader access at the response boundary
 
 The host initializes request-scoped `ReaderAccess` after optional authentication and before bootstrap, route guarding, and endpoint execution. ^[smartdocs-web/code-46] Every space combines the site default, deployment floor, and access-file requirement; a signed-in reader's roles grant permissions only through that space's own file. All required permissions must be covered. ^[smartdocs-web/code-47]
+
+Reader authentication stays with Entra in either role mode. Blank effective provider `Assembly` leaves the default role path unchanged; an explicitly configured module under `plugins` resolves replacement roles at fresh sign-in. The host selects once at startup and rejects an invalid configured plugin without fallback. ^[smartdocs-web/code-106,smartdocs-web/code-107] Each space then expands the reader's global roles plus roles matching its explicit `RoleScope` through its own policy. Provider output isn't permission authority. ^[smartdocs-web/code-108]
 
 Shared caches hold content facts, not reader-filtered responses. Navigation uses source-folder provenance for ownership, so a displayed route isn't an authorization key. ^[smartdocs-web/code-48,smartdocs-web/code-49] The one exception is the root's generated Home link, which has no source folder: it stays whenever the reader sees the space mounted at the root or anything outside spaces, so a hidden root-mounted space leaves the root level unchanged. ^[smartdocs-web/code-62,smartdocs-web/code-68] See [Security](../09.00-security/index.md) and the [access-file schema](../06.00-reference/07-access-file-schema.md).
 

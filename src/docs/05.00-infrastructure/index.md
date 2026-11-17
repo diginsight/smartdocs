@@ -7,12 +7,14 @@ source_sets:
   - deployment-descriptor
   - infrastructure-definition
   - settings-sources
+  - composition-root
+  - options-model
 ---
 
 <!--
 verification_stamp:
-  generated: "2026-10-28"
-  verified: "2026-10-28"
+  generated: "2026-11-17"
+  verified: "2026-11-17"
   gate_outcome: "pass-with-gaps"
   evidence:
     - dossier: "_evidence/smartdocs-web/environment.md"
@@ -20,13 +22,23 @@ verification_stamp:
     - dossier: "_evidence/smartdocs-web/devops.md"
       observed: "2026-08-18"
     - dossier: "_evidence/smartdocs-web/configuration.md"
-      observed: "2026-10-28"
+      observed: "2026-11-17"
+    - dossier: "_evidence/smartdocs-web/code.md"
+      observed: "2026-11-17"
     - dossier: "_evidence/smartdocs-web/security.md"
       observed: "2026-10-28"
-  open_gaps: 2
+  open_gaps: 3
 -->
 
 # Infrastructure
+
+## 📚 Table of contents
+
+- [🎯 Introduction](#-introduction)
+- [🗺️ Pages in this section](#-pages-in-this-section)
+- [🔑 Key points](#-key-points)
+- [🕳️ Open questions](#-open-questions)
+- [🔗 Related](#-related)
 
 ## 🎯 Introduction
 
@@ -50,7 +62,8 @@ Resource names are held outside this repository, so these pages use role aliases
 - **The difference is content.** The publish job is fixed to the `testmcdocs` environment; the other deployment is not a publish target. ^[devops-21] Content for the documentation environment lives in an Azure Blob Storage container, created by the publish workflow when absent. ^[environment-08]
 - **Resource identity is deliberately absent from this repository.** The settings file states that storage identity is environment-specific and arrives from the overlay ^[configuration-26]; the workflow masks the deployment target it reads and strips the deployment section before the settings file is staged into the published output ^[devops-15].
 - **The resource group is discovered, not declared.** The deployment workflow resolves it with `az webapp list` rather than being told where the application lives. ^[devops-17]
-- **No key reaches the application.** Blob access uses `DefaultAzureCredential` ^[security-08], and pipeline authentication uses an OIDC federated credential with no stored client secret ^[devops-14].
+- **Content-store access is keyless.** Blob access uses `DefaultAzureCredential` ^[security-08], and pipeline authentication uses an OIDC federated credential with no stored client secret ^[devops-14].
+- **A role provider is an optional in-process artifact, not a new hosting topology.** Its module and dependencies live under the running host's `plugins` directory, selected through configuration at startup; blank `Assembly` retains Entra roles. ^[code-106] Nonsecret environment values can use the existing private settings overlay; no provider-specific cloud environment-variable duplicates are required. ^[configuration-04,configuration-42] Provider credentials and hosted token acceptance remain deployment-specific; these source contracts don't establish them. ^[gap]
 
 ## 🕳️ Open questions
 

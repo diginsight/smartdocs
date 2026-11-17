@@ -8,18 +8,20 @@ source_sets:
   - pipeline-definition
   - release-gates
   - authn-authz-surface
+  - domain-model
+  - composition-root
 ---
 
 <!--
 verification_stamp:
-  generated: "2026-11-02"
-  verified: "2026-11-02"
+  generated: "2026-11-17"
+  verified: "2026-11-17"
   gate_outcome: "pass-with-gaps"
   evidence:
     - dossier: "_evidence/smartdocs-web/devops.md"
       observed: "2026-08-18"
     - dossier: "_evidence/smartdocs-web/code.md"
-      observed: "2026-11-02"
+      observed: "2026-11-17"
     - dossier: "_evidence/smartdocs-web-shared/code.md"
       observed: "2026-10-28"
     - dossier: "_evidence/smartdocs-web-client/configuration.md"
@@ -68,9 +70,11 @@ What this repository checks automatically, where those checks run, and — at le
 
 These are manual fixture observations on a local host, not tests run by this documentation refresh. See the [implementation plan](../90.00-issues/202610/20261027.01-smartdocs-authentication/01-roles-permissions-support.plan.md) and its validation records. The 2026-10-28 sequence 04 stopped before any scenario ran and is kept as history; the 2026-11-02 sequence 04 supersedes it. ^[smartdocs-web/code-60,smartdocs-web/code-63] During that run, a hidden space mounted at the site root was found to remove the root's Home link for readers who couldn't see it; the navigation filter was fixed during the run and the scenario passed afterwards. ^[smartdocs-web/code-62,smartdocs-web/code-68]
 
+Provider validation must distinguish startup selection from fresh sign-in: the loader selects the resolver once, while plugin roles resolve only when a new ticket is received. Existing cookies aren't proof of a new selection or assignment. ^[smartdocs-web/code-106,smartdocs-web/code-107] The [provider integration plan](../90.00-issues/202611/20261110.01-authorization-support-custom/04-dima-rbac-integration.plan.md) retains the separate local sequences and the hosted acceptance gate. **Not established by this documentation refresh:** hosted application-token exchange or the two protected API reads. ^[gap]
+
 ## 🕳️ Open questions
 
-> **Not established**: whether any automated test asserts application behaviour. A test project, test-framework reference or test-discovery entry was sought across the solution and the tree — `src/Diginsight.SmartDocs.slnx` was enumerated and `*Test*.csproj`, `*Tests*` directories and test-framework package references were searched for. None was found. ^[gap]
+> **Not established**: a fresh automated execution result for this documentation refresh. The standalone metadata harness has parser, concurrency, policy, and compatibility assertions in source; it isn't a solution test-framework project. Earlier absence-of-tests wording doesn't describe that harness. ^[smartdocs-web/code-93,smartdocs-web/code-96,smartdocs-web/code-97,smartdocs-web/code-98] No new harness or runtime run is claimed here. ^[gap]
 
 > **Not established**: whether the behaviours documented in the [Reference](../06.00-reference/index.md) chapter — label derivation, sort ordering, folder classification, front-matter defaults, coverage merging — behave as declared. Unit tests for `NavRules`, `FrontMatter`, `PageLoader` and `SpaceRegistry` were sought specifically and not found, so those pages are established from source rather than from executed cases. ^[gap]
 

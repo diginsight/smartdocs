@@ -8,18 +8,19 @@ source_sets:
   - composition-root
   - options-model
   - authn-authz-surface
+  - domain-model
 ---
 
 <!--
 verification_stamp:
-  generated: "2026-11-02"
-  verified: "2026-11-02"
+  generated: "2026-11-17"
+  verified: "2026-11-17"
   gate_outcome: "pass-with-gaps"
   evidence:
     - dossier: "_evidence/smartdocs-web/configuration.md"
-      observed: "2026-10-28"
+      observed: "2026-11-17"
     - dossier: "_evidence/smartdocs-web/code.md"
-      observed: "2026-11-02"
+      observed: "2026-11-17"
     - dossier: "_evidence/smartdocs-web/devops.md"
       observed: "2026-08-18"
     - dossier: "_evidence/smartdocs-web/environment.md"
@@ -84,6 +85,7 @@ The base file declares an **empty array**. Each environment must supply complete
 | `Source` and physical-source options | Supplied by the environment ^[configuration-07,configuration-17] |
 | `Access` | Empty by default; only empty or `authenticated`, additive to file requirements ^[configuration-36] |
 | `AccessFileRequired` | `false` by default; when true a missing root file hides the space ^[configuration-37] |
+| `RoleScope` | Optional explicit scope for provider assignments; trimmed, case-insensitive matching. No scope means only global roles apply. Scopes aren't derived from `Id`, `RouteBase`, or metadata ^[configuration-45,code-108] |
 
 The settings file states that a space's mount point is stated by `RouteBase` and nothing else, that at most one space may claim `/`, and that every other space reserves the first segment of its route base. ^[configuration-08] `SpaceRegistry` enforces that at least one space exists, that every space declares an id and that every route base is a single segment, and resolves a request path by longest matching route base. ^[code-07]
 
@@ -105,6 +107,48 @@ The `Development` overlay replaces the source for this space with `FileSystem`, 
 | `Diginsight:SmartCache:SmartDocs:Access` | `00:00:30` | Parsed access-file freshness, not a proven end-to-end revocation deadline ^[configuration-38] |
 
 The host retains token claim names and reads its configured roles/name claims. ^[configuration-40] Base settings don't explicitly select a response type or declare a client secret/certificate. ^[configuration-41] Local sequence 03 observed an ID-token development flow, and the 2026-11-02 local end-to-end run used the same kind of development registration; neither validates a deployed certificate-backed code flow. ^[code-59,code-63] Follow the [provisioning guide](../90.00-issues/202610/20261027.01-smartdocs-authentication/02-reader-access-provisioning.md) rather than putting credentials in public settings.
+
+### `Site:Authorization:RoleProvider`
+
+**Entra ID remains the default.** An absent, empty, or whitespace-only effective `Assembly` selects `EntraIdRoleProvider` without the plugin sign-in hook. Supplying `Type`, `Settings`, or `RoleScope` alone doesn't activate a plugin. Both modes retain the existing reader sign-in configuration. ^[configuration-42,configuration-43,code-106]
+
+| Key under `Site:Authorization:RoleProvider` | Model default | Contract |
+|---|---|---|
+| `Assembly` | Null | Existing relative DLL path inside the running host's `plugins` directory; rooted paths, parent traversal, colon-containing segments, and symbolic links/junctions are rejected ^[configuration-44] |
+| `Type` | Null | Required for a plugin; fully qualified name of a public concrete `IRoleProviderModule` with a public parameterless constructor, **not** the resolver class ^[configuration-43,configuration-44] |
+| `Settings` | Module-defined | Child configuration passed unchanged to the module, which owns its schema and validation ^[configuration-42] |
+| `TimeoutSeconds` | `10` | Plugin mode requires an integer from 1 to 30; the sign-in hook enforces cancellation and an await deadline ^[configuration-43,code-107] |
+| `MaxScopedRoles` | `100` | Positive count limit, applied after scoped-role deduplication and deterministic sorting; not a cookie-byte limit ^[configuration-43,configuration-46] |
+| `DegradedSessionLifetime` | `00:05:00` | Positive, no longer than `SessionLifetime`; resolution failure shortens expiry without extending an earlier expiry ^[configuration-43,configuration-46] |
+
+For example, after deploying a compatible provider and its dependencies, the private environment JSON can contain this **illustrative fragment**. Replace the sample assembly, module, and scopes with your own; it isn't a complete site configuration. The existing overlay mechanism supplies environment settings, so provider-specific App Service environment-variable duplicates aren't required. Exact precedence inside the external configuration extension remains unestablished. ^[configuration-04,configuration-42,configuration-44,configuration-45]
+
+```json
+{
+  "Site": {
+    "Authorization": {
+      "RoleProvider": {
+        "Assembly": "plugins\\example-roles\\Example.Roles.dll",
+        "Type": "Example.Roles.RoleProviderModule",
+        "TimeoutSeconds": 10,
+        "MaxScopedRoles": 100,
+        "DegradedSessionLifetime": "00:05:00",
+        "Settings": {}
+      }
+    },
+    "Spaces": [
+      { "Id": "guide", "RoleScope": "product-guide" },
+      { "Id": "reference", "RoleScope": "product-reference" }
+    ]
+  }
+}
+```
+
+The host loads one module at startup and requires exactly one resolver registration. An invalid configured module stops startup; it never silently falls back to Entra. The provider is trusted code running inside the host, not a sandbox. Keep its artifacts and configuration under deployment control. ^[code-106]
+
+On fresh sign-in, plugin roles **replace**, rather than augment, prior role claims across identities. Only valid roles and configured scopes survive. A resolver error or timeout logs a warning and leaves an authenticated-only, shortened session; it doesn't restore the old roles. Resolution isn't refreshed per request. After changing selection or assignments, restart when necessary and sign out/sign in again; don't use an old cookie to test a new provider. ^[code-107]
+
+**SmartDocs policies are the sole permission authority.** Each space evaluates global roles plus roles matching its explicit `RoleScope`, then unions only the grants in its own root policy. An external permission catalog or mapping isn't consulted by that evaluator. `authenticated` still allows a signed-in reader with no documentation roles when that is all the policy requires. See the [space access policy](08-unified-metadata-contract.md#-space-access-policy). ^[code-108]
 
 ### `Diginsight:SmartCache`
 

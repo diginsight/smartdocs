@@ -10,18 +10,19 @@ source_sets:
   - pipeline-definition
   - deployment-descriptor
   - authn-authz-surface
+  - domain-model
 ---
 
 <!--
 verification_stamp:
-  generated: "2026-10-28"
-  verified: "2026-10-28"
+  generated: "2026-11-17"
+  verified: "2026-11-17"
   gate_outcome: "pass-with-gaps"
   evidence:
     - dossier: "_evidence/smartdocs-web/configuration.md"
-      observed: "2026-10-28"
+      observed: "2026-11-17"
     - dossier: "_evidence/smartdocs-web/code.md"
-      observed: "2026-10-28"
+      observed: "2026-11-17"
     - dossier: "_evidence/smartdocs-web/devops.md"
       observed: "2026-08-18"
     - dossier: "_evidence/smartdocs-web/environment.md"
@@ -68,7 +69,7 @@ Every project builds through the same `Directory.Build.props`, which fixes the .
 dotnet build src/Diginsight.SmartDocs.slnx
 ```
 
-Three projects build: the ASP.NET Core host ^[smartdocs-web/code-01], the Blazor WebAssembly client ^[smartdocs-web-client/code-01] and the Razor Class Library both of them reference ^[smartdocs-web-shared/code-01].
+Four application projects build: the ASP.NET Core host ^[smartdocs-web/code-01], the Blazor WebAssembly client ^[smartdocs-web-client/code-01], the Razor Class Library both of them reference ^[smartdocs-web-shared/code-01], and the authorization contracts library referenced by the host and independently built role providers. ^[smartdocs-web/code-105]
 
 ## ▶️ Run
 
@@ -102,6 +103,8 @@ dotnet run --launch-profile "https - access"
 ```
 
 Nonblank `AzureAd:ClientId` enables sign-in; an empty value leaves the host anonymous-only. Requirements still apply when sign-in is off, so a restricted space can be invisible to everyone until sign-in is configured. ^[smartdocs-web/configuration-28,smartdocs-web/code-47] See the [reader-access provisioning guide](../90.00-issues/202610/20261027.01-smartdocs-authentication/02-reader-access-provisioning.md).
+
+**Keep the default or opt in explicitly.** Leave effective `Site:Authorization:RoleProvider:Assembly` blank to retain Entra roles. To select a separate provider, deploy its assembly/dependencies under the running host's `plugins`, configure its module and settings in the environment overlay, and restart in a visible console. Invalid selection stops startup rather than silently reverting. ^[smartdocs-web/code-106,smartdocs-web/configuration-42,smartdocs-web/configuration-44] Use a fresh sign-out/sign-in to test either mode; existing sessions aren't a new provider-resolution run. See [provider configuration](../06.00-reference/01-configuration-settings.md#siteauthorizationroleprovider). ^[smartdocs-web/code-107]
 
 ## 📂 Where your content goes
 

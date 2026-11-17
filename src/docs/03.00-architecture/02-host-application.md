@@ -10,18 +10,19 @@ source_sets:
   - pipeline-definition
   - authn-authz-surface
   - options-model
+  - domain-model
 ---
 
 <!--
 verification_stamp:
-  generated: "2026-10-28"
-  verified: "2026-10-28"
+  generated: "2026-11-17"
+  verified: "2026-11-17"
   gate_outcome: "pass-with-gaps"
   evidence:
     - dossier: "_evidence/smartdocs-web/code.md"
-      observed: "2026-10-28"
+      observed: "2026-11-17"
     - dossier: "_evidence/smartdocs-web/configuration.md"
-      observed: "2026-10-28"
+      observed: "2026-11-17"
     - dossier: "_evidence/smartdocs-web/data.md"
       observed: "2026-08-18"
     - dossier: "_evidence/smartdocs-web/devops.md"
@@ -56,6 +57,7 @@ The host is where every decision in this system is made concrete. It reads confi
 | `Navigation/` | `DynamicNavBuilder`, `CachedDynamicNavBuilder`, `NavChangePublisher`, `NavHub` | ^[code-18,code-23,code-34,code-35] |
 | `Endpoints/` | `ContentEndpoints`, `NavEndpoints`, `TestContentEndpoints` | ^[code-10,code-11,code-17] |
 | `Authorization/` | Access-file facts, effective requirements, per-space role expansion, and request-scoped filtering | ^[code-46,code-47,code-48] |
+| `RoleProviderLoader`, `RoleProviderSignInHook` | Default or module-based startup selection and bounded replacement-role resolution at sign-in | ^[code-106,code-107] |
 | `Caching/` | `ContentPathCacheKey`, the value type keying the content cache by space and path | ^[data-12] |
 | `Observability.cs`, `ObservabilityManager.cs` | Diginsight, OpenTelemetry and log4net setup | ^[code-02] |
 
@@ -70,6 +72,12 @@ Then, in sequence: the observability and telemetry registrations; Razor componen
 Outside `Development`, the pipeline adds an exception handler at `/error`, HSTS, and HTTPS redirection; antiforgery and static assets apply in every environment. ^[code-38] When `AzureAd:ClientId` is nonblank, Microsoft Identity Web registers reader sign-in and authentication runs immediately before `ReaderAccess` initialization. Authorization then happens through that scoped service rather than a blanket fallback policy. ^[code-46,code-54]
 
 The server checks the exact file selected by the shared rendered-page cache, filters navigation and shell responses, and composes visible totals before returning them. ^[code-20,code-49,code-50] Sign-in and sign-out are full-page transitions; the bootstrap carries display and sign-out-form state, not permission authority. ^[code-54,code-55]
+
+### Selecting reader roles
+
+The host references the neutral authorization contracts, not a provider implementation. With effective `Assembly` blank, the loader registers `EntraIdRoleProvider` and returns without adding the plugin ticket hook. Otherwise it loads the configured module from the running output's `plugins` tree and requires exactly one resolver registration. Path/type/registration failures stop startup. ^[code-105,code-106]
+
+The plugin hook runs after the previous ticket handler, clears previous global/scoped role claims, and resolves replacement roles under an enforced timeout. Failed resolution retains authentication without roles and caps the session at `DegradedSessionLifetime`. Successful results are filtered to valid roles/configured scopes. Resolution runs at sign-in, not on each request. ^[code-107] `SpaceVisibilityEvaluator` still derives permissions only from each space's own policy, using global roles plus matching `RoleScope` assignments. ^[code-108]
 
 ### Warm-up
 
@@ -105,7 +113,7 @@ The invalidation endpoint has a configuration-dependent management guard. ^[secu
 
 ## 🔗 Related
 
-- [System architecture](01-system-architecture.md) — how this fits with the other two projects
+- [System architecture](01-system-architecture.md) — how this fits with the client, shared library, and authorization contracts
 - [Caching and invalidation](05-caching-and-invalidation.md) — the cache this host composes
 - [Reference](../06.00-reference/index.md) — the endpoints and settings named above
 - [Security](../09.00-security/index.md) — the posture that follows from the middleware pipeline above
