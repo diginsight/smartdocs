@@ -71,6 +71,37 @@ internal static class RoleProviderChecks
                 (await loaded.ResolveAsync(Principal(), default)).Scoped.Count == 1,
                 "sample plugin loads outside default context with shared contract identity");
         }
+        const string enabledVariable = "Site__Authorization__RoleProvider__IsEnabled";
+        string? previous = Environment.GetEnvironmentVariable(enabledVariable);
+        try
+        {
+            Environment.SetEnvironmentVariable(enabledVariable, "false");
+            IConfiguration disabled = new ConfigurationBuilder()
+                .AddConfiguration(Config(assembly: @"plugins\not-installed\missing.dll", type: "",
+                    extra: new("TimeoutSeconds", "0")))
+                .AddEnvironmentVariables().Build();
+            var disabledServices = new ServiceCollection();
+            disabledServices.AddRoleProvider(disabled, Site(), new(false), NullLogger.Instance);
+            using (ServiceProvider provider = disabledServices.BuildServiceProvider())
+            {
+                assert(provider.GetRequiredService<IRoleProvider>() is EntraIdRoleProvider &&
+                    disabledServices.All(static d => d.ServiceType != typeof(IPostConfigureOptions<OpenIdConnectOptions>)),
+                    "single environment switch disables plugin loading, validation and OIDC hook even with retained plugin settings");
+                ResolvedRoles roles = await provider.GetRequiredService<IRoleProvider>().ResolveAsync(Principal(), default);
+                assert(roles.Global.SetEquals(["Legacy"]) && roles.Scoped.Count == 0,
+                    "disabled external provider preserves Entra roles, not an authorization bypass");
+            }
+
+            Environment.SetEnvironmentVariable(enabledVariable, "true");
+            IConfiguration reenabled = new ConfigurationBuilder()
+                .AddConfiguration(Config(assembly: @"plugins\not-installed\missing.dll", extra: new("IsEnabled", "false")))
+                .AddEnvironmentVariables().Build();
+            Reject(reenabled, "environment switch re-enables plugin and fails closed when its assembly is missing");
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable(enabledVariable, previous);
+        }
         foreach (string path in new[] { @"C:\provider.dll", @"\\host\share\x.dll", @"\plugins\x.dll", @"plugins\..\x.dll",
             "outside.dll", @"plugins\missing.dll" })
         {

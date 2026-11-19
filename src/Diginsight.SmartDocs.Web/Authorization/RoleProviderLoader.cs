@@ -34,6 +34,11 @@ public static class RoleProviderLoader
 
         if (!options.IsPlugin)
         {
+            if (!options.IsEnabled)
+            {
+                logger.LogInformation("External role provider is disabled by {Setting}; using Entra ID roles",
+                    $"{RoleProviderOptions.Section}:IsEnabled");
+            }
             services.AddSingleton<IRoleProvider, EntraIdRoleProvider>();
             return services;
         }

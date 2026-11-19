@@ -23,12 +23,20 @@ internal static class MetadataChecks
                 return 0;
             }
 
+            if (args is ["test-authorization"])
+            {
+                await ProviderChecks.RunAsync(Assert);
+                await RoleProviderChecks.RunAsync(Assert);
+                Console.WriteLine($"PASS: {assertions} authorization/provider assertions.");
+                return 0;
+            }
+
             if (args is ["validate-tree", var path])
             {
                 return await ValidateTreeAsync(path);
             }
 
-            Console.Error.WriteLine("Usage: MetadataChecks test | validate-tree <content-root>");
+            Console.Error.WriteLine("Usage: MetadataChecks test | test-authorization | validate-tree <content-root>");
             return 2;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or JsonException)

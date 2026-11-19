@@ -6,12 +6,13 @@ public sealed class RoleProviderOptions
 {
     public const string Section = "Site:Authorization:RoleProvider";
 
+    public bool IsEnabled { get; set; } = true;
     public string? Assembly { get; set; }
     public string? Type { get; set; }
     public int TimeoutSeconds { get; set; } = 10;
     public int MaxScopedRoles { get; set; } = 100;
     public TimeSpan DegradedSessionLifetime { get; set; } = TimeSpan.FromMinutes(5);
-    public bool IsPlugin => !string.IsNullOrWhiteSpace(Assembly);
+    public bool IsPlugin => IsEnabled && !string.IsNullOrWhiteSpace(Assembly);
 
     public void Validate(SiteAuthorizationOptions authorization, bool signInEnabled)
     {
