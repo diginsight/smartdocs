@@ -19,3 +19,9 @@ public interface IRoleProviderModule
 {
     void Register(IServiceCollection services, IConfiguration settings);
 }
+
+/// <summary>Optionally requests delegated API scopes during the host's reader sign-in.</summary>
+public interface IUserDelegatedRoleProviderModule : IRoleProviderModule
+{
+    IReadOnlyList<string> GetDelegatedScopes(IConfiguration settings);
+}

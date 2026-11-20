@@ -39,14 +39,15 @@ public static class AuthEndpoints
         this IServiceCollection services,
         IConfiguration configuration,
         SignInConfiguration signIn,
-        SiteAuthorizationOptions authorization)
+        SiteAuthorizationOptions authorization,
+        IReadOnlyList<string>? delegatedScopes = null)
     {
         if (!signIn.Enabled)
         {
             return services;
         }
 
-        services.AddAuthentication(OpenIdConnectDefaults.AuthenticationScheme)
+        var identityBuilder = services.AddAuthentication(OpenIdConnectDefaults.AuthenticationScheme)
             .AddMicrosoftIdentityWebApp(
                 identity => configuration.GetSection("AzureAd").Bind(identity),
                 cookie =>
@@ -59,6 +60,12 @@ public static class AuthEndpoints
                     cookie.Cookie.SecurePolicy = CookieSecurePolicy.Always;
                     cookie.Cookie.SameSite = SameSiteMode.Lax;
                 });
+
+        if (delegatedScopes is { Count: > 0 })
+        {
+            identityBuilder.EnableTokenAcquisitionToCallDownstreamApi(delegatedScopes)
+                .AddInMemoryTokenCaches();
+        }
 
         // Keep the token's claim names, so role values arrive as "roles" claims and the reader's
         // display name as "name". Post-configured so it applies after Identity Web's own defaults.

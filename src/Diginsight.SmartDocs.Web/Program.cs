@@ -114,8 +114,8 @@ public class Program
             // anonymous-only and registers no authentication service at all.
             SignInConfiguration signIn = SignInConfiguration.From(configuration);
             services.AddSingleton(signIn);
-            services.AddReaderSignIn(configuration, signIn, siteOptions.Authorization);
-            services.AddRoleProvider(configuration, siteOptions, signIn, logger);
+            services.AddRoleProvider(configuration, siteOptions, signIn, logger, out var delegatedScopes);
+            services.AddReaderSignIn(configuration, signIn, siteOptions.Authorization, delegatedScopes);
             logger.LogInformation("Reader sign-in is {State}", signIn.Enabled ? "enabled" : "disabled");
 
             // Populated after the container is built (see BrandingAssetResolver), so the scoped

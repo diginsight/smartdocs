@@ -12,7 +12,13 @@ public static class RoleProviderLoader
     public static IServiceCollection AddRoleProvider(this IServiceCollection services,
         IConfiguration configuration, SiteOptions site, SignInConfiguration signIn,
         ILogger logger, string? baseDirectory = null)
+        => services.AddRoleProvider(configuration, site, signIn, logger, out _, baseDirectory);
+
+    public static IServiceCollection AddRoleProvider(this IServiceCollection services,
+        IConfiguration configuration, SiteOptions site, SignInConfiguration signIn,
+        ILogger logger, out IReadOnlyList<string> delegatedScopes, string? baseDirectory = null)
     {
+        delegatedScopes = [];
         IConfigurationSection section = configuration.GetSection(RoleProviderOptions.Section);
         RoleProviderOptions options = section.Get<RoleProviderOptions>() ?? new();
         options.Validate(site.Authorization, signIn.Enabled);
@@ -56,7 +62,16 @@ public static class RoleProviderLoader
             }
 
             var module = (IRoleProviderModule)Activator.CreateInstance(type)!;
-            module.Register(services, section.GetSection("Settings"));
+            IConfigurationSection settings = section.GetSection("Settings");
+            if (module is IUserDelegatedRoleProviderModule delegated)
+            {
+                delegatedScopes = delegated.GetDelegatedScopes(settings).Distinct(StringComparer.Ordinal).ToArray();
+                if (delegatedScopes.Any(string.IsNullOrWhiteSpace))
+                {
+                    throw new InvalidOperationException("Delegated scopes must not be empty or whitespace.");
+                }
+            }
+            module.Register(services, settings);
             if (services.Count(static d => d.ServiceType == typeof(IRoleProvider)) != 1)
             {
                 throw new InvalidOperationException("Type must register exactly one IRoleProvider.");
