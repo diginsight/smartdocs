@@ -56,6 +56,10 @@ public sealed record NavChild(
     /// </summary>
     [JsonIgnore]
     public string? SourceFolder { get; init; }
+
+    /// <summary>Source metadata for the server-side folder projection; never sent to the browser.</summary>
+    [JsonIgnore]
+    public FolderMeta? Metadata { get; init; }
 }
 
 /// <summary>A flattened navigable article (leaf) with its section breadcrumb — used by menu search.</summary>

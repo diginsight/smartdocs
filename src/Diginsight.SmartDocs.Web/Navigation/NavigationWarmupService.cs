@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Threading.Channels;
+using Diginsight.Diagnostics;
 using Diginsight.SmartDocs.Web.Shared.Navigation;
 
 namespace Diginsight.SmartDocs.Web.Navigation;
@@ -68,6 +69,9 @@ public sealed class NavigationWarmupService(
 
             try
             {
+                using var activity = Observability.ActivitySource.StartMethodActivity(
+                    logger, () => new { request.Prefix, request.Depth, request.All });
+
                 await foreground.WaitForBackgroundTurnAsync(MaximumForegroundPause, stoppingToken);
                 if (request.All)
                 {
@@ -96,6 +100,8 @@ public sealed class NavigationWarmupService(
 
     private async Task RunStartupWarmupAsync(CancellationToken cancellationToken)
     {
+        using var activity = Observability.ActivitySource.StartMethodActivity(logger);
+
         string snapshotPath = SnapshotPath(configuration);
         if (await metrics.LoadSnapshotAsync(snapshotPath, cancellationToken) > 0)
         {

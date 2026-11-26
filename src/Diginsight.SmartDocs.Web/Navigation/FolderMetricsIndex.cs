@@ -182,11 +182,11 @@ public sealed class FolderMetricsIndex(
     /// </summary>
     public async Task<IReadOnlyList<string>> DrainAsync(CancellationToken ct = default)
     {
+        using var activity = Observability.ActivitySource.StartMethodActivity(logger);
+
         await _drainGate.WaitAsync(ct);
         try
         {
-            using var activity = Observability.ActivitySource.StartMethodActivity(logger);
-
             List<string> dirty = _cells
                 .Where(kv => IsFoldable(kv.Value))
                 .Select(kv => kv.Key)
@@ -195,6 +195,7 @@ public sealed class FolderMetricsIndex(
 
             if (dirty.Count == 0)
             {
+                activity?.SetOutput(new { changedCount = 0 });
                 return Array.Empty<string>();
             }
 
@@ -257,6 +258,7 @@ public sealed class FolderMetricsIndex(
             }
 
             logger.LogDebug("Drain folded {Dirty} folders, {Changed} changed", dirty.Count, changed.Count);
+            activity?.SetOutput(new { dirtyCount = dirty.Count, changedCount = changed.Count });
             return changed;
         }
         finally
@@ -279,6 +281,7 @@ public sealed class FolderMetricsIndex(
 
         var visited = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         await WalkAsync(Normalize(root), NextStamp(), visited, ct, beforeLevel);
+        activity?.SetOutput(new { visitedCount = visited.Count });
         return visited;
     }
 
@@ -288,6 +291,8 @@ public sealed class FolderMetricsIndex(
     /// </summary>
     public int PruneUnreachable(IReadOnlyCollection<string> reachable)
     {
+        using var activity = Observability.ActivitySource.StartMethodActivity(logger, () => new { reachableCount = reachable.Count });
+
         var keep = new HashSet<string>(reachable, StringComparer.OrdinalIgnoreCase) { string.Empty };
         int removed = 0;
         foreach (string prefix in _cells.Keys.Where(k => !keep.Contains(k)).ToArray())
@@ -303,6 +308,7 @@ public sealed class FolderMetricsIndex(
             logger.LogInformation("Pruned {Count} stale nav metric cells", removed);
         }
 
+        activity?.SetOutput(removed);
         return removed;
     }
 
@@ -477,6 +483,8 @@ public sealed class FolderMetricsIndex(
     /// </summary>
     public async Task SaveSnapshotAsync(string path, CancellationToken ct = default)
     {
+        using var activity = Observability.ActivitySource.StartMethodActivity(logger);
+
         try
         {
             var cells = _cells
@@ -492,10 +500,12 @@ public sealed class FolderMetricsIndex(
             string tmp = path + ".tmp";
             await File.WriteAllTextAsync(tmp, JsonSerializer.Serialize(payload), ct);
             File.Move(tmp, path, overwrite: true);
+            activity?.SetOutput(new { saved = true, cellCount = cells.Count });
         }
         catch (Exception ex)
         {
             logger.LogWarning(ex, "Nav metrics snapshot save failed");
+            activity?.SetOutput(new { saved = false });
         }
     }
 
@@ -509,10 +519,13 @@ public sealed class FolderMetricsIndex(
     /// </summary>
     public async Task<int> LoadSnapshotAsync(string path, CancellationToken ct = default)
     {
+        using var activity = Observability.ActivitySource.StartMethodActivity(logger);
+
         try
         {
             if (!File.Exists(path))
             {
+                activity?.SetOutput(0);
                 return 0;
             }
 
@@ -524,6 +537,7 @@ public sealed class FolderMetricsIndex(
                     "Nav metrics snapshot ignored: it is in format {Found}, this build reads format {Expected}. The crawl rebuilds it.",
                     payload?.Format ?? 0,
                     SnapshotFormat);
+                activity?.SetOutput(0);
                 return 0;
             }
 
@@ -545,11 +559,13 @@ public sealed class FolderMetricsIndex(
             }
 
             logger.LogInformation("Nav metrics seeded from snapshot: {Count} folders", payload.Cells.Count);
+            activity?.SetOutput(payload.Cells.Count);
             return payload.Cells.Count;
         }
         catch (Exception ex)
         {
             logger.LogWarning(ex, "Nav metrics snapshot load failed");
+            activity?.SetOutput(0);
             return 0;
         }
     }

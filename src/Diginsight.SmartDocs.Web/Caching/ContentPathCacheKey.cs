@@ -1,8 +1,9 @@
 using Diginsight.SmartCache;
 using Diginsight.SmartCache.Externalization;
+using Diginsight.Stringify;
 using Diginsight.SmartDocs.Web.Metadata;
+using Diginsight.SmartDocs.Web.Shared.Services;
 using Newtonsoft.Json;
-using System.Collections.Concurrent;
 
 namespace Diginsight.SmartDocs.Web.Caching;
 
@@ -21,21 +22,30 @@ namespace Diginsight.SmartDocs.Web.Caching;
 /// a folder prefix for a menu level, or the empty string for the whole-tree index.
 /// </param>
 [CacheInterchangeName("LPCK")]
-public sealed record ContentPathCacheKey(string Kind, string Path) : IInvalidatable
+public sealed record ContentPathCacheKey(string Kind, string Path) : IInvalidatable, IStringifiable
 {
+    bool IStringifiable.IsDeep => false;
+    object IStringifiable.Subject => this;
+
+    public void AppendTo(StringifyContext context)
+    {
+        context.AppendDirect("ContentPathCacheKey{Kind:");
+        context.ComposeAndAppend(Kind);
+        context.AppendDirect(", Path:");
+        context.ComposeAndAppend(Path);
+        context.AppendDirect('}');
+    }
+
     public bool IsInvalidatedBy(IInvalidationRule invalidationRule, out Func<Task>? invalidationCallback)
     {
         invalidationCallback = null;
         if (invalidationRule is not ContentPathInvalidationRule rule ||
             (rule.Kind is not null && !string.Equals(rule.Kind, Kind, StringComparison.Ordinal)) ||
-            !rule.Paths.Any(path => OnSameBranch(Path, path)))
+            !rule.Paths.Any(path =>
+                OnSameBranch(Path, path) ||
+                (Kind == "page-route-v1" && PageLoader.Candidates(Path).Any(candidate => OnSameBranch(candidate, path)))))
         {
             return false;
-        }
-
-        if (string.Equals(Kind, "folder", StringComparison.Ordinal))
-        {
-            invalidationCallback = FolderInvalidationCallbacks.Get(Path);
         }
 
         return true;
@@ -97,18 +107,4 @@ public sealed record ContentPathInvalidationRule : IInvalidationRule
 
     /// <summary>Original changed paths, before metadata file names are broadened to their folder scope.</summary>
     public IReadOnlySet<string> ChangedPaths { get; }
-}
-
-internal static class FolderInvalidationCallbacks
-{
-    private static readonly ConcurrentDictionary<string, Func<Task>> Callbacks =
-        new(StringComparer.OrdinalIgnoreCase);
-
-    public static void Register(string path, Func<Task> callback) =>
-        Callbacks[ContentPathCacheKey.Normalize(path)] = callback;
-
-    public static Func<Task>? Get(string path) =>
-        Callbacks.TryGetValue(ContentPathCacheKey.Normalize(path), out Func<Task>? callback)
-            ? callback
-            : null;
 }

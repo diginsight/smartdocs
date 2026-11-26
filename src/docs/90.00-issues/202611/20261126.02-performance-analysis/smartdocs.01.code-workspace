@@ -1,0 +1,29 @@
+{
+	"folders": [
+		{
+			"path": "../../../../.."
+		},
+		{
+			"name": "Diginsight.SmartDocs.ABB.RBAC",
+			"path": "../../../../../../smartdocs.internal/src/Diginsight.SmartDocs.ABB.RBAC"
+		}
+	],
+	"settings": {
+		"chat.agentFilesLocations": {
+			".github/agents": true,
+			".github/agents/00.01-pe-consolidated": true,
+			".github/agents/00.02-pe-granular": true,
+			".github/agents/00.09-pe-meta": true,
+			".github/agents/01.00-article-writing": true,
+			".github/agents/10.00-application-development": true
+		},
+		"chat.promptFilesLocations": {
+			".github/prompts": true,
+			".github/prompts/00.01-pe-consolidated": true,
+			".github/prompts/00.02-pe-granular": true,
+			".github/prompts/00.09-pe-meta": true,
+			".github/prompts/01.00-article-writing": true,
+			".github/prompts/10.00-application-development": true
+		}
+	}
+}

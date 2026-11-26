@@ -1,10 +1,8 @@
 using System.Collections.Concurrent;
-using Diginsight.SmartCache;
-using Diginsight.SmartDocs.Web.Caching;
+using Diginsight.Diagnostics;
 using Diginsight.SmartDocs.Web.Metadata;
 using Diginsight.SmartDocs.Web.Shared.Navigation;
 using Diginsight.SmartDocs.Web.Shared.Sites;
-using Diginsight.Runtime;
 
 namespace Diginsight.SmartDocs.Web.Navigation;
 
@@ -12,56 +10,32 @@ public sealed class FolderRecordProvider(
     INavBuilder nav,
     IContentLister content,
     FolderMetricsIndex metrics,
-    ISmartCache smartCache,
-    BackgroundRevalidationCache revalidation,
-    ContentFreshnessOptions freshness,
     SiteOptions site,
     ILogger<FolderRecordProvider> logger)
 {
     private readonly ConcurrentDictionary<string, byte> warnedReservedFolders = new(StringComparer.OrdinalIgnoreCase);
 
-    public Task<FolderRecord> GetAsync(string prefix, CancellationToken cancellationToken = default)
+    public async Task<FolderRecord> GetAsync(string prefix, CancellationToken cancellationToken = default)
     {
         string normalized = Normalize(prefix);
-        FolderInvalidationCallbacks.Register(normalized, () =>
-        {
-            metrics.InvalidateIfTracked(normalized);
-            return Task.CompletedTask;
-        });
-        var key = new ContentPathCacheKey("folder", normalized);
-        var options = new SmartCacheOperationOptions
-        {
-            CoalesceRacingCacheMisses = true,
-            MaxAge = freshness.Structure,
-        };
+        using var activity = Observability.ActivitySource.StartMethodActivity(
+            logger, () => new { prefix }, callerMemberName: nameof(GetAsync));
 
-        return GetRecordAsync();
-
-        async Task<FolderRecord> GetRecordAsync()
-        {
-            FolderRecordEnvelope envelope = await revalidation.GetAsync(
-            key,
-            freshness.Structure,
-            ct => smartCache.GetAsync(
-                key,
-                async cacheCt => new FolderRecordEnvelope(await BuildAsync(normalized, cacheCt)),
-                options,
-                callerType: typeof(FolderRecordProvider),
-                cancellationToken: ct),
-            cancellationToken);
-            return envelope.Record;
-        }
+        FolderRecord record = await BuildAsync(normalized, cancellationToken);
+        activity?.SetOutput(new { record.Classification, record.Coverage });
+        return record;
     }
 
     public void Invalidate(string prefix)
     {
-        var rule = new ContentPathInvalidationRule(Normalize(prefix), Kind: "folder");
-        revalidation.Invalidate(rule);
-        smartCache.Invalidate(rule);
+        using var activity = Observability.ActivitySource.StartMethodActivity(logger, () => new { prefix });
+        metrics.InvalidateIfTracked(Normalize(prefix));
     }
 
     private async Task<FolderRecord> BuildAsync(string prefix, CancellationToken cancellationToken)
     {
+        using var activity = Observability.ActivitySource.StartMethodActivity(logger, () => new { prefix });
+
         if (prefix.Length == 0)
         {
             FolderMetrics root = metrics.TryGet(string.Empty) ?? default;
@@ -86,10 +60,11 @@ public sealed class FolderRecordProvider(
         string parent = ParentOf(prefix);
         NavChild? node = (await nav.GetChildrenAsync(parent, cancellationToken))
             .FirstOrDefault(child =>
-                child.IsSection &&
-                string.Equals(child.Prefix, prefix, StringComparison.OrdinalIgnoreCase));
+                child.Metadata is not null &&
+                string.Equals(child.SourceFolder, prefix, StringComparison.OrdinalIgnoreCase));
 
-        FolderMeta meta = await content.ReadFolderMetaAsync($"{prefix}/metadata.yml", cancellationToken);
+        FolderMeta meta = node?.Metadata
+            ?? await content.ReadFolderMetaAsync($"{prefix}/metadata.yml", cancellationToken);
         FolderMetrics aggregate = metrics.TryGet(prefix) ?? default;
         return Compose(prefix, node, meta, aggregate);
     }
@@ -165,16 +140,4 @@ public sealed class FolderRecordProvider(
         return cut < 0 ? string.Empty : prefix[..cut];
     }
 
-    private sealed record FolderRecordEnvelope(FolderRecord Record) : ISizeableHeuristically
-    {
-        public HeuristicSizeResult GetSizeHeuristically(HeuristicSizeGetter innerGet) =>
-            new(256L + 2L * (
-                Record.Prefix.Length +
-                Record.Label.Length +
-                (Record.Route?.Length ?? 0) +
-                (Record.Short?.Length ?? 0) +
-                (Record.Icon?.Length ?? 0) +
-                Record.Classification.Length +
-                Record.Metadata.Sum(static pair => pair.Key.Length + pair.Value.Length)));
-    }
 }

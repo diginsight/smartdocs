@@ -1,3 +1,4 @@
+using Diginsight.Diagnostics;
 using Diginsight.SmartDocs.Web.Rendering;
 using Diginsight.SmartDocs.Web.Shared.Rendering;
 
@@ -15,26 +16,31 @@ namespace Diginsight.SmartDocs.Web.Authorization;
 /// </summary>
 public sealed class AuthorizingRenderedPageResolver(
     RenderedPageProvider pages,
-    AccessRequirementResolver requirements,
-    ReaderAccess reader) : IRenderedPageResolver
+    ReaderAccess reader,
+    ILogger<AuthorizingRenderedPageResolver> logger) : IRenderedPageResolver
 {
     public async Task<RenderedPageResolution> ResolveRenderedAsync(
         string? routePath,
         CancellationToken cancellationToken = default)
     {
+        using var activity = Observability.ActivitySource.StartMethodActivity(logger, () => new { routePath });
+
         RenderedPageResolution resolution = await pages.ResolveRenderedAsync(routePath, cancellationToken);
-        if (resolution.Page is null || reader.SeesEverything)
+        if (resolution.Page is null)
         {
+            activity?.SetOutput(new { found = resolution.Page is not null });
             return resolution;
         }
 
         // A rendered page whose file is unknown can't be placed in a space, so it is hidden.
         if (resolution.ContentKey is not { Length: > 0 } key)
         {
+            activity?.SetOutput(new { visible = false });
             return RenderedPageResolution.Hidden;
         }
 
-        AccessRequirement requirement = await requirements.ForContentKeyAsync(key, cancellationToken);
-        return reader.IsVisible(requirement) ? resolution : RenderedPageResolution.Hidden;
+        bool visible = await reader.IsPathVisibleAsync(key, cancellationToken);
+        activity?.SetOutput(new { visible });
+        return visible ? resolution : RenderedPageResolution.Hidden;
     }
 }

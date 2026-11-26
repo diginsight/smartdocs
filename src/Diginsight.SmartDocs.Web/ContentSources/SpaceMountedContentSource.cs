@@ -19,7 +19,7 @@ namespace Diginsight.SmartDocs.Web.ContentSources;
 /// space dimension.
 /// </para>
 /// </summary>
-public sealed class SpaceMountedContentSource : IContentSource, IContentLister
+public sealed class SpaceMountedContentSource : IContentSource, IConditionalContentSource, IContentLister
 {
     private readonly SpaceRegistry registry;
     private readonly IReadOnlyDictionary<string, SpaceContentAccess> bySpaceId;
@@ -36,7 +36,7 @@ public sealed class SpaceMountedContentSource : IContentSource, IContentLister
 
     public Task<ContentResult?> GetAsync(string contentKey, CancellationToken ct = default)
     {
-        using var activity = Observability.HotPathActivitySource.StartMethodActivity(logger, () => new { contentKey });
+        using var activity = Observability.ActivitySource.StartMethodActivity(logger, () => new { contentKey });
 
         // Metadata is read internally from the physical source, never delivered as raw content.
         if (MetadataFiles.IsCarrierKey(contentKey))
@@ -49,9 +49,39 @@ public sealed class SpaceMountedContentSource : IContentSource, IContentLister
             : Task.FromResult<ContentResult?>(null);
     }
 
+    public async Task<ContentValidationResult> GetIfChangedAsync(
+        string contentKey, string etag, CancellationToken ct = default)
+    {
+        using var activity = Observability.ActivitySource.StartMethodActivity(logger, () => new { contentKey });
+
+        if (MetadataFiles.IsCarrierKey(contentKey) ||
+            !TryMap(contentKey, out SpaceContentAccess? access, out string inner))
+        {
+            return ContentValidationResult.Missing;
+        }
+
+        ContentValidationResult result;
+        if (access.Source is IConditionalContentSource conditional)
+        {
+            result = await conditional.GetIfChangedAsync(inner, etag, ct);
+        }
+        else
+        {
+            ContentResult? current = await access.Source.GetAsync(inner, ct);
+            result = current is null
+                ? ContentValidationResult.Missing
+                : string.Equals(current.ETag, etag, StringComparison.Ordinal)
+                    ? ContentValidationResult.Unchanged
+                    : ContentValidationResult.Changed(current);
+        }
+
+        activity?.SetOutput(new { result.NotModified, found = result.NotModified || result.Content is not null });
+        return result;
+    }
+
     public async Task<IReadOnlyList<ChildEntry>> ListChildrenAsync(string prefix, CancellationToken ct = default)
     {
-        using var activity = Observability.HotPathActivitySource.StartMethodActivity(logger, () => new { prefix });
+        using var activity = Observability.ActivitySource.StartMethodActivity(logger, () => new { prefix });
 
         string rel = Normalize(prefix);
         if (rel.Length == 0)
@@ -78,7 +108,7 @@ public sealed class SpaceMountedContentSource : IContentSource, IContentLister
 
     public Task<string?> ReadHeadAsync(string key, CancellationToken ct = default)
     {
-        using var activity = Observability.HotPathActivitySource.StartMethodActivity(logger, () => new { key });
+        using var activity = Observability.ActivitySource.StartMethodActivity(logger, () => new { key });
 
         if (MetadataFiles.IsCarrierKey(key))
         {

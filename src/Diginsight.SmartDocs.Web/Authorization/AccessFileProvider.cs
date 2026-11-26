@@ -19,7 +19,7 @@ public sealed class AccessFileProvider(
 
     public async Task<AccessFileOutcome> GetAsync(string spaceId, CancellationToken cancellationToken = default)
     {
-        using var activity = Observability.HotPathActivitySource.StartMethodActivity(logger, () => new { spaceId });
+        using var activity = Observability.ActivitySource.StartMethodActivity(logger, () => new { spaceId });
 
         SpaceContentAccess access = spaces.Get(spaceId);
         MetadataOutcome snapshot = await metadata.GetForSpaceAsync(spaceId, cancellationToken);

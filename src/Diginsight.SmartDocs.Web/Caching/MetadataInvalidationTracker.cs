@@ -1,3 +1,5 @@
+using Diginsight.SmartDocs.Web.Shared.Services;
+
 namespace Diginsight.SmartDocs.Web.Caching;
 
 /// <summary>Tracks invalidations, including those received before a metadata scope is first read.</summary>
@@ -9,12 +11,23 @@ public sealed class MetadataInvalidationTracker
 
     public long Generation(string metadataKey)
     {
+        return Generation([metadataKey]);
+    }
+
+    public long Generation(ContentPathCacheKey key) =>
+        Generation(key.Kind == "page-route-v1"
+            ? PageLoader.Candidates(key.Path)
+            : [key.Path]);
+
+    private long Generation(IEnumerable<string> paths)
+    {
+        string[] candidates = paths.ToArray();
         lock (gate)
         {
             long result = 0;
             foreach ((string path, long version) in changes)
             {
-                if (version > result && ContentPathCacheKey.OnSameBranch(metadataKey, path))
+                if (version > result && candidates.Any(candidate => ContentPathCacheKey.OnSameBranch(candidate, path)))
                 {
                     result = version;
                 }

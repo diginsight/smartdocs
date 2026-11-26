@@ -1,17 +1,29 @@
 using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
+using Diginsight.Diagnostics;
 using Diginsight.SmartDocs.Web.Shared.Navigation;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Components.Endpoints;
 
 namespace Diginsight.SmartDocs.Web.Navigation;
 
-public sealed class NavigationBootstrapMiddleware(RequestDelegate next)
+public sealed class NavigationBootstrapMiddleware(
+    RequestDelegate next,
+    ILogger<NavigationBootstrapMiddleware> logger)
 {
     public async Task InvokeAsync(HttpContext context, NavigationBootstrapState bootstrap)
     {
+        using var activity = Observability.ActivitySource.StartMethodActivity(logger);
+
         if (!HttpMethods.IsGet(context.Request.Method))
+        {
+            await next(context);
+            return;
+        }
+
+        if (context.Request.Path.StartsWithSegments("/_page") ||
+            context.Request.Path.StartsWithSegments("/_nav"))
         {
             await next(context);
             return;
@@ -47,11 +59,13 @@ public sealed class NavigationBootstrapMiddleware(RequestDelegate next)
                 context.Response.Headers.CacheControl = "private, no-store";
                 context.Response.ContentLength = bytes.Length;
                 await originalBody.WriteAsync(bytes, context.RequestAborted);
+                activity?.SetOutput(new { bootstrapInjected = true, length = bytes.Length });
                 return;
             }
 
             context.Response.ContentLength = buffer.Length;
             await buffer.CopyToAsync(originalBody, context.RequestAborted);
+            activity?.SetOutput(new { bootstrapInjected = false, length = buffer.Length });
         }
         finally
         {

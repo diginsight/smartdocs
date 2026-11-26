@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text;
+using Diginsight.Diagnostics;
 using Diginsight.SmartDocs.Web.Caching;
 using Diginsight.SmartDocs.Web.Metadata;
 using Diginsight.SmartDocs.Web.Shared.Navigation;
@@ -16,7 +17,8 @@ public sealed class VisibleMetadataFingerprint(
     SiteOptions site,
     MetadataInvalidationTracker invalidations,
     ContentFreshnessOptions freshness,
-    TimeProvider clock)
+    TimeProvider clock,
+    ILogger<VisibleMetadataFingerprint> logger)
 {
     private readonly HashSet<string> assetFolders =
         new(NavRules.AssetFolderNames.Concat(site.AssetFolders), StringComparer.OrdinalIgnoreCase);
@@ -24,6 +26,8 @@ public sealed class VisibleMetadataFingerprint(
 
     public async Task<string> ForSpaceAsync(SpaceOptions space, CancellationToken ct = default)
     {
+        using var activity = Observability.ActivitySource.StartMethodActivity(logger, () => new { spaceId = space.Id });
+
         string root = space.NormalizedRouteBase.Trim('/');
         TimeSpan maxAge = freshness.Access < freshness.Structure ? freshness.Access : freshness.Structure;
         while (true)
@@ -72,6 +76,8 @@ public sealed class VisibleMetadataFingerprint(
 
     private async Task<Fingerprint> ComputeAsync(SpaceOptions space, string root)
     {
+        using var activity = Observability.ActivitySource.StartMethodActivity(logger, () => new { spaceId = space.Id, root });
+
         bool cacheable = true;
         var records = new List<string>();
         Add(root, await metadata.GetForSpaceAsync(space.Id));
@@ -107,6 +113,7 @@ public sealed class VisibleMetadataFingerprint(
 
         records.Sort(StringComparer.Ordinal);
         string value = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(string.Join('\n', records))));
+        activity?.SetOutput(new { cacheable, folderCount = visited.Count, metadataCount = records.Count });
         return new Fingerprint(value, cacheable);
 
         void Add(string path, MetadataOutcome outcome)

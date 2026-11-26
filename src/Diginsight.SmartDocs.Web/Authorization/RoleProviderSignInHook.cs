@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using Diginsight.Diagnostics;
 using Diginsight.SmartDocs.Authorization;
 using Diginsight.SmartDocs.Web.Shared.Sites;
 using Microsoft.AspNetCore.Authentication;
@@ -15,6 +16,8 @@ public sealed class RoleProviderSignInHook(
 {
     public void Configure(OpenIdConnectOptions oidc)
     {
+        using var activity = Observability.ActivitySource.StartMethodActivity(logger);
+
         Func<TicketReceivedContext, Task> previous = oidc.Events.OnTicketReceived;
         oidc.Events.OnTicketReceived = async context =>
         {
@@ -30,6 +33,8 @@ public sealed class RoleProviderSignInHook(
 
     private async Task ResolveAsync(TicketReceivedContext context)
     {
+        using var activity = Observability.ActivitySource.StartMethodActivity(logger);
+
         if (context.Principal?.Identities.Any(static i => i.IsAuthenticated) != true)
         {
             context.Fail("The role provider requires an authenticated principal.");
@@ -94,11 +99,13 @@ public sealed class RoleProviderSignInHook(
             claims.AddRange(scoped.Take(options.MaxScopedRoles).Select(static value => new Claim(RoleSet.ScopedRolesClaimType, value)));
             ClaimsIdentity target = clean.Identities.First(static i => i.IsAuthenticated);
             target.AddClaims(claims);
+            activity?.SetOutput(new { degraded = false, grantedClaimCount = claims.Count });
         }
         catch (Exception ex) when (!context.HttpContext.RequestAborted.IsCancellationRequested)
         {
             cancellation.Cancel();
             logger.LogWarning("Role resolution failed ({FailureType}); issuing an authenticated-only degraded session", ex.GetType().Name);
+            activity?.SetOutput(new { degraded = true });
             DateTimeOffset expires = DateTimeOffset.UtcNow + options.DegradedSessionLifetime;
             AuthenticationProperties properties = context.Properties ??= new();
             if (properties.ExpiresUtc is not { } current || current > expires)

@@ -40,10 +40,10 @@ public sealed class SpaceVisibilityEvaluator(
     /// <summary>Evaluates every configured space, and the nodes outside every space, for <paramref name="roles"/>.</summary>
     public async Task<ReaderVisibility> EvaluateAsync(RoleSet roles, CancellationToken cancellationToken = default)
     {
-        using var activity = Observability.HotPathActivitySource.StartMethodActivity(logger, () => new { roles = roles.ToString() });
+        using var activity = Observability.ActivitySource.StartMethodActivity(logger, () => new { roles.IsSignedIn });
 
         (SpaceVisibility Visibility, AccessFile? File)[] evaluated = await Task.WhenAll(
-            spaces.All.Select(space => EvaluateSpaceAsync(space, roles, cancellationToken)));
+            spaces.All.Select(space => EvaluateSpaceOutcomeAsync(space, roles, cancellationToken)));
 
         WarnUnmappedRoles(roles, evaluated);
 
@@ -55,15 +55,32 @@ public sealed class SpaceVisibilityEvaluator(
             outsidePermissions,
             outsideRequirement.IsCoveredBy(outsidePermissions));
 
-        activity?.SetOutput(new { visible = string.Join(", ", visibility.VisibleSpaceIds), visibility.OutsideVisible });
+        activity?.SetOutput(new { visibleSpaceCount = visibility.VisibleSpaceIds.Count(), visibility.OutsideVisible });
         return visibility;
     }
 
     /// <summary>Whether <paramref name="roles"/> may see the space <paramref name="spaceId"/>.</summary>
     public async Task<bool> IsSpaceVisibleAsync(string spaceId, RoleSet roles, CancellationToken cancellationToken = default) =>
-        spaces.ById(spaceId) is { } space && (await EvaluateSpaceAsync(space, roles, cancellationToken)).Visibility.IsVisible;
+        spaces.ById(spaceId) is not null &&
+        (await EvaluateSpaceAsync(spaceId, roles, cancellationToken)).IsVisible;
 
-    private async Task<(SpaceVisibility Visibility, AccessFile? File)> EvaluateSpaceAsync(SpaceOptions space, RoleSet roles, CancellationToken cancellationToken)
+    /// <summary>Evaluates only one space for a point read, using one policy snapshot for its grants and requirement.</summary>
+    public async Task<SpaceVisibility> EvaluateSpaceAsync(string spaceId, RoleSet roles, CancellationToken cancellationToken = default)
+    {
+        using var activity = Observability.ActivitySource.StartMethodActivity(logger, () => new { spaceId, roles.IsSignedIn });
+
+        if (spaces.ById(spaceId) is not { } space)
+        {
+            return new SpaceVisibility(spaceId, AccessRequirement.UnresolvableIn(spaceId), NoPermissions, false);
+        }
+
+        var result = await EvaluateSpaceOutcomeAsync(space, roles, cancellationToken);
+        activity?.SetOutput(new { result.Visibility.IsVisible });
+        return result.Visibility;
+    }
+
+    private async Task<(SpaceVisibility Visibility, AccessFile? File)> EvaluateSpaceOutcomeAsync(
+        SpaceOptions space, RoleSet roles, CancellationToken cancellationToken)
     {
         // One read of the access file yields both the requirement and the role map, so a file that
         // changes between two reads can never pair one version's requirement with another's grants.

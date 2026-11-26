@@ -2,18 +2,22 @@ using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.InteropServices;
+using System.Security.Cryptography;
 using System.Text;
 using Diginsight.Components;
 using Diginsight.SmartCache;
 using Diginsight.SmartCache.Externalization;
+using Diginsight.Stringify;
 using Diginsight.SmartDocs.Web.Authorization;
 using Diginsight.SmartDocs.Web.Caching;
 using Diginsight.SmartDocs.Web.ContentSources;
 using Diginsight.SmartDocs.Web.Metadata;
 using Diginsight.SmartDocs.Web.Navigation;
+using Diginsight.SmartDocs.Web.Rendering;
 using Diginsight.SmartDocs.Web.Shared;
 using Diginsight.SmartDocs.Web.Shared.Navigation;
 using Diginsight.SmartDocs.Web.Shared.Sites;
+using Diginsight.SmartDocs.Web.Shared.Rendering;
 using Diginsight.SmartDocs.Web.Sites;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -57,6 +61,9 @@ internal static class ProviderChecks
 
     public static async Task RunAsync(Action<bool, string> assert)
     {
+        CacheKeyLogging(assert);
+        await ServerActivityFlowAsync(assert);
+
         await SharedAndFreshAsync(assert);
         await ConcurrentAsync(assert);
         await InvalidationRaceAsync(assert);
@@ -66,6 +73,9 @@ internal static class ProviderChecks
         await FingerprintRecoveryAsync(assert);
         await FingerprintInvalidationRaceAsync(assert);
         await HubRefreshAsync(assert);
+        await ArticleCacheConsolidationAsync(assert);
+        await RouteAliasInvalidationAsync(assert);
+        await FolderDescriptionConsolidationAsync(assert);
         await ScopeIsolationAsync(assert);
         await ScopedRoleEvaluationAsync(assert);
         await ConsumersAsync(assert);
@@ -427,6 +437,47 @@ internal static class ProviderChecks
         }
     }
 
+    private static void CacheKeyLogging(Action<bool, string> assert)
+    {
+        using ServiceProvider services = new ServiceCollection()
+            .AddLogging()
+            .AddStringify()
+            .Configure<StringifyOverallConfiguration>(options => options.MaxTime = TimeSpan.FromSeconds(1))
+            .BuildServiceProvider();
+        IStringifyContextFactory factory = services.GetRequiredService<IStringifyContextFactory>();
+        var key = new ContentPathCacheKey("content", "guide/index.md");
+        assert(factory.Stringify(key) == "ContentPathCacheKey{Kind:\"content\", Path:\"guide/index.md\"}",
+            "cache logs show the kind and path without reflection errors");
+        assert(factory.Stringify(new ContentPathCacheKey("nav-index", string.Empty)) ==
+            "ContentPathCacheKey{Kind:\"nav-index\", Path:\"\"}",
+            "whole-tree cache keys retain their empty root path in logs");
+        string bounded = factory.Stringify(new ContentPathCacheKey("content", new string('x', 200)));
+        assert(bounded.Length < 120 && !bounded.Contains(new string('x', 100), StringComparison.Ordinal),
+            "cache key formatting retains Diginsight string-length limits");
+    }
+
+    private static async Task ServerActivityFlowAsync(Action<bool, string> assert)
+    {
+        var activities = new ConcurrentBag<Activity>();
+        using var listener = new ActivityListener
+        {
+            ShouldListenTo = source => source.Name == "Diginsight.SmartDocs.Web",
+            Sample = (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllData,
+            ActivityStopped = activities.Add,
+        };
+        ActivitySource.AddActivityListener(listener);
+        using var fixture = new ConsumerFixture(required: false);
+        fixture.Source.Set("metadata.yml", "label: Example");
+        using var request = new Activity("server-logging-check").Start();
+        ReaderVisibility result = await fixture.Evaluator.EvaluateAsync(RoleSet.Anonymous);
+        Activity evaluation = activities.Single(activity => activity.OperationName.Contains("EvaluateAsync", StringComparison.Ordinal));
+        Activity resolution = activities.Single(activity => activity.OperationName.Contains("ResolveSpaceAsync", StringComparison.Ordinal));
+        assert(result.SeesEverything && resolution.ParentSpanId == evaluation.SpanId,
+            "normal-source authorization spans preserve the evaluator-to-resolver parent chain");
+        assert(activities.Count >= 4 && activities.All(activity => activity.TraceId == request.TraceId),
+            "server metadata reads share the request trace without enabling a HotPath source");
+    }
+
     private static async Task SharedAndFreshAsync(Action<bool, string> assert)
     {
         using var fixture = new Fixture(compatibility: false);
@@ -510,7 +561,8 @@ internal static class ProviderChecks
         using var fixture = new Fixture(compatibility: false);
         var tracker = new MetadataInvalidationTracker();
         var remote = new RemoteContentInvalidations();
-        var cache = new CoordinatedSmartCache(fixture.Cache, fixture.Companion, tracker, remote);
+        var cache = new CoordinatedSmartCache(fixture.Cache, fixture.Companion, tracker, remote,
+            NullLogger<CoordinatedSmartCache>.Instance);
         SpaceOptions space = NewSpace("alpha", "/alpha");
         var provider = NewProvider([new(space, fixture.Source, fixture.Source)], cache, fixture.Parser,
             new ContentFreshnessOptions(), new SiteOptions { LegacyMetadataCompatibility = false }, tracker);
@@ -562,7 +614,7 @@ internal static class ProviderChecks
         using var lateFixture = new Fixture(compatibility: false);
         var lateTracker = new MetadataInvalidationTracker();
         var lateCache = new CoordinatedSmartCache(lateFixture.Cache, lateFixture.Companion, lateTracker,
-            new RemoteContentInvalidations());
+            new RemoteContentInvalidations(), NullLogger<CoordinatedSmartCache>.Instance);
         lateCache.Invalidate(new InvalidationDescriptor("other-host", transmitted));
         lateFixture.Source.Set("metadata.yml", RevokedPolicy);
         lateCache.AddExternalMiss(new CacheMissDescriptor("other-host", key, lateFixture.Clock.GetUtcNow(), "other-host",
@@ -598,7 +650,8 @@ internal static class ProviderChecks
         ContentMetadataProvider provider = NewProvider(entries, fixture.Cache, fixture.Parser,
             freshness, new SiteOptions { LegacyMetadataCompatibility = false }, tracker);
         var fingerprints = new VisibleMetadataFingerprint(
-            mounted, provider, registry, new SiteOptions(), tracker, freshness, fixture.Clock);
+            mounted, provider, registry, new SiteOptions(), tracker, freshness, fixture.Clock,
+            NullLogger<VisibleMetadataFingerprint>.Instance);
 
         fixture.Source.Delay = TimeSpan.FromMilliseconds(50);
         string[] initial = await Task.WhenAll(Enumerable.Range(0, 100).Select(_ => fingerprints.ForSpaceAsync(alpha)));
@@ -663,7 +716,8 @@ internal static class ProviderChecks
         var freshness = new ContentFreshnessOptions();
         var site = new SiteOptions { LegacyMetadataCompatibility = false };
         ContentMetadataProvider provider = NewProvider(entries, fixture.Cache, fixture.Parser, freshness, site, tracker);
-        var fingerprints = new VisibleMetadataFingerprint(mounted, provider, registry, site, tracker, freshness, fixture.Clock);
+        var fingerprints = new VisibleMetadataFingerprint(mounted, provider, registry, site, tracker, freshness, fixture.Clock,
+            NullLogger<VisibleMetadataFingerprint>.Instance);
 
         var timer = Stopwatch.StartNew();
         string cold = await fingerprints.ForSpaceAsync(alpha);
@@ -690,7 +744,8 @@ internal static class ProviderChecks
         var freshness = new ContentFreshnessOptions();
         var site = new SiteOptions { LegacyMetadataCompatibility = false };
         ContentMetadataProvider provider = NewProvider(entries, fixture.Cache, fixture.Parser, freshness, site, tracker);
-        var fingerprints = new VisibleMetadataFingerprint(mounted, provider, registry, site, tracker, freshness, fixture.Clock);
+        var fingerprints = new VisibleMetadataFingerprint(mounted, provider, registry, site, tracker, freshness, fixture.Clock,
+            NullLogger<VisibleMetadataFingerprint>.Instance);
 
         fixture.Source.FailKey = "metadata.yml";
         string unreadable = await fingerprints.ForSpaceAsync(alpha);
@@ -735,7 +790,8 @@ internal static class ProviderChecks
         var freshness = new ContentFreshnessOptions();
         var site = new SiteOptions { LegacyMetadataCompatibility = false };
         ContentMetadataProvider provider = NewProvider(entries, fixture.Cache, fixture.Parser, freshness, site, tracker);
-        var fingerprints = new VisibleMetadataFingerprint(mounted, provider, registry, site, tracker, freshness, fixture.Clock);
+        var fingerprints = new VisibleMetadataFingerprint(mounted, provider, registry, site, tracker, freshness, fixture.Clock,
+            NullLogger<VisibleMetadataFingerprint>.Instance);
 
         fixture.Source.BlockListing("guide");
         Task<string> inFlight = fingerprints.ForSpaceAsync(alpha);
@@ -761,21 +817,21 @@ internal static class ProviderChecks
         var registry = new SpaceRegistry([alpha]);
         var content = new SpaceContentRegistry([new(alpha, fixture.Source, fixture.Source)]);
         var tracker = new MetadataInvalidationTracker();
-        var cache = new CoordinatedSmartCache(fixture.Cache, fixture.Companion, tracker, new RemoteContentInvalidations());
+        var cache = new CoordinatedSmartCache(fixture.Cache, fixture.Companion, tracker, new RemoteContentInvalidations(),
+            NullLogger<CoordinatedSmartCache>.Instance);
         var site = new SiteOptions { LegacyMetadataCompatibility = false };
         var freshness = new ContentFreshnessOptions();
         var metadata = new ContentMetadataProvider(content, registry, cache, tracker, fixture.Parser, freshness,
             site, NullLogger<ContentMetadataProvider>.Instance);
         var physical = new SpaceMountedContentSource(registry, content, NullLogger<SpaceMountedContentSource>.Instance);
-        using var revalidation = new BackgroundRevalidationCache(NullLogger<BackgroundRevalidationCache>.Instance);
-        var cachedContent = new CachedContentSource(physical, physical, cache, revalidation, freshness, metadata,
-            NullLogger<CachedContentSource>.Instance);
+        var cachedContent = new CachedContentSource(physical, physical, cache, tracker, freshness, metadata,
+            new MarkdigMarkdownRenderer(), NullLogger<CachedContentSource>.Instance);
         var inner = new EmptyNavBuilder();
         using ServiceProvider navServices = new ServiceCollection().AddSingleton<INavBuilder>(inner).BuildServiceProvider();
         using var metrics = new FolderMetricsIndex(navServices, registry, NullLogger<FolderMetricsIndex>.Instance);
-        var nav = new CachedDynamicNavBuilder(inner, cache, revalidation, fixture.Parallel, freshness,
+        var nav = new CachedDynamicNavBuilder(inner, cache, fixture.Parallel, freshness,
             NullLogger<CachedDynamicNavBuilder>.Instance);
-        var folders = new FolderRecordProvider(nav, cachedContent, metrics, cache, revalidation, freshness, site,
+        var folders = new FolderRecordProvider(nav, cachedContent, metrics, site,
             NullLogger<FolderRecordProvider>.Instance);
         var resolver = new AccessRequirementResolver(registry,
             new AccessFileProvider(content, metadata, NullLogger<AccessFileProvider>.Instance), site.Authorization,
@@ -785,7 +841,8 @@ internal static class ProviderChecks
         var hub = new CapturingHub();
         var publisher = new NavChangePublisher(metrics, nav, folders, hub, active, evaluator, resolver,
             new ReaderCountComposer(metrics, registry), registry,
-            new VisibleMetadataFingerprint(cachedContent, metadata, registry, site, tracker, freshness, fixture.Clock),
+            new VisibleMetadataFingerprint(cachedContent, metadata, registry, site, tracker, freshness, fixture.Clock,
+                NullLogger<VisibleMetadataFingerprint>.Instance),
             NullLogger<NavChangePublisher>.Instance);
         RoleSet reader = RoleSet.SignedIn(["Reader"]);
         RoleSet anonymous = RoleSet.Anonymous;
@@ -828,6 +885,125 @@ internal static class ProviderChecks
         assert(hub.Sent(ActiveRoleSets.GroupOf(reader), NavHubContract.RefreshRequired) &&
             !hub.Sent(ActiveRoleSets.GroupOf(anonymous), NavHubContract.RefreshRequired),
             "a newly restored reader receives a refresh");
+    }
+
+    private static async Task ArticleCacheConsolidationAsync(Action<bool, string> assert)
+    {
+        using var fixture = new ConsumerFixture(required: false);
+        fixture.Source.Set("article.md", "---\ntitle: First\n---\n# First\n\nBody.");
+
+        ArticleHead head = await fixture.Cached.ReadArticleHeadAsync("alpha/article.md");
+        assert(head.Title == "First" && fixture.Source.HeadReads == 1 && fixture.Source.Reads == 0,
+            "menu head fills only the bounded head in the article cache");
+
+        CachedContentSource.CachedArticleRecord first =
+            await fixture.Cached.GetArticleRecordAsync("alpha/article.md");
+        assert(first.Content is not null && first.Page?.Title == "First" &&
+            first.ResponseBytes is not null && first.ResponseETag is not null &&
+            fixture.Source.Reads == 1 && fixture.Source.HeadReads == 1,
+            "page promotion reads full source once and keeps rendered JSON with the same article entry");
+
+        CachedContentSource.CachedArticleRecord repeat =
+            await fixture.Cached.GetArticleRecordAsync("alpha/article.md");
+        assert(repeat.ResponseETag == first.ResponseETag && fixture.Source.Reads == 1 &&
+            fixture.Source.HeadReads == 1,
+            "warm article lookup reuses the full source, head, render, and response validator");
+
+        fixture.Clock.Advance(TimeSpan.FromMinutes(6));
+        CachedContentSource.CachedArticleRecord revalidated =
+            await fixture.Cached.GetArticleRecordAsync("alpha/article.md");
+        assert(revalidated.ResponseETag == first.ResponseETag &&         fixture.Source.Reads == 1 && fixture.Source.Validations == 1 &&
+            revalidated.Page?.Html == first.Page?.Html,
+        "unchanged source validation reuses the rendered bytes and ETag without downloading the source again");
+
+        fixture.Source.Set("article.md", "---\ntitle: Second\n---\n# Second\n\nUpdated.");
+        var rule = new ContentPathInvalidationRule("alpha/article.md");
+        fixture.Tracker.Invalidate(rule);
+        fixture.Cache.Invalidate(rule);
+        CachedContentSource.CachedArticleRecord changed =
+            await fixture.Cached.GetArticleRecordAsync("alpha/article.md");
+        assert(changed.Page?.Title == "Second" && changed.ResponseETag != first.ResponseETag &&
+            fixture.Source.Reads == 2,
+            "article invalidation replaces the co-located source and rendered representation");
+    }
+
+    private static async Task RouteAliasInvalidationAsync(Action<bool, string> assert)
+    {
+        using var fixture = new ConsumerFixture(required: false);
+        fixture.Source.Set("guide.md", "# File route");
+        fixture.Source.Set("guide/index.md", "# Folder route");
+        var pages = new RenderedPageProvider(
+            fixture.Cached,
+            fixture.Cache,
+            fixture.Tracker,
+            new ContentFreshnessOptions(),
+            NullLogger<RenderedPageProvider>.Instance);
+
+        RenderedPageResolution first = await pages.ResolveRenderedAsync("alpha/guide");
+        assert(first.ContentKey == "alpha/guide.md" && first.Page?.Title == "File route",
+            "route cache preserves file-before-folder candidate precedence");
+
+        fixture.Source.Remove("guide.md");
+        var rule = new ContentPathInvalidationRule("alpha/guide.md");
+        fixture.Tracker.Invalidate(rule);
+        fixture.Cache.Invalidate(rule);
+        RenderedPageResolution changed = await pages.ResolveRenderedAsync("alpha/guide");
+        assert(changed.ContentKey == "alpha/guide/index.md" && changed.Page?.Title == "Folder route",
+            "file-candidate invalidation refreshes its route alias and selects the next candidate");
+    }
+
+    private static async Task FolderDescriptionConsolidationAsync(Action<bool, string> assert)
+    {
+        using var fixture = new Fixture(compatibility: false);
+        fixture.Source.Set("guide/metadata.yml", "label: Guide\nshort: G\ncustom: value");
+        fixture.Source.Set("guide/one.md", "# One");
+        fixture.Source.Set("guide/two.md", "# Two");
+        fixture.Source.Set("single/metadata.yml", "label: One-article folder");
+        fixture.Source.Set("single/only.md", "# Only");
+
+        SpaceOptions alpha = NewSpace("alpha", "/alpha");
+        var registry = new SpaceRegistry([alpha]);
+        var contentRegistry = new SpaceContentRegistry([new(alpha, fixture.Source, fixture.Source)]);
+        var invalidations = new MetadataInvalidationTracker();
+        var freshness = new ContentFreshnessOptions();
+        var site = new SiteOptions { LegacyMetadataCompatibility = false };
+        var metadata = new ContentMetadataProvider(
+            contentRegistry, registry, fixture.Cache, invalidations, fixture.Parser, freshness, site,
+            NullLogger<ContentMetadataProvider>.Instance);
+        var mounted = new SpaceMountedContentSource(
+            registry, contentRegistry, NullLogger<SpaceMountedContentSource>.Instance);
+        var cached = new CachedContentSource(
+            mounted, mounted, fixture.Cache, invalidations, freshness, metadata,
+            new MarkdigMarkdownRenderer(), NullLogger<CachedContentSource>.Instance);
+        using ServiceProvider services = new ServiceCollection().BuildServiceProvider();
+        using var metrics = new FolderMetricsIndex(services, registry, NullLogger<FolderMetricsIndex>.Instance);
+        var dynamic = new DynamicNavBuilder(
+            cached, metrics, fixture.Parallel, new Lazy<INavBuilder>(() => throw new InvalidOperationException()),
+            NullLogger<DynamicNavBuilder>.Instance, registry);
+        var nav = new CachedDynamicNavBuilder(
+            dynamic, fixture.Cache, fixture.Parallel, freshness, NullLogger<CachedDynamicNavBuilder>.Instance);
+        var folders = new FolderRecordProvider(
+            nav, cached, metrics, site, NullLogger<FolderRecordProvider>.Instance);
+
+        NavChild section = (await nav.GetChildrenAsync("alpha"))
+            .Single(child => child.Prefix == "alpha/guide");
+        FolderRecord record = await folders.GetAsync("alpha/guide");
+        bool oldFolderEntry = fixture.Cache.TryGetDirectFromMemory(
+            new ContentPathCacheKey("folder", "alpha/guide"), out _, out _);
+        assert(section.Metadata?.Label == "Guide" && record.Label == "Guide" &&
+            record.Metadata.TryGetValue("custom", out string? value) && value == "value" &&
+            !oldFolderEntry,
+            "folder metadata and its computed browser record share the cached navigation description");
+
+        NavChild collapsed = (await nav.GetChildrenAsync("alpha"))
+            .Single(child => child.SourceFolder == "alpha/single");
+        fixture.Source.Remove("single/metadata.yml");
+        fixture.Cache.Invalidate(new ContentPathInvalidationRule(
+            "alpha/single/metadata.yml", Kind: ContentMetadataProvider.CanonicalCacheKind));
+        FolderRecord collapsedRecord = await folders.GetAsync("alpha/single");
+        assert(!collapsed.IsSection && collapsed.Metadata?.Label == "One-article folder" &&
+            collapsedRecord.Label == "One-article folder",
+            "collapsed-folder records reuse metadata retained in the cached navigation description");
     }
 
     private static async Task ScopeIsolationAsync(Action<bool, string> assert)
@@ -962,6 +1138,10 @@ internal static class ProviderChecks
         var policies = new AccessFileProvider(new(entries), metadata, NullLogger<AccessFileProvider>.Instance);
         var resolver = new AccessRequirementResolver(registry, policies, site.Authorization, NullLogger<AccessRequirementResolver>.Instance);
         var evaluator = new SpaceVisibilityEvaluator(registry, resolver, NullLogger<SpaceVisibilityEvaluator>.Instance);
+        SpaceVisibility point = await evaluator.EvaluateSpaceAsync(
+            "a", RoleSet.SignedIn([], [new("Contributor", "REPO-A")]));
+        assert(point.IsVisible && fixture.Source.Reads == 1,
+            "point authorization reads only the selected space's policy snapshot");
         ReaderVisibility scoped = await evaluator.EvaluateAsync(RoleSet.SignedIn([], [new("Contributor", " REPO-A ")]));
         assert(scoped.VisibleSpaceIds.Order().SequenceEqual(new[] { "a", "a2" }),
             "scoped roles apply to matching scopes only, including shared scopes and whitespace/case normalization");
@@ -1019,7 +1199,6 @@ internal static class ProviderChecks
     private sealed class ConsumerFixture : IDisposable
     {
             private readonly Fixture storage;
-            private readonly BackgroundRevalidationCache revalidation;
 
             public ConsumerFixture(bool required, bool compatibility = false, string siteFloor = "", string spaceFloor = "",
                 StringComparer? comparer = null)
@@ -1036,7 +1215,8 @@ internal static class ProviderChecks
                     Authorization = new SiteAuthorizationOptions { DefaultRequirement = siteFloor },
                 };
                 var freshness = new ContentFreshnessOptions();
-                Provider = new ContentMetadataProvider(Content, Spaces, storage.Cache, new MetadataInvalidationTracker(),
+                Tracker = new MetadataInvalidationTracker();
+                Provider = new ContentMetadataProvider(Content, Spaces, storage.Cache, Tracker,
                     storage.Parser, freshness,
                     site, NullLogger<ContentMetadataProvider>.Instance);
                 var policies = new AccessFileProvider(Content, Provider, NullLogger<AccessFileProvider>.Instance);
@@ -1044,8 +1224,8 @@ internal static class ProviderChecks
                     NullLogger<AccessRequirementResolver>.Instance);
                 Evaluator = new SpaceVisibilityEvaluator(Spaces, resolver, NullLogger<SpaceVisibilityEvaluator>.Instance);
                 Mounted = new SpaceMountedContentSource(Spaces, Content, NullLogger<SpaceMountedContentSource>.Instance);
-                revalidation = new BackgroundRevalidationCache(NullLogger<BackgroundRevalidationCache>.Instance);
-                Cached = new CachedContentSource(Mounted, Mounted, storage.Cache, revalidation, freshness, Provider,
+                Cached = new CachedContentSource(Mounted, Mounted, storage.Cache, Tracker, freshness, Provider,
+                    new MarkdigMarkdownRenderer(),
                     NullLogger<CachedContentSource>.Instance);
             }
 
@@ -1056,15 +1236,12 @@ internal static class ProviderChecks
             public SpaceRegistry Spaces { get; }
             public SpaceContentRegistry Content { get; }
             public ContentMetadataProvider Provider { get; }
+            public MetadataInvalidationTracker Tracker { get; }
             public SpaceVisibilityEvaluator Evaluator { get; }
             public SpaceMountedContentSource Mounted { get; }
             public CachedContentSource Cached { get; }
 
-            public void Dispose()
-            {
-                revalidation.Dispose();
-                storage.Dispose();
-            }
+            public void Dispose() => storage.Dispose();
     }
 
     private sealed class ManualClock : TimeProvider
@@ -1096,11 +1273,13 @@ internal static class ProviderChecks
         }
     }
 
-    private sealed class CountingSource(StringComparer comparer) : IContentSource, IContentLister
+    private sealed class CountingSource(StringComparer comparer) : IContentSource, IConditionalContentSource, IContentLister
     {
         private readonly ConcurrentDictionary<string, byte[]> files = new(comparer);
         private int reads;
         private int listings;
+        private int headReads;
+        private int validations;
         private int blockNext;
         private int blockListing;
         private TaskCompletionSource release = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -1110,6 +1289,8 @@ internal static class ProviderChecks
         public string? BlockedPrefix { get; private set; }
         public int Reads => Volatile.Read(ref reads);
         public int Listings => Volatile.Read(ref listings);
+        public int HeadReads => Volatile.Read(ref headReads);
+        public int Validations => Volatile.Read(ref validations);
         public string? FailKey { get; set; }
         public TimeSpan Delay { get; set; }
         public void Set(string key, string value) => files[key] = Encoding.UTF8.GetBytes(value);
@@ -1143,7 +1324,23 @@ internal static class ProviderChecks
                 await Task.Delay(Delay, ct);
             }
 
-            return bytes is null ? null : new ContentResult(bytes, "text/yaml", "fixture");
+            string etag = bytes is null ? string.Empty : $"\"{Convert.ToHexString(SHA256.HashData(bytes))}\"";
+            return bytes is null ? null : new ContentResult(bytes, "text/yaml", etag);
+        }
+
+        public Task<ContentValidationResult> GetIfChangedAsync(
+            string key, string etag, CancellationToken ct = default)
+        {
+            Interlocked.Increment(ref validations);
+            if (!files.TryGetValue(key, out byte[]? bytes))
+            {
+                return Task.FromResult(ContentValidationResult.Missing);
+            }
+
+            string currentETag = $"\"{Convert.ToHexString(SHA256.HashData(bytes))}\"";
+            return Task.FromResult(string.Equals(etag, currentETag, StringComparison.Ordinal)
+                ? ContentValidationResult.Unchanged
+                : ContentValidationResult.Changed(new ContentResult(bytes, "text/yaml", currentETag)));
         }
 
         public async Task<IReadOnlyList<ChildEntry>> ListChildrenAsync(string prefix, CancellationToken ct = default)
@@ -1168,8 +1365,16 @@ internal static class ProviderChecks
             return result;
         }
 
-        public Task<string?> ReadHeadAsync(string key, CancellationToken ct = default) =>
-            throw new InvalidOperationException("The metadata provider must not use a head read.");
+        public async Task<string?> ReadHeadAsync(string key, CancellationToken ct = default)
+        {
+            Interlocked.Increment(ref headReads);
+            if (!files.TryGetValue(key, out byte[]? bytes))
+            {
+                return null;
+            }
+
+            return await FrontMatter.ReadHeadAsync(new MemoryStream(bytes, writable: false), ct);
+        }
     }
 
     private sealed class PreloadedCache(MetadataSnapshotEnvelope envelope) : ISmartCache

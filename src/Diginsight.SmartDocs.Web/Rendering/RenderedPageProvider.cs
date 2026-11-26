@@ -1,78 +1,112 @@
-using System.Text;
+using Diginsight.Diagnostics;
+using Diginsight.Runtime;
 using Diginsight.SmartCache;
 using Diginsight.SmartDocs.Web.Caching;
-using Diginsight.SmartDocs.Web.Shared;
+using Diginsight.SmartDocs.Web.ContentSources;
 using Diginsight.SmartDocs.Web.Shared.Rendering;
 using Diginsight.SmartDocs.Web.Shared.Services;
-using Diginsight.Runtime;
 
 namespace Diginsight.SmartDocs.Web.Rendering;
 
 public sealed class RenderedPageProvider(
-    IContentSource content,
-    IMarkdownRenderer renderer,
+    CachedContentSource content,
     ISmartCache smartCache,
-    BackgroundRevalidationCache revalidation,
-    ContentFreshnessOptions freshness) : IRenderedPageResolver
+    MetadataInvalidationTracker invalidations,
+    ContentFreshnessOptions freshness,
+    ILogger<RenderedPageProvider> logger) : IRenderedPageResolver
 {
+    private const string RouteCacheKind = "page-route-v1";
+    private readonly string origin = Guid.NewGuid().ToString("N");
+
     public async Task<RenderedPageResolution> ResolveRenderedAsync(
         string? routePath,
         CancellationToken cancellationToken = default)
     {
-        string route = (routePath ?? string.Empty).Replace('\\', '/').Trim('/');
-        var key = new ContentPathCacheKey("page", route);
-        var options = new SmartCacheOperationOptions
-        {
-            CoalesceRacingCacheMisses = true,
-            MaxAge = freshness.Content,
-        };
+        using var activity = Observability.ActivitySource.StartMethodActivity(logger, () => new { routePath });
 
-        RenderedPageEnvelope envelope = await revalidation.GetAsync(
-            key,
-            freshness.Content,
-            ct => smartCache.GetAsync(
+        string route = (routePath ?? string.Empty).Replace('\\', '/').Trim('/');
+        var key = new ContentPathCacheKey(RouteCacheKind, route);
+        RouteRecord routeRecord = await GetRouteAsync(key, route, cancellationToken);
+        if (routeRecord.ContentKey is not { } contentKey)
+        {
+            activity?.SetOutput(new { found = false });
+            return RenderedPageResolution.Nothing;
+        }
+
+        CachedContentSource.CachedArticleRecord article =
+            await content.GetArticleRecordAsync(contentKey, cancellationToken);
+        activity?.SetOutput(new { found = article.Page is not null });
+
+        return article.Page is { } page && article.ResponseBytes is { } responseBytes
+            ? RenderedPageResolution.Found(page, contentKey, responseBytes, article.ResponseETag)
+            : RenderedPageResolution.Nothing;
+    }
+
+    private async Task<RouteRecord> GetRouteAsync(
+        ContentPathCacheKey key, string route, CancellationToken cancellationToken)
+    {
+        RouteRecord record = await ReadRouteAsync(key, route, freshness.Content, cancellationToken);
+        if (record.ContentKey is null && freshness.Missing < freshness.Content)
+        {
+            record = await ReadRouteAsync(key, route, freshness.Missing, cancellationToken);
+        }
+
+        return record;
+    }
+
+    private async Task<RouteRecord> ReadRouteAsync(
+        ContentPathCacheKey key, string route, TimeSpan maxAge, CancellationToken cancellationToken)
+    {
+        bool forceOrigin = false;
+        while (true)
+        {
+            var options = new SmartCacheOperationOptions
+            {
+                CoalesceRacingCacheMisses = true,
+                MaxAge = forceOrigin ? TimeSpan.Zero : maxAge,
+            };
+
+            RouteRecord record = await smartCache.GetAsync(
                 key,
-                BuildAsync,
+                async ct =>
+                {
+                    long started = invalidations.Generation(key);
+                    string? resolvedKey = await ResolveContentKeyAsync(route, ct);
+                    return new RouteRecord(resolvedKey, origin, started);
+                },
                 options,
                 callerType: typeof(RenderedPageProvider),
-                cancellationToken: ct),
-            cancellationToken);
+                cancellationToken: cancellationToken);
 
-        return envelope.Page is { } page
-            ? RenderedPageResolution.Found(page, envelope.ContentKey)
-            : RenderedPageResolution.Nothing;
-
-        async Task<RenderedPageEnvelope> BuildAsync(CancellationToken ct)
-        {
-            foreach (string contentKey in PageLoader.Candidates(route))
+            long current = invalidations.Generation(key);
+            if ((record.Origin == origin && record.Generation != current) ||
+                (record.Origin != origin && current != 0))
             {
-                ContentResult? result = await content.GetAsync(contentKey, ct);
-                if (result is null)
-                {
-                    continue;
-                }
-
-                string markdown = Encoding.UTF8.GetString(result.Bytes);
-                string contentDir = contentKey.Contains('/')
-                    ? contentKey[..contentKey.LastIndexOf('/')]
-                    : string.Empty;
-                return new RenderedPageEnvelope(renderer.Render(markdown, contentDir), contentKey);
+                forceOrigin = true;
+                continue;
             }
 
-            return new RenderedPageEnvelope(null);
+            return record;
         }
     }
 
-    /// <param name="ContentKey">The candidate key that was rendered, so the page is checked through the exact file shown.</param>
-    private sealed record RenderedPageEnvelope(RenderedPage? Page, string? ContentKey = null) : ISizeableHeuristically
+    private async Task<string?> ResolveContentKeyAsync(string route, CancellationToken ct)
+    {
+        foreach (string candidate in PageLoader.Candidates(route))
+        {
+            CachedContentSource.CachedArticleRecord article = await content.GetArticleRecordAsync(candidate, ct);
+            if (article.Content is not null)
+            {
+                return candidate;
+            }
+        }
+
+        return null;
+    }
+
+    private sealed record RouteRecord(string? ContentKey, string Origin, long Generation) : ISizeableHeuristically
     {
         public HeuristicSizeResult GetSizeHeuristically(HeuristicSizeGetter innerGet) =>
-            new(Page is null
-                ? 64
-                : 128L + 2L * (
-                    Page.Html.Length +
-                    Page.Title.Length +
-                    (ContentKey?.Length ?? 0) +
-                    Page.Toc.Sum(static item => item.Text.Length + item.Id.Length)));
+            new(96L + 2L * ((ContentKey?.Length ?? 0) + Origin.Length));
     }
 }

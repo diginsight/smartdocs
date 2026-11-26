@@ -34,7 +34,13 @@ public interface IRenderedPageResolver
 /// <see cref="Nothing"/>, so every caller answers it exactly as a missing page — but distinct from it,
 /// because the server must not fall through to another candidate file for a hidden one.
 /// </param>
-public sealed record RenderedPageResolution(bool Handled, RenderedPage? Page, string? ContentKey = null, bool IsHidden = false)
+public sealed record RenderedPageResolution(
+    bool Handled,
+    RenderedPage? Page,
+    string? ContentKey = null,
+    bool IsHidden = false,
+    byte[]? ResponseBytes = null,
+    string? ResponseETag = null)
 {
     public static RenderedPageResolution Unhandled { get; } = new(false, null);
 
@@ -43,7 +49,9 @@ public sealed record RenderedPageResolution(bool Handled, RenderedPage? Page, st
     /// <summary>The route renders a page the reader may not see: answered as <see cref="Nothing"/> is.</summary>
     public static RenderedPageResolution Hidden { get; } = new(true, null, null, true);
 
-    public static RenderedPageResolution Found(RenderedPage page, string? contentKey = null) => new(true, page, contentKey);
+    public static RenderedPageResolution Found(
+        RenderedPage page, string? contentKey = null, byte[]? responseBytes = null, string? responseETag = null) =>
+        new(true, page, contentKey, false, responseBytes, responseETag);
 }
 
 /// <summary>A single heading in the on-page table of contents.</summary>

@@ -1,3 +1,7 @@
+using System.Collections.Concurrent;
+using Diginsight.Diagnostics;
+using Diginsight.SmartDocs.Web.Caching;
+using Diginsight.SmartDocs.Web.ContentSources;
 using Diginsight.SmartDocs.Web.Navigation;
 using Diginsight.SmartDocs.Web.Shared.Navigation;
 using Diginsight.SmartDocs.Web.Shared.Sites;
@@ -5,9 +9,9 @@ using Diginsight.SmartDocs.Web.Shared.Sites;
 namespace Diginsight.SmartDocs.Web.Authorization;
 
 /// <summary>
-/// What the current request's reader may see. Scoped to the request and initialized once, at the
-/// start of the pipeline, by the middleware <c>Program</c> places ahead of navigation bootstrap, so
-/// every later component and endpoint reads the same verdicts.
+/// Captures the current request's reader and lazily resolves only the policy scopes that its
+/// navigation or content requests need. Per-request memoization keeps grants and requirements on
+/// the same policy revision without storing a principal's verdict in a shared cache.
 /// <para>
 /// Filters find each node's space from its <see cref="NavChild.SourceFolder"/>, never from its route:
 /// a mount node and a root-mounted space's page can share a route. A node that carries no source
@@ -20,69 +24,89 @@ public sealed class ReaderAccess(
     SpaceVisibilityEvaluator evaluator,
     AccessRequirementResolver requirements,
     FolderRecordProvider folders,
-    ReaderCountComposer counts)
+    ReaderCountComposer counts,
+    ILogger<ReaderAccess> logger)
 {
-    private ReaderVisibility? visibility;
-
-    /// <summary>The verdicts of this request. Reading them before <see cref="InitializeAsync"/> is a wiring fault.</summary>
-    private ReaderVisibility Visibility => visibility
-        ?? throw new InvalidOperationException("ReaderAccess was read before the request pipeline initialized it.");
+    private readonly ConcurrentDictionary<string, Lazy<Task<SpaceVisibility>>> spaceVisibility =
+        new(StringComparer.OrdinalIgnoreCase);
+    private RoleSet? roles;
+    private Task<ReaderVisibility>? allVisibility;
+    private CancellationToken requestAborted;
 
     /// <summary>True once <see cref="InitializeAsync"/> has run for this request.</summary>
-    public bool IsInitialized => visibility is not null;
+    public bool IsInitialized => roles is not null;
 
     /// <summary>The reader's role set.</summary>
-    public RoleSet Roles => Visibility.Roles;
+    public RoleSet Roles => roles
+        ?? throw new InvalidOperationException("ReaderAccess was read before the request pipeline initialized it.");
 
-    /// <summary>The spaces the reader may see, in configuration order.</summary>
+    /// <summary>The spaces visible to a full-page shell after its global navigation policy has been evaluated.</summary>
     public IReadOnlyList<SpaceOptions> VisibleSpaces =>
-        spaces.All.Where(space => IsSpaceVisible(space.Id)).ToList();
+        spaces.All.Where(space => IsSpaceVisible(space.Id)).ToArray();
 
-    /// <summary>True when the reader sees every space and every node outside them.</summary>
-    public bool SeesEverything => Visibility.SeesEverything;
+    public bool IsSpaceVisible(string spaceId) =>
+        GetCompletedVisibility().Spaces.TryGetValue(spaceId, out SpaceVisibility? verdict) && verdict.IsVisible;
 
-    /// <summary>Evaluates every configured space for the reader of <paramref name="context"/>. Runs on every request.</summary>
-    public async Task InitializeAsync(HttpContext context)
+    /// <summary>Captures the request's principal without reading unrelated space policies.</summary>
+    public Task InitializeAsync(HttpContext context)
     {
-        visibility = await evaluator.EvaluateAsync(RoleSet.FromPrincipal(context.User), context.RequestAborted);
+        using var activity = Observability.ActivitySource.StartMethodActivity(logger);
+
+        roles = RoleSet.FromPrincipal(context.User);
+        requestAborted = context.RequestAborted;
+        activity?.SetOutput(new { roles.IsSignedIn });
+        return Task.CompletedTask;
     }
 
-    /// <summary>True when the reader may see the space <paramref name="spaceId"/>.</summary>
-    public bool IsSpaceVisible(string? spaceId) =>
-        spaceId is not null && Visibility.Spaces.TryGetValue(spaceId, out SpaceVisibility? space) && space.IsVisible;
-
-    /// <summary>
-    /// True when the reader's permissions in the space that owns <paramref name="requirement"/> cover
-    /// it. The space must also be visible in this request's evaluation, so a requirement computed
-    /// from a newer read of the access file can only hide more, never open a space the evaluation of
-    /// this request closed.
-    /// </summary>
-    public bool IsVisible(AccessRequirement requirement) => Visibility.IsVisible(requirement);
-
-    /// <summary>Drops the nodes of one navigation level whose space the reader can't see.</summary>
-    public Task<IReadOnlyList<NavChild>> FilterLevelAsync(IReadOnlyList<NavChild> level)
+    /// <summary>Whether the current reader may see a mounted path, using only its owning space.</summary>
+    public async Task<PathAccessDecision> ResolvePathAccessAsync(
+        string? path, CancellationToken cancellationToken = default)
     {
-        if (SeesEverything)
+        string normalized = ContentPathCacheKey.Normalize(path ?? string.Empty);
+        if (!ContentKeyGuard.IsSafe(normalized))
         {
-            return Task.FromResult(level);
+            return new PathAccessDecision(false, false);
         }
 
-        IReadOnlyList<NavChild> kept = level
-            .Where(child => IsSiteHome(child) ? IsSiteHomeVisible() : IsFolderVisible(child.SourceFolder))
-            .ToList();
-        return Task.FromResult(kept);
+        if (spaces.TryResolve(normalized, out SpaceOptions space, out _))
+        {
+            SpaceVisibility visibility = await GetSpaceVisibilityAsync(space.Id, cancellationToken);
+            return new PathAccessDecision(visibility.IsVisible, visibility.Requirement.IsEmpty);
+        }
+
+        AccessRequirement requirement = requirements.ForOutsideSpaces();
+        return new PathAccessDecision(IsOutsideVisible(requirement), requirement.IsEmpty);
+    }
+
+    public async Task<bool> IsPathVisibleAsync(string? path, CancellationToken cancellationToken = default) =>
+        (await ResolvePathAccessAsync(path, cancellationToken)).IsVisible;
+
+    /// <summary>Visible spaces in configured order; global shell generation legitimately needs every space.</summary>
+    public async Task<IReadOnlyList<SpaceOptions>> GetVisibleSpacesAsync(CancellationToken cancellationToken = default)
+    {
+        ReaderVisibility visible = await GetAllVisibilityAsync(cancellationToken);
+        return spaces.All.Where(space =>
+            visible.Spaces.TryGetValue(space.Id, out SpaceVisibility? verdict) && verdict.IsVisible).ToArray();
+    }
+
+    /// <summary>Drops the nodes of one navigation level whose space the reader can't see.</summary>
+    public async Task<IReadOnlyList<NavChild>> FilterLevelAsync(
+        IReadOnlyList<NavChild> level, CancellationToken cancellationToken = default)
+    {
+        bool[] visible = await Task.WhenAll(level.Select(child =>
+            IsSiteHome(child)
+                ? IsSiteHomeVisibleAsync(cancellationToken)
+                : IsPathVisibleAsync(child.SourceFolder, cancellationToken)));
+        return level.Where((_, index) => visible[index]).ToArray();
     }
 
     /// <summary>Drops the leaves of the article index whose space the reader can't see.</summary>
-    public Task<IReadOnlyList<NavLeaf>> FilterIndexAsync(IReadOnlyList<NavLeaf> leaves)
+    public async Task<IReadOnlyList<NavLeaf>> FilterIndexAsync(
+        IReadOnlyList<NavLeaf> leaves, CancellationToken cancellationToken = default)
     {
-        if (SeesEverything)
-        {
-            return Task.FromResult(leaves);
-        }
-
-        IReadOnlyList<NavLeaf> kept = leaves.Where(leaf => IsFolderVisible(leaf.SourceFolder)).ToList();
-        return Task.FromResult(kept);
+        bool[] visible = await Task.WhenAll(leaves.Select(leaf =>
+            IsPathVisibleAsync(leaf.SourceFolder, cancellationToken)));
+        return leaves.Where((_, index) => visible[index]).ToArray();
     }
 
     /// <summary>
@@ -93,51 +117,59 @@ public sealed class ReaderAccess(
     /// </summary>
     public async Task<FolderRecord> GetFolderAsync(string? prefix, CancellationToken cancellationToken = default)
     {
+        using var activity = Observability.ActivitySource.StartMethodActivity(logger, () => new { prefix });
+
         string normalized = (prefix ?? string.Empty).Replace('\\', '/').Trim('/');
-        if (normalized.Length > 0 && !SeesEverything)
+        if (normalized.Length > 0 && !await IsPathVisibleAsync(normalized, cancellationToken))
         {
-            AccessRequirement requirement = await requirements.ForFolderAsync(normalized, cancellationToken);
-            if (!IsVisible(requirement))
-            {
-                return folders.Unknown(normalized);
-            }
+            return folders.Unknown(normalized);
         }
 
         FolderRecord record = await folders.GetAsync(normalized, cancellationToken);
-        return normalized.Length == 0 ? counts.ComposeRootRecord(record, Visibility) : record;
+        return normalized.Length == 0
+            ? counts.ComposeRootRecord(record, await GetAllVisibilityAsync(cancellationToken))
+            : record;
     }
 
     /// <summary>The site-wide counts this reader may see, or null while the index has no root cell.</summary>
-    public FolderMetrics? GetTotal() => counts.ComposeRoot(Visibility);
+    public async Task<FolderMetrics?> GetTotalAsync(CancellationToken cancellationToken = default) =>
+        counts.ComposeRoot(await GetAllVisibilityAsync(cancellationToken));
 
-    /// <summary>
-    /// The verdict for a node coming from <paramref name="sourceFolder"/>, a mounted content folder.
-    /// The owning space is found exactly as the mounted content source finds it.
-    /// </summary>
-    private bool IsFolderVisible(string? sourceFolder)
+    private Task<SpaceVisibility> GetSpaceVisibilityAsync(string spaceId, CancellationToken cancellationToken)
     {
-        if (sourceFolder is null)
-        {
-            return false;
-        }
-
-        string normalized = sourceFolder.Replace('\\', '/').Trim('/');
-        return spaces.TryResolve(normalized, out SpaceOptions space, out _)
-            ? IsSpaceVisible(space.Id)
-            : Visibility.OutsideVisible;
+        CancellationToken token = cancellationToken == default ? requestAborted : cancellationToken;
+        Lazy<Task<SpaceVisibility>> lazy = spaceVisibility.GetOrAdd(
+            spaceId,
+            id => new Lazy<Task<SpaceVisibility>>(
+                () => evaluator.EvaluateSpaceAsync(id, Roles, token),
+                LazyThreadSafetyMode.ExecutionAndPublication));
+        return lazy.Value;
     }
 
-    /// <summary>
-    /// True for the site root's generated <b>Home</b> link, the only node with the empty route: index
-    /// pages never become nodes, and a collapsed folder or a mount routes to its own path.
-    /// </summary>
-    private static bool IsSiteHome(NavChild child) => !child.IsSection && child.Route is { Length: 0 };
+    private Task<ReaderVisibility> GetAllVisibilityAsync(CancellationToken cancellationToken) =>
+        allVisibility ??= evaluator.EvaluateAsync(Roles, cancellationToken == default ? requestAborted : cancellationToken);
 
-    /// <summary>
-    /// The Home link opens <c>/</c>, which shows a root-mounted space's page when the reader sees that
-    /// space and the generated index otherwise. Taking the outside verdict when the root-mounted space
-    /// is hidden keeps the root level shaped exactly as on a site with no root-mounted space, so the
-    /// missing link can't reveal that a hidden space claims the root.
-    /// </summary>
-    private bool IsSiteHomeVisible() => IsFolderVisible(string.Empty) || Visibility.OutsideVisible;
+    private ReaderVisibility GetCompletedVisibility() =>
+        allVisibility is { IsCompletedSuccessfully: true } completed
+            ? completed.Result
+            : throw new InvalidOperationException("Global reader visibility was requested before the shell initialized it.");
+
+    private async Task<bool> IsSiteHomeVisibleAsync(CancellationToken cancellationToken)
+    {
+        AccessRequirement outside = requirements.ForOutsideSpaces();
+        bool outsideVisible = IsOutsideVisible(outside);
+        return spaces.TryResolve(string.Empty, out SpaceOptions root, out _)
+            ? (await GetSpaceVisibilityAsync(root.Id, cancellationToken)).IsVisible || outsideVisible
+            : outsideVisible;
+    }
+
+    private bool IsOutsideVisible(AccessRequirement requirement)
+    {
+        string[] permissions = Roles.IsSignedIn ? [AccessRequirement.Authenticated] : [];
+        return requirement.IsCoveredBy(permissions);
+    }
+
+    private static bool IsSiteHome(NavChild child) => !child.IsSection && child.Route is { Length: 0 };
 }
+
+public sealed record PathAccessDecision(bool IsVisible, bool IsPublic);

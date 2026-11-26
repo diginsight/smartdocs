@@ -24,6 +24,7 @@ using Diginsight.SmartDocs.Web.Sites;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using Microsoft.AspNetCore.Components.Web;
+using Microsoft.AspNetCore.Components.Endpoints;
 
 namespace Diginsight.SmartDocs.Web;
 
@@ -129,7 +130,7 @@ public class Program
                 // state the browser hydrates from, and the generated space index all follow it.
                 SiteShellOptions shell = SiteEndpoints.ForReader(
                     SiteShellOptions.From(siteOptions, brandingAssets.LogoUrl, signIn.Enabled),
-                    sp.GetRequiredService<ReaderAccess>());
+                    sp.GetRequiredService<ReaderAccess>().VisibleSpaces);
                 sp.GetRequiredService<NavigationBootstrapState>().Site = shell;
                 var state = new SiteShellState();
                 state.Apply(shell);
@@ -251,9 +252,10 @@ public class Program
                     mounted,
                     mounted,
                     sp.GetRequiredService<ISmartCache>(),
-                    sp.GetRequiredService<BackgroundRevalidationCache>(),
+                    sp.GetRequiredService<MetadataInvalidationTracker>(),
                     freshness,
                     sp.GetRequiredService<ContentMetadataProvider>(),
+                    sp.GetRequiredService<IMarkdownRenderer>(),
                     sp.GetRequiredService<ILogger<CachedContentSource>>());
             });
             services.AddSingleton<IContentSource>(sp => sp.GetRequiredService<CachedContentSource>());
@@ -280,7 +282,8 @@ public class Program
                 siteOptions,
                 sp.GetRequiredService<MetadataInvalidationTracker>(),
                 freshness,
-                TimeProvider.System));
+                TimeProvider.System,
+                sp.GetRequiredService<ILogger<VisibleMetadataFingerprint>>()));
             services.AddScoped<ReaderAccess>();
 
             services.AddSingleton<IMarkdownRenderer, MarkdigMarkdownRenderer>();
@@ -296,9 +299,6 @@ public class Program
             // IMemoryCache is registered here: SmartCache's builder registers its own, and SmartCache
             // itself keeps a private memory cache, so nothing in this application resolves one.
             services.AddSingleton<FolderMetricsIndex>();
-            services.AddSingleton<BackgroundRevalidationCache>();
-            services.AddHostedService(
-                sp => sp.GetRequiredService<BackgroundRevalidationCache>());
             // The inner builder gets a lazy handle on the decorator that wraps it, so the whole-tree
             // walk behind GetIndexAsync reads each level through the cache instead of re-listing the
             // tree. Lazy breaks the cycle: it is never forced in the constructor, only on first walk.
@@ -313,7 +313,6 @@ public class Program
             services.AddSingleton<CachedDynamicNavBuilder>(sp => new CachedDynamicNavBuilder(
                 sp.GetRequiredService<DynamicNavBuilder>(),
                 sp.GetRequiredService<ISmartCache>(),
-                sp.GetRequiredService<BackgroundRevalidationCache>(),
                 sp.GetRequiredService<IParallelService>(),
                 freshness,
                 sp.GetRequiredService<ILogger<CachedDynamicNavBuilder>>()));
@@ -322,9 +321,6 @@ public class Program
                 sp.GetRequiredService<INavBuilder>(),
                 sp.GetRequiredService<IContentLister>(),
                 sp.GetRequiredService<FolderMetricsIndex>(),
-                sp.GetRequiredService<ISmartCache>(),
-                sp.GetRequiredService<BackgroundRevalidationCache>(),
-                freshness,
                 siteOptions,
                 sp.GetRequiredService<ILogger<FolderRecordProvider>>()));
             services.AddScoped<INavProvider, ServerNavProvider>();
@@ -355,9 +351,8 @@ public class Program
 
             app.UseResponseCompression();
 
-            // What this request's reader may see, evaluated once, ahead of everything that serves
-            // content, so every later component and endpoint reads initialized verdicts.
-            // Authentication runs immediately before it, so the verdicts follow the signed-in reader.
+            // Capture the principal before any content is served. Full component pages also need the
+            // global space list for their shell; point APIs resolve only the scopes they touch.
             if (signIn.Enabled)
             {
                 app.UseAuthentication();
@@ -365,7 +360,12 @@ public class Program
 
             app.Use(static async (context, next) =>
             {
-                await context.RequestServices.GetRequiredService<ReaderAccess>().InitializeAsync(context);
+                ReaderAccess reader = context.RequestServices.GetRequiredService<ReaderAccess>();
+                await reader.InitializeAsync(context);
+                if (context.GetEndpoint()?.Metadata.GetMetadata<ComponentTypeMetadata>() is not null)
+                {
+                    await reader.GetVisibleSpacesAsync(context.RequestAborted);
+                }
                 await next(context);
             });
 

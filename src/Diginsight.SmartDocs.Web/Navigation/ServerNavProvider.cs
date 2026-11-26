@@ -21,7 +21,7 @@ public sealed class ServerNavProvider(
         using var activity = Observability.ActivitySource.StartMethodActivity(logger, () => new { prefix });
 
         IReadOnlyList<NavChild> level = NavRules.WithoutEmptySections(
-            await reader.FilterLevelAsync(await builder.GetChildrenAsync(prefix, ct)));
+            await reader.FilterLevelAsync(await builder.GetChildrenAsync(prefix, ct), ct));
         bootstrap.SetLevel(prefix, level);
         FolderRecord?[] records = await Task.WhenAll(level
             .Where(static child => child.IsSection && child.Prefix is not null)
@@ -30,14 +30,14 @@ public sealed class ServerNavProvider(
         return level;
     }
 
-    public Task<FolderArticleStats?> GetTotalAsync(CancellationToken ct = default)
+    public async Task<FolderArticleStats?> GetTotalAsync(CancellationToken ct = default)
     {
         using var activity = Observability.ActivitySource.StartMethodActivity(logger);
 
-        FolderArticleStats? total = reader.GetTotal() is { } site
+        FolderArticleStats? total = await reader.GetTotalAsync(ct) is { } site
             ? new FolderArticleStats(site.Count, site.Latest, null, site.Coverage)
             : null;
-        return Task.FromResult(total);
+        return total;
     }
 
     public async Task<FolderRecord?> GetFolderAsync(string prefix, CancellationToken ct = default) =>
@@ -47,6 +47,6 @@ public sealed class ServerNavProvider(
     {
         using var activity = Observability.ActivitySource.StartMethodActivity(logger);
 
-        return await reader.FilterIndexAsync(await builder.GetIndexAsync(ct));
+        return await reader.FilterIndexAsync(await builder.GetIndexAsync(ct), ct);
     }
 }

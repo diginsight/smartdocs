@@ -1,3 +1,4 @@
+using Diginsight.Diagnostics;
 using Diginsight.SmartDocs.Web.Caching;
 
 namespace Diginsight.SmartDocs.Web.Navigation;
@@ -16,6 +17,9 @@ public sealed class RemoteNavigationInvalidationService(
         {
             try
             {
+                using var activity = Observability.ActivitySource.StartMethodActivity(
+                    logger, () => new { rule.Kind, changedPathCount = rule.ChangedPaths.Count });
+
                 nav.ReceiveInvalidation(rule);
                 foreach (string path in rule.ChangedPaths)
                 {
