@@ -1,0 +1,12 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Validate keyed TopMenu persistence",
+			"type": "shell",
+			"command": "Set-Location 'C:\\dev\\Diginsight\\smartdocs.01\\src\\Diginsight.SmartDocs.Web'; $env:Observability__ConsoleEnabled='true'; dotnet run --launch-profile http --artifacts-path 'C:\\Users\\darioa\\.copilot\\session-state\\598a3d19-1a40-40f8-81dc-059de6bbe332\\files\\persistence-build' -- --urls http://localhost:5281",
+			"isBackground": false,
+			"problemMatcher": []
+		}
+	]
+}
