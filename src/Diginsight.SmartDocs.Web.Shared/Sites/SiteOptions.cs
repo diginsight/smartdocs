@@ -169,6 +169,8 @@ public sealed class SpaceShellInfo
     public string Icon { get; set; } = string.Empty;
     /// <summary>Mounted content URL of the configured image, or empty to render Icon.</summary>
     public string IconUrl { get; set; } = string.Empty;
+    /// <summary>Mounted content URL of the space's own stylesheet, or empty when it has none.</summary>
+    public string StylesheetUrl { get; set; } = string.Empty;
     public string Description { get; set; } = string.Empty;
     public string RepositoryUrl { get; set; } = string.Empty;
     public string DefaultTheme { get; set; } = string.Empty;
@@ -179,13 +181,17 @@ public sealed class SpaceShellInfo
         RouteBase = space.RouteBase,
         Title = string.IsNullOrWhiteSpace(space.Title) ? space.Id : space.Title,
         Icon = space.Icon,
-        IconUrl = string.IsNullOrWhiteSpace(space.IconPath) ? string.Empty
-            : "/_content/" + string.Join("/", SpaceRegistry.ToRoute(space,
-                space.IconPath.Trim().Replace('\\', '/')).TrimStart('/').Split('/').Select(Uri.EscapeDataString)),
+        IconUrl = ContentUrl(space, space.IconPath),
+        StylesheetUrl = ContentUrl(space, space.StylesheetPath),
         Description = space.Description,
         RepositoryUrl = space.RepositoryUrl,
         DefaultTheme = space.DefaultTheme,
     };
+
+    private static string ContentUrl(SpaceOptions space, string path) =>
+        string.IsNullOrWhiteSpace(path) ? string.Empty
+            : "/_content/" + string.Join("/", SpaceRegistry.ToRoute(space,
+                path.Trim().Replace('\\', '/')).TrimStart('/').Split('/').Select(Uri.EscapeDataString));
 
     [JsonIgnore]
     public bool IsRootMounted => string.IsNullOrWhiteSpace(RouteBase) || RouteBase.Trim() == "/";
@@ -304,6 +310,12 @@ public sealed class SpaceOptions
 
     /// <summary>Image path relative to this space's content root; takes precedence over Icon.</summary>
     public string IconPath { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Stylesheet path relative to this space's content root, linked on this space's pages only. It
+    /// lets a documentation repository own the presentation of its content, such as screenshots.
+    /// </summary>
+    public string StylesheetPath { get; set; } = string.Empty;
 
     /// <summary>Optional one-line summary shown on the space's card in the generated index.</summary>
     public string Description { get; set; } = string.Empty;

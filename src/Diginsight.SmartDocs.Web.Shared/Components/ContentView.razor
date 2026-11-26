@@ -9,6 +9,13 @@
 
 <PageTitle>@(!string.IsNullOrWhiteSpace(_page?.Title) ? _page.Title : Site.Title)</PageTitle>
 
+@if (Site.ResolveSpace(Path)?.StylesheetUrl is { Length: > 0 } stylesheetUrl)
+{
+    <HeadContent>
+        <link rel="stylesheet" href="@stylesheetUrl" />
+    </HeadContent>
+}
+
 @if (_loading)
 {
     <p class="content-loading"><em>Loading…</em></p>
