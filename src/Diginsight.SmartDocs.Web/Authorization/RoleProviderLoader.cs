@@ -1,14 +1,19 @@
 using System.Reflection;
 using System.Runtime.Loader;
+using Diginsight.Diagnostics;
 using Diginsight.SmartDocs.Authorization;
 using Diginsight.SmartDocs.Web.Endpoints;
 using Diginsight.SmartDocs.Web.Shared.Sites;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Diginsight.SmartDocs.Web.Authorization;
 
 public static class RoleProviderLoader
 {
+    private static ILogger? cachedLogger;
+    private static ILogger logger => (cachedLogger ??= Observability.LoggerFactory?.CreateLogger(typeof(RoleProviderLoader))) ?? NullLogger.Instance;
+
     public static IServiceCollection AddRoleProvider(this IServiceCollection services,
         IConfiguration configuration, SiteOptions site, SignInConfiguration signIn,
         ILogger logger, string? baseDirectory = null)
@@ -18,6 +23,8 @@ public static class RoleProviderLoader
         IConfiguration configuration, SiteOptions site, SignInConfiguration signIn,
         ILogger logger, out IReadOnlyList<string> delegatedScopes, string? baseDirectory = null)
     {
+        using var activity = Observability.ActivitySource.StartMethodActivity(RoleProviderLoader.logger);
+
         delegatedScopes = [];
         IConfigurationSection section = configuration.GetSection(RoleProviderOptions.Section);
         RoleProviderOptions options = section.Get<RoleProviderOptions>() ?? new();
@@ -94,6 +101,8 @@ public static class RoleProviderLoader
 
     private static string ResolvePath(string baseDirectory, string configuredPath)
     {
+        using var activity = Observability.ActivitySource.StartMethodActivity(logger);
+
         string normalized = configuredPath.Replace('\\', Path.DirectorySeparatorChar).Replace('/', Path.DirectorySeparatorChar);
         if (Path.IsPathRooted(normalized) || normalized.Split(Path.DirectorySeparatorChar).Any(static p => p is ".." || p.Contains(':')))
         {

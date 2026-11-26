@@ -43,8 +43,8 @@
     </header>
 
     <nav class="tabbar">
-        <TopMenu Placement="TopMenu.Group.Left" />
-        <TopMenu Placement="TopMenu.Group.Right" />
+        <TopMenu @key="TopMenu.Group.Left" Placement="TopMenu.Group.Left" />
+        <TopMenu @key="TopMenu.Group.Right" Placement="TopMenu.Group.Right" />
     </nav>
 
     <SearchOverlay Open="_searchOpen" OnClose="() => _searchOpen = false" />

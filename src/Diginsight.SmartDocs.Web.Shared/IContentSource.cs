@@ -11,6 +11,20 @@ public interface IContentSource
     Task<ContentResult?> GetAsync(string contentKey, CancellationToken ct = default);
 }
 
+/// <summary>Optional source capability for validating a cached content ETag without returning unchanged bytes.</summary>
+public interface IConditionalContentSource
+{
+    Task<ContentValidationResult> GetIfChangedAsync(
+        string contentKey, string etag, CancellationToken ct = default);
+}
+
+public sealed record ContentValidationResult(ContentResult? Content, bool NotModified)
+{
+    public static ContentValidationResult Missing { get; } = new(null, false);
+    public static ContentValidationResult Unchanged { get; } = new(null, true);
+    public static ContentValidationResult Changed(ContentResult content) => new(content, false);
+}
+
 /// <summary>Raw content fetched from an <see cref="IContentSource"/>.</summary>
 public sealed record ContentResult(byte[] Bytes, string? ContentType, string ETag);
 

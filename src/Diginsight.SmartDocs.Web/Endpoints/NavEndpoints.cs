@@ -66,7 +66,7 @@ public static class NavEndpoints
 
         // Only the children the reader may see, and folder records only for those.
         IReadOnlyList<NavChild> children = await reader.FilterLevelAsync(
-            await nav.GetChildrenAsync(prefix ?? string.Empty, ct));
+            await nav.GetChildrenAsync(prefix ?? string.Empty, ct), ct);
         FolderRecord[] records = await Task.WhenAll(children
             .Where(static child => child.IsSection && child.Prefix is not null)
             .Select(child => reader.GetFolderAsync(child.Prefix!, ct)));
@@ -121,13 +121,13 @@ public static class NavEndpoints
         return Results.Json(new { version = CachedDynamicNavBuilder.Version });
     }
 
-    private static IResult GetNavTotal(ReaderAccess reader, HttpContext http)
+    private static async Task<IResult> GetNavTotal(ReaderAccess reader, HttpContext http)
     {
         using var activity = Observability.ActivitySource.StartMethodActivity(logger);
 
         // The total covers only the spaces the reader sees, so no shared cache may keep it.
         http.Response.Headers.CacheControl = HttpValidators.RevalidatePrivate;
-        return reader.GetTotal() is { } site
+        return await reader.GetTotalAsync(http.RequestAborted) is { } site
             ? Results.Json(new FolderArticleStats(site.Count, site.Latest, null, site.Coverage))
             : Results.NoContent();
     }
@@ -138,7 +138,7 @@ public static class NavEndpoints
         using var activity = Observability.ActivitySource.StartMethodActivity(logger);
 
         // Client-abort cancellation is handled centrally by the /_nav group endpoint filter.
-        IReadOnlyList<NavLeaf> leaves = await reader.FilterIndexAsync(await nav.GetIndexAsync(ct));
+        IReadOnlyList<NavLeaf> leaves = await reader.FilterIndexAsync(await nav.GetIndexAsync(ct), ct);
         http.Response.Headers.CacheControl = HttpValidators.RevalidatePrivate;
         return Results.Json(leaves);
     }

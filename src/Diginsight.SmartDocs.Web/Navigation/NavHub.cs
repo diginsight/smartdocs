@@ -1,3 +1,4 @@
+using Diginsight.Diagnostics;
 using Diginsight.SmartDocs.Web.Authorization;
 using Microsoft.AspNetCore.SignalR;
 
@@ -20,10 +21,15 @@ namespace Diginsight.SmartDocs.Web.Navigation;
 /// total would stay at the cold-start value.
 /// </para>
 /// </summary>
-public sealed class NavHub(NavChangePublisher publisher, ActiveRoleSets activeRoleSets) : Hub
+public sealed class NavHub(
+    NavChangePublisher publisher,
+    ActiveRoleSets activeRoleSets,
+    ILogger<NavHub> logger) : Hub
 {
     public override async Task OnConnectedAsync()
     {
+        using var activity = Observability.ActivitySource.StartMethodActivity(logger);
+
         await base.OnConnectedAsync();
 
         RoleSet roles = RoleSet.FromPrincipal(Context.User);
@@ -34,6 +40,9 @@ public sealed class NavHub(NavChangePublisher publisher, ActiveRoleSets activeRo
 
     public override async Task OnDisconnectedAsync(Exception? exception)
     {
+        using var activity = Observability.ActivitySource.StartMethodActivity(
+            logger, () => new { failureType = exception == null ? null : exception.GetType().Name });
+
         activeRoleSets.Remove(Context.ConnectionId);
         await base.OnDisconnectedAsync(exception);
     }

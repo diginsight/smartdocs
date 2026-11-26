@@ -1,0 +1,97 @@
+- generic [ref=e2]:
+  - banner [ref=e3]:
+    - link " ELSP Documentation Site" [ref=e4] [cursor=pointer]:
+      - /url: ""
+      - generic [ref=e5]: 
+      - generic [ref=e6]: ELSP Documentation Site
+    - generic [ref=e8]:
+      - button " All documentation ▾" [ref=e9] [cursor=pointer]:
+        - generic [ref=e10]: 
+        - generic [ref=e11]: All documentation
+        - generic [ref=e12]: ▾
+      - text: 
+    - generic [ref=e14]:
+      - button " About ▾" [ref=e15] [cursor=pointer]:
+        - generic [ref=e16]: 
+        - generic [ref=e17]: About
+        - generic [ref=e18]: ▾
+      - text: ✓
+    - link "Sign in" [ref=e20] [cursor=pointer]:
+      - /url: /_auth/signin?returnUrl=%2F
+      - generic [ref=e21]: 
+    - button " Search" [ref=e23] [cursor=pointer]:
+      - generic [ref=e24]: 
+      - generic [ref=e25]: Search
+    - button "" [ref=e26] [cursor=pointer]
+    - button "🌙" [ref=e28] [cursor=pointer]
+  - navigation [ref=e29]:
+    - navigation [ref=e30]:
+      - link " Home" [ref=e31] [cursor=pointer]:
+        - /url: /
+        - generic [ref=e32]: 
+        - generic [ref=e33]: Home
+    - navigation [ref=e34]:
+      - button " Em Adapter ▾" [ref=e36] [cursor=pointer]:
+        - generic [ref=e37]: 
+        - generic [ref=e38]: Em Adapter
+        - generic [ref=e39]: ▾
+  - generic [ref=e40]:
+    - navigation [ref=e41]:
+      - generic [ref=e43]:
+        - generic [ref=e44]:
+          - generic [ref=e45]:
+            - generic [ref=e46]: 
+            - searchbox "Filter menu" [ref=e47]
+          - generic [ref=e48]:
+            - button "" [ref=e49] [cursor=pointer]
+            - button "" [ref=e51] [cursor=pointer]
+        - tree [ref=e53]:
+          - treeitem [ref=e54]:
+            - link " Home" [ref=e55] [cursor=pointer]:
+              - /url: /
+              - generic [ref=e56]: 
+              - generic [ref=e58]: Home
+          - treeitem [ref=e59]:
+            - group [ref=e60]:
+              - generic " Em Adapter Expand or collapse" [ref=e61] [cursor=pointer]:
+                - generic [ref=e62]: 
+                - generic [ref=e64]: Em Adapter
+                - button "Expand or collapse" [ref=e65]: ›
+    - generic "Drag to resize · double-click to reset" [ref=e66]
+    - main [ref=e67]:
+      - article [ref=e68]:
+        - heading "ELSP Documentation Site" [level=1] [ref=e69]
+        - paragraph [ref=e70]: "The current site includes documentation for the following repositories:"
+        - list [ref=e71]:
+          - listitem [ref=e72]:
+            - generic [ref=e73]:
+              - link "Apidevice:" [ref=e74] [cursor=pointer]:
+                - /url: /apidevice
+                - generic [aria-hidden] [ref=e75]: 📡
+              - text: ASP.NET Web API project for managing ABB Ekip COM Hub devices, firmware distribution, and cloud connectivity.
+            - paragraph [ref=e77]:
+              - generic [ref=e78]:
+                - text: "repository:"
+                - link "ABB_Portfolio/ApiDevice" [ref=e79] [cursor=pointer]:
+                  - /url: https://abbsace.visualstudio.com/ABB_Portfolio/_git/ApiDevice
+              - generic [ref=e80]:
+                - text: "documentation:"
+                - link "/apidevice/" [ref=e81] [cursor=pointer]:
+                  - /url: /apidevice/
+          - listitem [ref=e82]:
+            - generic [ref=e83]:
+              - link "Em Adapter:" [ref=e84] [cursor=pointer]:
+                - /url: /em-adapter
+                - generic [aria-hidden] [ref=e85]: ⚙️
+              - text: Flink+Kotlin streaming job that processes legacy device events from industrial equipment, normalizes data across diverse device types, and publishes normalized records to Kafka.
+            - paragraph [ref=e87]:
+              - generic [ref=e88]:
+                - text: "repository:"
+                - link "ABB-ELSP-Digital/ABB-ELSP-legacy-em-adapter" [ref=e89] [cursor=pointer]:
+                  - /url: https://github.com/ABB-ELSP-Digital/ABB-ELSP-legacy-em-adapter
+              - generic [ref=e90]:
+                - text: "documentation:"
+                - link "/em-adapter/" [ref=e91] [cursor=pointer]:
+                  - /url: /em-adapter/
+  - contentinfo [ref=e92]:
+    - generic [ref=e93]: "Total: …"

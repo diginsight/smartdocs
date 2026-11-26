@@ -1,8 +1,10 @@
+using Diginsight.Diagnostics;
 using Diginsight.SmartDocs.Web.ContentSources;
 using Diginsight.SmartDocs.Web.Metadata;
 using Diginsight.SmartDocs.Web.Shared;
 using Diginsight.SmartDocs.Web.Shared.Sites;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Diginsight.SmartDocs.Web.Sites;
 
@@ -58,6 +60,9 @@ public sealed class BrandingAssets
 
 public static class BrandingAssetResolver
 {
+    private static ILogger? cachedLogger;
+    private static ILogger logger => (cachedLogger ??= Observability.LoggerFactory?.CreateLogger(typeof(BrandingAssetResolver))) ?? NullLogger.Instance;
+
     /// <summary>
     /// Locates the configured brand mark once, after the container is built and before the first
     /// request. Doing it here rather than per request means the prerendered page already carries the
@@ -71,6 +76,8 @@ public static class BrandingAssetResolver
     /// </summary>
     public static void Resolve(IServiceProvider services, ILogger logger)
     {
+        using var activity = Observability.ActivitySource.StartMethodActivity(BrandingAssetResolver.logger);
+
         var assets = services.GetRequiredService<BrandingAssets>();
         SiteOptions site = services.GetRequiredService<IOptions<SiteOptions>>().Value;
 

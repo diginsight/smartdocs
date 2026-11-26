@@ -18,7 +18,6 @@ namespace Diginsight.SmartDocs.Web.Navigation;
 public sealed class CachedDynamicNavBuilder(
     INavBuilder inner,
     ISmartCache smartCache,
-    BackgroundRevalidationCache revalidation,
     IParallelService parallelService,
     ContentFreshnessOptions freshness,
     ILogger<CachedDynamicNavBuilder> logger) : INavBuilder
@@ -43,7 +42,7 @@ public sealed class CachedDynamicNavBuilder(
     /// <see cref="WarmAllLevelsAsync"/> rebuild them with the now-computed counts.
     /// </summary>
     public void InvalidateLevels() =>
-        smartCache.Invalidate(new ContentPathInvalidationRule(string.Empty, Kind: "nav-level"));
+        smartCache.Invalidate(new ContentPathInvalidationRule(string.Empty, Kind: "nav-level-v2"));
 
     /// <summary>
     /// Invalidates just the branch touched by a content write at <paramref name="path"/>: the cached
@@ -69,20 +68,18 @@ public sealed class CachedDynamicNavBuilder(
 
         Interlocked.Increment(ref _version);
         var rule = new ContentPathInvalidationRule(normalized, changedPaths: changed);
-        revalidation.Invalidate(rule);
         smartCache.Invalidate(rule);
     }
 
-    /// <summary>Clears local background projections after a companion invalidates the shared cache.</summary>
+    /// <summary>Bumps the client-visible version after a companion invalidates the shared cache.</summary>
     public void ReceiveInvalidation(ContentPathInvalidationRule rule)
     {
         Interlocked.Increment(ref _version);
-        revalidation.Invalidate(rule);
     }
 
     public async Task<IReadOnlyList<NavChild>> GetChildrenAsync(string prefix, CancellationToken ct = default)
     {
-        using var activity = Observability.HotPathActivitySource.StartMethodActivity(logger, () => new { prefix });
+        using var activity = Observability.ActivitySource.StartMethodActivity(logger, () => new { prefix });
 
         prefix = (prefix ?? string.Empty).Replace('\\', '/').Trim('/');
 
@@ -96,19 +93,15 @@ public sealed class CachedDynamicNavBuilder(
             CoalesceRacingCacheMisses = true,
             MaxAge = freshness.NavLevel,
         };
-        var key = new ContentPathCacheKey("nav-level", prefix);
+        var key = new ContentPathCacheKey("nav-level-v2", prefix);
 
         string levelPrefix = prefix;
-        NavChildrenEnvelope envelope = await revalidation.GetAsync(
-            key,
-            freshness.NavLevel,
-            innerCt => smartCache.GetAsync(
+        NavChildrenEnvelope envelope = await smartCache.GetAsync(
                 key,
                 async cacheCt => new NavChildrenEnvelope((await inner.GetChildrenAsync(levelPrefix, cacheCt)).ToArray()),
                 options,
                 callerType: typeof(CachedDynamicNavBuilder),
-                cancellationToken: innerCt),
-            ct);
+                cancellationToken: ct);
 
         activity?.SetOutput(new { count = envelope.Items.Count() });
         return envelope.Items;

@@ -1,8 +1,10 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Threading.Channels;
+using Diginsight.Diagnostics;
 using Diginsight.SmartCache;
 using Diginsight.SmartCache.Externalization;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Diginsight.SmartDocs.Web.Caching;
 
@@ -11,7 +13,8 @@ public sealed class CoordinatedSmartCache(
     ISmartCache inner,
     ICacheCompanion companion,
     MetadataInvalidationTracker metadata,
-    RemoteContentInvalidations remote) : ISmartCache
+    RemoteContentInvalidations remote,
+    ILogger<CoordinatedSmartCache> logger) : ISmartCache
 {
     public Task<T> GetAsync<T>(
         object key,
@@ -26,6 +29,9 @@ public sealed class CoordinatedSmartCache(
 
     public void Invalidate(IInvalidationRule rule)
     {
+        using var activity = Observability.ActivitySource.StartMethodActivity(
+            logger, () => new { ruleType = rule.GetType().Name });
+
         if (rule is ContentPathInvalidationRule paths)
         {
             metadata.Invalidate(paths);
@@ -35,6 +41,8 @@ public sealed class CoordinatedSmartCache(
 
     public void Invalidate(InvalidationDescriptor descriptor)
     {
+        using var activity = Observability.ActivitySource.StartMethodActivity(logger);
+
         bool foreign = !string.Equals(descriptor.Emitter, companion.SelfLocationId, StringComparison.Ordinal);
         if (foreign && descriptor.Rule is ContentPathInvalidationRule paths)
         {
@@ -54,8 +62,13 @@ public sealed class CoordinatedSmartCache(
 
 public static class SmartCacheCoordination
 {
+    private static ILogger? cachedLogger;
+    private static ILogger logger => (cachedLogger ??= Observability.LoggerFactory?.CreateLogger(typeof(SmartCacheCoordination))) ?? NullLogger.Instance;
+
     public static void Register(IServiceCollection services)
     {
+        using var activity = Observability.ActivitySource.StartMethodActivity(logger);
+
         ServiceDescriptor descriptor = services.Single(item => item.ServiceType == typeof(ISmartCache));
         Type implementation = descriptor.ImplementationType
             ?? throw new InvalidOperationException("The SmartCache service must have a concrete implementation type.");
@@ -66,7 +79,8 @@ public static class SmartCacheCoordination
             (ISmartCache)sp.GetRequiredService(implementation),
             sp.GetRequiredService<ICacheCompanion>(),
             sp.GetRequiredService<MetadataInvalidationTracker>(),
-            sp.GetRequiredService<RemoteContentInvalidations>())));
+            sp.GetRequiredService<RemoteContentInvalidations>(),
+            sp.GetRequiredService<ILogger<CoordinatedSmartCache>>())));
     }
 }
 

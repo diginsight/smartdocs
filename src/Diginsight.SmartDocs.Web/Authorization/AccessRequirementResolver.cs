@@ -33,7 +33,7 @@ public sealed class AccessRequirementResolver(
     /// </summary>
     public async Task<SpaceAccessState> ResolveSpaceAsync(string spaceId, CancellationToken cancellationToken = default)
     {
-        using var activity = Observability.HotPathActivitySource.StartMethodActivity(logger, () => new { spaceId });
+        using var activity = Observability.ActivitySource.StartMethodActivity(logger, () => new { spaceId });
 
         if (spaces.ById(spaceId) is not { } space)
         {

@@ -1,3 +1,4 @@
+using Diginsight.Diagnostics;
 using Diginsight.SmartDocs.Web.Authorization;
 using Diginsight.SmartDocs.Web.Shared.Sites;
 using Microsoft.AspNetCore.Antiforgery;
@@ -5,6 +6,7 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.Identity.Web;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Diginsight.SmartDocs.Web.Endpoints;
 
@@ -28,6 +30,9 @@ public sealed record SignInConfiguration(bool Enabled)
 /// </summary>
 public static class AuthEndpoints
 {
+    private static ILogger? cachedLogger;
+    private static ILogger logger => (cachedLogger ??= Observability.LoggerFactory?.CreateLogger(typeof(AuthEndpoints))) ?? NullLogger.Instance;
+
     public const string SignInPath = "/_auth/signin";
     public const string SignOutPath = "/_auth/signout";
 
@@ -42,6 +47,9 @@ public static class AuthEndpoints
         SiteAuthorizationOptions authorization,
         IReadOnlyList<string>? delegatedScopes = null)
     {
+        using var activity = Observability.ActivitySource.StartMethodActivity(
+            logger, () => new { signIn.Enabled, sessionLifetime = authorization.SessionLifetime, delegatedScopeCount = delegatedScopes == null ? 0 : delegatedScopes.Count });
+
         if (!signIn.Enabled)
         {
             return services;
@@ -84,18 +92,26 @@ public static class AuthEndpoints
     /// <summary>Maps <c>GET /_auth/signin</c> and <c>POST /_auth/signout</c> when sign-in is enabled.</summary>
     public static IEndpointRouteBuilder MapAuthEndpoints(this IEndpointRouteBuilder app, SignInConfiguration signIn)
     {
+        using var activity = Observability.ActivitySource.StartMethodActivity(logger, () => new { signIn.Enabled });
+
         if (!signIn.Enabled)
         {
             return app;
         }
 
         app.MapGet(SignInPath, (string? returnUrl) =>
-            Results.Challenge(
+        {
+            using var activity = Observability.ActivitySource.StartMethodActivity(logger, () => new { endpoint = SignInPath });
+
+            return Results.Challenge(
                 new AuthenticationProperties { RedirectUri = ToLocalReturnUrl(returnUrl) },
-                [OpenIdConnectDefaults.AuthenticationScheme]));
+                [OpenIdConnectDefaults.AuthenticationScheme]);
+        });
 
         app.MapPost(SignOutPath, async (HttpContext http, IAntiforgery antiforgery) =>
         {
+            using var activity = Observability.ActivitySource.StartMethodActivity(logger, () => new { endpoint = SignOutPath });
+
             if (!await antiforgery.IsRequestValidAsync(http))
             {
                 return Results.BadRequest();

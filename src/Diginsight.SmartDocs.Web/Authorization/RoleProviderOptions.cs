@@ -1,9 +1,14 @@
+using Diginsight.Diagnostics;
 using Diginsight.SmartDocs.Web.Shared.Sites;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Diginsight.SmartDocs.Web.Authorization;
 
 public sealed class RoleProviderOptions
 {
+    private static ILogger? cachedLogger;
+    private static ILogger logger => (cachedLogger ??= Observability.LoggerFactory?.CreateLogger(typeof(RoleProviderOptions))) ?? NullLogger.Instance;
+
     public const string Section = "Site:Authorization:RoleProvider";
 
     public bool IsEnabled { get; set; } = true;
@@ -16,6 +21,9 @@ public sealed class RoleProviderOptions
 
     public void Validate(SiteAuthorizationOptions authorization, bool signInEnabled)
     {
+        using var activity = Observability.ActivitySource.StartMethodActivity(
+            logger, () => new { sessionLifetime = authorization.SessionLifetime, signInEnabled });
+
         if (!IsPlugin)
         {
             return;

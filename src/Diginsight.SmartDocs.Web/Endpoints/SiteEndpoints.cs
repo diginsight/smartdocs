@@ -1,3 +1,4 @@
+using Diginsight.Diagnostics;
 using Diginsight.SmartDocs.Web.Authorization;
 using Diginsight.SmartDocs.Web.Caching;
 using Diginsight.SmartDocs.Web.ContentSources;
@@ -5,23 +6,33 @@ using Diginsight.SmartDocs.Web.Shared;
 using Diginsight.SmartDocs.Web.Shared.Sites;
 using Diginsight.SmartDocs.Web.Sites;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Logging.Abstractions;
 using System.Text;
 
 namespace Diginsight.SmartDocs.Web.Endpoints;
 
 public static class SiteEndpoints
 {
+    private static ILogger? cachedLogger;
+    private static ILogger logger => (cachedLogger ??= Observability.LoggerFactory?.CreateLogger(typeof(SiteEndpoints))) ?? NullLogger.Instance;
+
     public static IEndpointRouteBuilder MapSiteEndpoints(this IEndpointRouteBuilder app)
     {
-        app.MapGet("/_site", (IOptions<SiteOptions> siteOptions, BrandingAssets branding, SignInConfiguration signIn, ReaderAccess reader, HttpContext http) =>
+        app.MapGet("/_site", async (IOptions<SiteOptions> siteOptions, BrandingAssets branding, SignInConfiguration signIn, ReaderAccess reader, HttpContext http) =>
         {
+            using var activity = Observability.ActivitySource.StartMethodActivity(logger, () => new { endpoint = "/_site" });
+
             // Only the spaces the reader may see; the generated space index follows.
             http.Response.Headers.CacheControl = HttpValidators.RevalidatePrivate;
-            return Results.Json(ForReader(SiteShellOptions.From(siteOptions.Value, branding.LogoUrl, signIn.Enabled), reader));
+            return Results.Json(ForReader(
+                SiteShellOptions.From(siteOptions.Value, branding.LogoUrl, signIn.Enabled),
+                await reader.GetVisibleSpacesAsync(http.RequestAborted)));
         });
 
         app.MapGet("/robots.txt", async (IOptions<SiteOptions> siteOptions, SpaceVisibilityEvaluator evaluator, HttpContext http) =>
         {
+            using var activity = Observability.ActivitySource.StartMethodActivity(logger, () => new { endpoint = "/robots.txt" });
+
             // Built for an anonymous reader, whoever asks, so the answer is the same for everyone and
             // stays publicly cacheable.
             ReaderVisibility anonymous = await evaluator.EvaluateAsync(RoleSet.Anonymous, http.RequestAborted);
@@ -39,6 +50,8 @@ public static class SiteEndpoints
             HttpContext http,
             CancellationToken ct) =>
         {
+            using var activity = Observability.ActivitySource.StartMethodActivity(logger, () => new { endpoint = BrandingAssets.LogoRoute });
+
             if (branding.LogoSpaceId is not { Length: > 0 } spaceId
                 || branding.LogoContentKey is not { Length: > 0 } key
                 || !spaces.TryGet(spaceId, out SpaceContentAccess access))
@@ -63,17 +76,11 @@ public static class SiteEndpoints
         return app;
     }
 
-    /// <summary>
-    /// Removes from <paramref name="shell"/> every space the reader can't see. When the root-mounted
-    /// space is hidden, the shell has none, so the browser serves the generated space index at <c>/</c>.
-    /// </summary>
-    public static SiteShellOptions ForReader(SiteShellOptions shell, ReaderAccess reader)
+    /// <summary>Filters the site shell to a previously resolved set of visible spaces.</summary>
+    public static SiteShellOptions ForReader(SiteShellOptions shell, IReadOnlyList<SpaceOptions> visibleSpaces)
     {
-        if (!reader.SeesEverything)
-        {
-            shell.Spaces = shell.Spaces.Where(space => reader.IsSpaceVisible(space.Id)).ToList();
-        }
-
+        shell.Spaces = shell.Spaces.Where(space => visibleSpaces.Any(visible =>
+            string.Equals(visible.Id, space.Id, StringComparison.OrdinalIgnoreCase))).ToList();
         return shell;
     }
 
@@ -84,6 +91,8 @@ public static class SiteEndpoints
     /// </summary>
     private static string BuildRobots(SiteOptions site, ReaderVisibility anonymous)
     {
+        using var activity = Observability.ActivitySource.StartMethodActivity(logger);
+
         if (!string.IsNullOrWhiteSpace(site.Authorization.DefaultRequirement))
         {
             return new StringBuilder()

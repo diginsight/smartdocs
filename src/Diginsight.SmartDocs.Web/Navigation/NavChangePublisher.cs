@@ -61,6 +61,8 @@ public sealed class NavChangePublisher(
     /// </summary>
     public async Task PublishChangeAsync(string path)
     {
+        using var activity = Observability.ActivitySource.StartMethodActivity(logger, () => new { path });
+
         string normalized = (path ?? string.Empty).Replace('\\', '/').Trim('/');
         if (normalized.Length == 0)
         {
@@ -84,6 +86,8 @@ public sealed class NavChangePublisher(
 
     private async Task PublishMetadataRefreshAsync(string path)
     {
+        using var activity = Observability.ActivitySource.StartMethodActivity(logger, () => new { path });
+
         string? changedSpace = null;
         if (path.Length > 0)
         {
@@ -202,7 +206,7 @@ public sealed class NavChangePublisher(
 
     private async Task OnMetricsChangedAsync(IReadOnlyList<string> prefixes)
     {
-        using var activity = Observability.ActivitySource.StartMethodActivity(logger, () => new { prefixes });
+        using var activity = Observability.ActivitySource.StartMethodActivity(logger, () => new { prefixCount = prefixes.Count });
 
         try
         {

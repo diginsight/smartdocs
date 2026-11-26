@@ -38,15 +38,15 @@ public static class ContentEndpoints
 
     private static async Task<IResult> GetContentRawAsync(
         string key, IContentSource source, ContentFreshnessOptions freshness,
-        AccessRequirementResolver requirements, ReaderAccess reader,
+        ReaderAccess reader,
         HttpContext http, CancellationToken ct)
     {
         using var activity = Observability.ActivitySource.StartMethodActivity(logger, () => new { key });
 
         // Checked before the read and before any entity tag, so a key the reader can't see answers
         // exactly as a missing key does — never a 304, whatever If-None-Match the request carries.
-        AccessRequirement requirement = await requirements.ForContentKeyAsync(key, ct);
-        if (!reader.IsVisible(requirement))
+        PathAccessDecision access = await reader.ResolvePathAccessAsync(key, ct);
+        if (!access.IsVisible)
         {
             activity?.SetOutput(new { found = false });
             return Results.NotFound();
@@ -65,7 +65,7 @@ public static class ContentEndpoints
         // because an article invalidated by a publish must not linger in the browser. Bytes of a
         // restricted space are kept by no cache at all.
         string etag = HttpValidators.Tag(key, result.ETag);
-        string cacheControl = !requirement.IsEmpty ? HttpValidators.NoStorePrivate
+        string cacheControl = !access.IsPublic ? HttpValidators.NoStorePrivate
             : NavRules.IsMarkdown(key) ? HttpValidators.Revalidate
             : $"public, max-age={(int)freshness.Content.TotalSeconds}";
         if (HttpValidators.IsNotModified(http, etag, cacheControl))
@@ -103,9 +103,10 @@ public static class ContentEndpoints
             return status == StatusCodes.Status200OK ? Results.NoContent() : Results.StatusCode(status);
         }
 
-        byte[] body = JsonSerializer.SerializeToUtf8Bytes(page);
+        byte[] body = resolution.ResponseBytes ?? JsonSerializer.SerializeToUtf8Bytes(page);
+        string etag = resolution.ResponseETag ?? HttpValidators.Tag(body);
         activity?.SetOutput(new { found = true });
-        if (HttpValidators.IsNotModified(http, HttpValidators.Tag(body), HttpValidators.RevalidatePrivate))
+        if (HttpValidators.IsNotModified(http, etag, HttpValidators.RevalidatePrivate))
         {
             return Results.StatusCode(StatusCodes.Status304NotModified);
         }

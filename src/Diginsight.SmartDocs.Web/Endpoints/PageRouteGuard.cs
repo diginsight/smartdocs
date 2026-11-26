@@ -1,3 +1,4 @@
+using Diginsight.Diagnostics;
 using Diginsight.SmartDocs.Web.Authorization;
 using Diginsight.SmartDocs.Web.Components;
 using Diginsight.SmartDocs.Web.Shared.Navigation;
@@ -9,6 +10,7 @@ using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Diginsight.SmartDocs.Web.Endpoints;
 
@@ -32,6 +34,9 @@ namespace Diginsight.SmartDocs.Web.Endpoints;
 /// </summary>
 public static class PageRouteGuard
 {
+    private static ILogger? cachedLogger;
+    private static ILogger logger => (cachedLogger ??= Observability.LoggerFactory?.CreateLogger(typeof(PageRouteGuard))) ?? NullLogger.Instance;
+
     private static readonly FileExtensionContentTypeProvider ContentTypes = new();
 
     public static IApplicationBuilder UsePageRouteGuard(this IApplicationBuilder app) =>
@@ -126,6 +131,8 @@ public static class PageRouteGuard
     /// </summary>
     internal static async Task<int> GetStatusCodeAsync(HttpContext context, PathString path)
     {
+        using var activity = Observability.ActivitySource.StartMethodActivity(logger, () => new { path = path.Value });
+
         (bool exists, string folder) = await RouteExistsAsync(context, path);
         if (!exists)
         {
@@ -133,11 +140,6 @@ public static class PageRouteGuard
         }
 
         ReaderAccess reader = context.RequestServices.GetRequiredService<ReaderAccess>();
-        if (reader.SeesEverything)
-        {
-            return StatusCodes.Status200OK;
-        }
-
         string route = (path.Value ?? string.Empty).Trim('/');
         RenderedPageResolution resolution = await context.RequestServices
             .GetRequiredService<IRenderedPageResolver>()
@@ -149,13 +151,14 @@ public static class PageRouteGuard
 
         if (route.Length == 0)
         {
-            return reader.VisibleSpaces.Count > 0 ? StatusCodes.Status200OK : StatusCodes.Status403Forbidden;
+            return (await reader.GetVisibleSpacesAsync(context.RequestAborted)).Count > 0
+                ? StatusCodes.Status200OK
+                : StatusCodes.Status403Forbidden;
         }
 
-        AccessRequirement requirement = await context.RequestServices
-            .GetRequiredService<AccessRequirementResolver>()
-            .ForFolderAsync(folder, context.RequestAborted);
-        return reader.IsVisible(requirement) ? StatusCodes.Status200OK : StatusCodes.Status403Forbidden;
+        return await reader.IsPathVisibleAsync(folder, context.RequestAborted)
+            ? StatusCodes.Status200OK
+            : StatusCodes.Status403Forbidden;
     }
 
     /// <summary>
@@ -166,6 +169,8 @@ public static class PageRouteGuard
     /// </summary>
     private static async Task<(bool Exists, string Folder)> RouteExistsAsync(HttpContext context, PathString path)
     {
+        using var activity = Observability.ActivitySource.StartMethodActivity(logger, () => new { path = path.Value });
+
         string route = (path.Value ?? string.Empty).Trim('/');
         if (route.Length == 0)
         {

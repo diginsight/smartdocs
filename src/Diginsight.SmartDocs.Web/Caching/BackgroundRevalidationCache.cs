@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Threading.Channels;
+using Diginsight.Diagnostics;
 
 namespace Diginsight.SmartDocs.Web.Caching;
 
@@ -19,6 +20,9 @@ public sealed class BackgroundRevalidationCache(
         Func<CancellationToken, Task<T>> valueFactory,
         CancellationToken cancellationToken)
     {
+        using var activity = Observability.ActivitySource.StartMethodActivity(
+            logger, () => new { key.Kind, key.Path, maxAge });
+
         DateTimeOffset now = DateTimeOffset.UtcNow;
         if (_entries.TryGetValue(key, out Entry? entry) && entry.Value is T cached)
         {
@@ -27,6 +31,7 @@ public sealed class BackgroundRevalidationCache(
                 Enqueue(key, valueFactory);
             }
 
+            activity?.SetOutput(new { cacheHit = true, revalidationRequired = now - entry.CreatedAt >= maxAge });
             return cached;
         }
 
@@ -37,11 +42,15 @@ public sealed class BackgroundRevalidationCache(
             _entries[key] = new Entry(value!, DateTimeOffset.UtcNow);
         }
 
+        activity?.SetOutput(new { cacheHit = false });
         return value;
     }
 
     public void Invalidate(ContentPathInvalidationRule rule)
     {
+        using var activity = Observability.ActivitySource.StartMethodActivity(
+            logger, () => new { rule.Kind, pathCount = rule.Paths.Count });
+
         Interlocked.Increment(ref _generation);
         foreach (ContentPathCacheKey key in _entries.Keys)
         {
@@ -58,6 +67,9 @@ public sealed class BackgroundRevalidationCache(
         {
             try
             {
+                using var activity = Observability.ActivitySource.StartMethodActivity(
+                    logger, () => new { item.Key.Kind, item.Key.Path });
+
                 object value = await item.Factory(stoppingToken);
                 if (item.Generation == Interlocked.Read(ref _generation))
                 {

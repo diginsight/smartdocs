@@ -13,14 +13,15 @@ namespace Diginsight.SmartDocs.Web.ContentSources;
 /// Reads content from the storage account container over HTTPS using a managed/CLI identity.
 /// Used in production; the browser never sees storage credentials.
 /// </summary>
-public sealed class BlobContentSource : IContentSource, IContentLister
+public sealed class BlobContentSource : IContentSource, IConditionalContentSource, IContentLister
 {
     private readonly BlobContainerClient _container;
-    private readonly ILogger<BlobContentSource> _logger;
+    private readonly ILogger<BlobContentSource> logger;
 
     public BlobContentSource(string accountUri, string containerName, ILogger<BlobContentSource> logger)
     {
-        _logger = logger;
+        this.logger = logger;
+        using var activity = Observability.ActivitySource.StartMethodActivity(this.logger, () => new { containerName });
 
         var account = new Uri(accountUri.TrimEnd('/') + "/");
         var containerUri = new Uri(account, containerName);
@@ -32,23 +33,50 @@ public sealed class BlobContentSource : IContentSource, IContentLister
 
     public async Task<ContentResult?> GetAsync(string contentKey, CancellationToken ct = default)
     {
-        using var activity = Observability.HotPathActivitySource.StartMethodActivity(_logger, () => new { contentKey });
+        using var activity = Observability.ActivitySource.StartMethodActivity(logger, () => new { contentKey });
+        ContentValidationResult result = await DownloadAsync(contentKey, null, ct);
+        activity?.SetOutput(new
+        {
+            found = result.Content is not null,
+            contentType = result.Content?.ContentType,
+            length = result.Content?.Bytes.Length ?? 0,
+        });
+        return result.Content;
+    }
 
+    public async Task<ContentValidationResult> GetIfChangedAsync(
+        string contentKey, string etag, CancellationToken ct = default)
+    {
+        using var activity = Observability.ActivitySource.StartMethodActivity(logger, () => new { contentKey });
+        ContentValidationResult result = await DownloadAsync(contentKey, etag, ct);
+        activity?.SetOutput(new { result.NotModified, found = result.NotModified || result.Content is not null });
+        return result;
+    }
+
+    private async Task<ContentValidationResult> DownloadAsync(
+        string contentKey, string? etag, CancellationToken ct)
+    {
         if (!TryGetBlob(contentKey, out BlobClient? blob))
         {
-            return null;
+            return ContentValidationResult.Missing;
         }
 
-        // One round trip: a download that answers 404 is the "not found" an existence check would
-        // have reported, without paying for the check on every blob that does exist.
         Response<BlobDownloadResult> response;
         try
         {
-            response = await blob.DownloadContentAsync(ct);
+            var options = new BlobDownloadOptions
+            {
+                Conditions = etag is null ? null : new BlobRequestConditions { IfNoneMatch = new ETag(etag) },
+            };
+            response = await blob.DownloadContentAsync(options, ct);
+        }
+        catch (RequestFailedException ex) when (ex.Status == 304)
+        {
+            return ContentValidationResult.Unchanged;
         }
         catch (RequestFailedException ex) when (ex.Status == 404)
         {
-            return null;
+            return ContentValidationResult.Missing;
         }
 
         byte[] bytes = response.Value.Content.ToArray();
@@ -56,13 +84,12 @@ public sealed class BlobContentSource : IContentSource, IContentLister
             ? "text/plain; charset=utf-8"
             : response.Value.Details.ContentType;
         var result = new ContentResult(bytes, contentType, response.Value.Details.ETag.ToString());
-        activity?.SetOutput(new { contentType, length = bytes.Length });
-        return result;
+        return ContentValidationResult.Changed(result);
     }
 
     public async Task<IReadOnlyList<ChildEntry>> ListChildrenAsync(string prefix, CancellationToken ct = default)
     {
-        using var activity = Observability.HotPathActivitySource.StartMethodActivity(_logger, () => new { prefix });
+        using var activity = Observability.ActivitySource.StartMethodActivity(logger, () => new { prefix });
 
         string p = (prefix ?? string.Empty).Replace('\\', '/').TrimStart('/');
         if (!ContentKeyGuard.IsSafe(p))
@@ -99,7 +126,7 @@ public sealed class BlobContentSource : IContentSource, IContentLister
 
     public async Task<string?> ReadHeadAsync(string key, CancellationToken ct = default)
     {
-        using var activity = Observability.HotPathActivitySource.StartMethodActivity(_logger, () => new { key });
+        using var activity = Observability.ActivitySource.StartMethodActivity(logger, () => new { key });
 
         if (!TryGetBlob(key, out BlobClient? blob))
         {
@@ -139,7 +166,7 @@ public sealed class BlobContentSource : IContentSource, IContentLister
         BlobClient candidate = _container.GetBlobClient(key);
         if (!string.Equals(candidate.BlobContainerName, _container.Name, StringComparison.Ordinal))
         {
-            _logger.LogWarning("Refused content key '{Key}': it resolves outside container '{Container}'.", key, _container.Name);
+            logger.LogWarning("Refused content key '{Key}': it resolves outside container '{Container}'.", key, _container.Name);
             return false;
         }
 

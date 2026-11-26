@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
+using Diginsight.Diagnostics;
 using Diginsight.SmartCache;
 using Diginsight.SmartDocs.Web.Authorization;
 using Diginsight.SmartDocs.Web.Caching;
@@ -51,6 +52,9 @@ public sealed class ContentMetadataProvider(
 
     private async Task<MetadataOutcome> GetAsync(SpaceContentAccess access, string folder, CancellationToken ct)
     {
+        using var activity = Observability.ActivitySource.StartMethodActivity(
+            logger, () => new { spaceId = access.Space.Id, folder });
+
         bool root = folder.Length == 0;
         string innerKey = root ? MetadataParser.FileName : folder + "/" + MetadataParser.FileName;
         string mount = access.Space.NormalizedRouteBase.Trim('/');
@@ -89,6 +93,7 @@ public sealed class ContentMetadataProvider(
 
                 MetadataOutcome result = envelope.ToOutcome();
                 Report(mountedKey, result, null);
+                activity?.SetOutput(new { result.Status });
                 return result;
             }
         }
@@ -100,12 +105,16 @@ public sealed class ContentMetadataProvider(
         {
             MetadataOutcome result = MetadataOutcome.Unreadable($"{ex.GetType().Name}: {ex.Message}");
             Report(mountedKey, result, ex);
+            activity?.SetOutput(new { result.Status });
             return result;
         }
     }
 
     private async Task<MetadataOutcome> ReadAsync(SpaceContentAccess access, string folder, CancellationToken ct)
     {
+        using var activity = Observability.ActivitySource.StartMethodActivity(
+            logger, () => new { spaceId = access.Space.Id, folder });
+
         bool root = folder.Length == 0;
         string canonicalKey = root ? MetadataParser.FileName : folder + "/" + MetadataParser.FileName;
         ContentResult? canonical = await access.Source.GetAsync(canonicalKey, ct);
