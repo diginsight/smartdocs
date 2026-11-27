@@ -82,6 +82,8 @@ The base file declares an **empty array**. Each environment must supply complete
 |---|---|
 | `Id` | Required space identifier ^[configuration-17] |
 | `RouteBase` | Mount used by the registry ^[configuration-08] |
+| `IconPath` | Optional image path inside the space's content, shown instead of the emoji `Icon`; served through `/_content/` |
+| `StylesheetPath` | Optional stylesheet path inside the space's content, linked in the head of that space's pages only and served through `/_content/` with the space's access rules. It lets the documentation repository own its presentation, for example screenshot frames; other spaces and the shell are unaffected, and an empty value links nothing |
 | `Source` and physical-source options | Supplied by the environment ^[configuration-07,configuration-17] |
 | `Access` | Empty by default; only empty or `authenticated`, additive to file requirements ^[configuration-36] |
 | `AccessFileRequired` | `false` by default; when true a missing root file hides the space ^[configuration-37] |

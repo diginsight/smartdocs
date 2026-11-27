@@ -45,6 +45,10 @@ internal static class RoleProviderChecks
         var site = Site();
         assert(!System.Text.Json.JsonSerializer.Serialize(SpaceShellInfo.From(site.Spaces[0])).Contains("RoleScope"),
             "shell projection does not disclose RoleScope");
+        assert(SpaceShellInfo.From(new() { Id = "a", RouteBase = "/docs", StylesheetPath = @" assets\my styles.css " }).StylesheetUrl == "/_content/docs/assets/my%20styles.css" &&
+            SpaceShellInfo.From(new() { Id = "b", StylesheetPath = "site.css" }).StylesheetUrl == "/_content/site.css" &&
+            SpaceShellInfo.From(new() { Id = "c", RouteBase = "/docs", StylesheetPath = " " }).StylesheetUrl.Length == 0,
+            "shell projection maps StylesheetPath to a mounted content URL, empty when unset");
         await LoaderAsync(assert);
         await HookAsync(assert);
     }
