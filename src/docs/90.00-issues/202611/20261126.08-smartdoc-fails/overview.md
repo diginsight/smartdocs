@@ -136,3 +136,52 @@ smartdocs fails with
 can yo help me understand why ? 
 and fix it?
 
+## 🔍 Root cause
+
+This is a .NET 10 Blazor component-state persistence collision, not a SmartCache failure.
+The successful cache lookups precede the failure because navigation loads during prerendering.
+The exception occurs later, when Blazor serializes component properties for the browser.
+Here, "pausing the application" describes that persistence phase; it doesn't mean the host stopped.
+
+[MainLayout.razor](../../../../Diginsight.SmartDocs.Web.Client/Layout/MainLayout.razor)
+renders two instances of
+[TopMenu](../../../../Diginsight.SmartDocs.Web.Client/Layout/TopMenu.razor.cs).
+Both expose `PersistedScope` and `PersistedRoot` with `[PersistentState]`.
+Their different `Placement` parameter values don't provide distinct persistence identities.
+Without explicit component keys, the two instances collide when Blazor persists their properties.
+The opaque key in the exception belongs to Blazor's state store, not the navigation cache.
+
+## ⚙️ Fix (✅ done)
+
+Assign stable keys directly to the two component instances:
+
+```razor
+<TopMenu @key="TopMenu.Group.Left" Placement="TopMenu.Group.Left" />
+<TopMenu @key="TopMenu.Group.Right" Placement="TopMenu.Group.Right" />
+```
+
+This preserves the menu layout, prerendering, and state transfer to WebAssembly.
+It doesn't disable persistence, clear SmartCache, or suppress the exception.
+
+## ✅ Verification (✅ done)
+
+The host and client built with zero warnings and zero errors using isolated build output,
+so the existing running host wasn't overwritten or stopped.
+A separate local host served the rebuilt application in a visible console.
+
+Visible Microsoft Edge validation confirmed two independently persisted menu-root arrays,
+stable persistence keys after a full reload, and an interactive Architecture dropdown.
+See the [validation sequence](./_validation/20261126.01-validation-sequence.md) for exact
+observations and screenshots. The original deployment and its private content weren't retested.
+
+## 💡 Conclusion
+
+Give multiple instances of a component with `[PersistentState]` distinct, stable `@key` values.
+Rebuild and restart the affected deployment to load this fix; an already running process
+continues serving its previously loaded assembly.
+
+## 📚 References
+
+- **[Blazor prerendered state persistence](https://learn.microsoft.com/en-us/aspnet/core/blazor/state-management/prerendered-state-persistence?view=aspnetcore-10.0)** 📘 [Official].
+  Describes declarative persistence and using `@key` to associate state with multiple
+  instances of the same component. Use it when adding repeated stateful components.
